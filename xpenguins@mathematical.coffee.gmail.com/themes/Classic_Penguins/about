@@ -1,0 +1,19 @@
+# This file describes the default "Classic Penguins" theme, which is
+# the same as xpenguins version 1.2. All images were taken from
+# Pingus.
+
+# The artists are:
+# bomber.xpm     Joel Fauche <joel.fauche@wanadoo.fr>
+# climber.xpm    Joel Fauche <joel.fauche@wanadoo.fr>
+# faller.xpm     Joel Fauche <joel.fauche@wanadoo.fr>
+# floater.xpm    Joel Fauche <joel.fauche@wanadoo.fr>
+# tumbler.xpm    Craig Timpany <timpany@es.co.nz>
+# walker.xpm     Joel Fauche <joel.fauche@wanadoo.fr>
+# explosion.xpm  unknown
+
+artist Joel Fauche <joel.fauche@wanadoo.fr>, Craig Timpany
+maintainer Robin Hogan <R.J.Hogan@reading.ac.uk>
+license GPL
+comment Most images are from Pingus (http://pingus.seul.org/)
+icon sitter.png
+date 24 April 2001

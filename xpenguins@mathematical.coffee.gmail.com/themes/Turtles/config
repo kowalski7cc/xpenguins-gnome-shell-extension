@@ -1,0 +1,26 @@
+# This is the config file for the xpenguins theme "Turtles"
+delay 60
+number 8
+define default
+	width 30  # Default width of each frame
+	height 30 # Default height of each frame
+	frames 8  # Default number of frames in each pixmap
+	speed 4   # Default speed
+	directions 1 # default number of directions 
+
+define walker
+	pixmap walker.xpm directions 2
+define faller
+	pixmap faller.xpm speed 3
+define tumbler
+	pixmap tumbler.xpm speed 1 acceleration 1 terminal_velocity 8
+define climber
+	pixmap climber.xpm directions 2
+define floater
+	pixmap floater.xpm
+define exit
+	pixmap bomber.xpm frames 16
+define explosion
+	pixmap explosion.xpm frames 1 width 64 height 64
+
+

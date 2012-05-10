@@ -5,6 +5,12 @@
  * - genus == theme (penguins, simpsons, ...)
  * TODO:
  * - what to do about eror handling? at them oment thorw new Error
+ *
+ * GENUS
+ *
+ * CONFIG FILE:
+ *  toon == walker, skater ('genera'), in which there are types
+ *   (walker, faller, tumbler, floater, ...)
  *********************/
 warn = function(msg) { 
     log(msg);
@@ -14,25 +20,60 @@ warn = function(msg) {
 /***********************
  * ThemeManager object *
  ***********************/
-// TODO: make object not class?
-function ThemeManager() {
-    this._init.apply(this, arguments);
-}
+// TODO: really no need to make this an object/class...
+ThemeManager = {
+    /*
+     * Look for themes in
+     * $HOME/.xpenguins/themes
+     * [xpenguins_directory]/themes
+     */
+    theme_directory: 'themes',
+    system_directory: GET_EXTENSION_PATH, // metadata.path
+    user_directory: '.xpenguins',
+    config_file: 'config',
 
-ThemeManager.prototype = {
-    _init: function() {
-        /*
-         * Look for themes in
-         * $HOME/.xpenguins/themes
-         * [xpenguins_directory]/themes
-         */
-        this.theme_directory = 'themes';
-        this.system_directory = GET_EXTENSION_PATH; // metadata.path
-        this.user_directory = '.xpenguins';
-        this.config_file = 'config';
+    /* xpenguins_list_themes */
+    /* Return a NULL-terminated list of names of apparently valid themes -
+     * basically the directory names from either the user or the system
+     * theme directories that contain a file called "config" are
+     * returned. Underscores in the directory names are converted into
+     * spaces, but directory names that already contain spaces are
+     * rejected. This is because the install program seems to choke on
+     * directory names containing spaces, but theme names containing
+     * underscores are ugly. 
+     */
+    list_themes: function() {
+        let home = GLib.get_home_dir();
+
+        let config_path;
+
+        /* first look in $HOME/.xpenguins/themes for config */
+        config_path = '%s/%s/%s/*%s'.format(
+                home, this.user_directory, this.theme_directory, this.config_file);
+        // glob it.
+
+        /* Theme not found in users theme directory... look in [xpenguins_dir]/themes */
+        config_path = '%s/%s/*%s'.format(
+                this.system_directory, this.theme_directory, this.config_file);
+        // TODO
+        // glob it
+        // err don't seem to be able to list children of a dir?
+
+        let themeList = [];
+      /* We convert all underscores in the directory name 
+       * to spaces, but actual spaces in the directory
+       * name are not allowed. */
+        themeList = themeList.filter( function(x) !x.match(' ') );
+        themeList = themeList.map( function(x) x.replace(/_/g,' ');
+
+        // TODO: remove duplicates
+
+        return themeList;
+        // NOTE: themeList has to be *names* not full paths.
     },
 
-    list_themes: function() {
+    // xpenguins_theme_info(char *name)
+    theme_info: function(iname) {
     },
 
     /* Return the full path of the specified theme.
@@ -45,26 +86,23 @@ ThemeManager.prototype = {
         let name = iname.replace(/ /g,'_');
 
         /* first look in $HOME/.xpenguins/themes for config */
-        config_path = Gio.file_new_for_path('%s/%s/%s/%s/%s'.format(
-                home, this.user_directory, this.theme_directory, name, this.config_file));
-        if ( config_path.query_exists(null) ) {
+        config_path = '%s/%s/%s/%s/%s'.format(
+                home, this.user_directory, this.theme_directory, name, this.config_file);
+        if ( GLib.file_test(config_path, GLib.FileTest.EXISTS) ) {
             return config_path;
         }
 
         /* Theme not found in users theme directory... look in [xpenguins_dir]/themes */
-        config_path = Gio.file_new_for_path('%s/%s/%s/%s'.format(
-                this.system_directory, this.theme_directory, name, this.config_file));
-        if ( config_path.query_exists(null) ) {
+        config_path = '%s/%s/%s/%s'.format(
+                this.system_directory, this.theme_directory, name, this.config_file);
+        if ( GLib.file_test(config_path, GLib.FileTest.EXISTS) ) {
             return config_path;
         }
 
         /* Theme not found */
         return null;
     } // theme_path
-
-    }
-
-};
+}; // ThemeManager
 
 
 /***********************
@@ -80,16 +118,19 @@ function Theme() {
 Theme.prototype = {
     _init: function( themeList ) {
         /* members */
-        this.ToonData = []; // data, one per genera
-        this.names = [];    // theme names
+        /* Theme: can have one or more genera
+         * Genus: class of toons (Penguins has 2: walker & skateboarder).
+         * Each genus has toon types: walker, floater, tumbler, faller, ...
+         */
+        this.ToonData = []; // data, one per genus
+        this.name = [];    // names of genus
         this.number = [];   // theme penguin numbers
         this.total = 0;     // MIN( sum(numbers), PENGUIN_MAX )
-        this.ngenera = 0; // number of different themes (penguins, simpsons, ...)
-        this.delay = 0;
-        this._nallocated = 0;
+        this.ngenera = 0; // number of different genera
+        this.delay = 60;
 
         /* Initialise */
-        for ( let i=0; i<themeList.length; i++ ) {
+        for ( let i=0; i<themeList.length; ++i ) {
             this.append_theme( themeList[i] );
         }
     }, // _init
@@ -106,173 +147,204 @@ Theme.prototype = {
             return null;
         }
 
-        /* Alloc some memory __xpenguins_theme_{init,grow}:
-         * not necessary for me.
-         *
-         * add into names, ToonData, number,
-         */
+        /* Read config file, ignoring comments ('#') and whitespace */
+        let words = Shell.get_file_contents_utf8_sync(file_name);
+        words = words.replace(/#.+/g,'');
+        words = words.replace(/\s+/g,' ');
+        words = words.trim().split(' ');
 
-        /* Read config file */
-        // NOTE: read_next_word is in xpenguins_config.c
-        // Skip white space and comments
-        while (let word = read_next_word(file_name)) {
-            /* define a new genus of toon */
+        /* iterate through the words to parse the config file. */
+        let started=false; // whether we've started parsing a toon
+
+        let first_genera = this.ngenera; // original number of genera
+        let genus = this.ngenera; // current index into ToonData etc.
+
+        let current;   // the current toon
+        let def = {};  // holds the default toon's properties
+        let dummy = {};// any unknown toon's properties.
+        // TODO: encase in a tryCatch: config file ended unexpectedly.
+        for ( let i=0; i<words.length; ++i ) {
+            let word=words[i];
+            /* define a new genus of toon (walker, skateboarder, ...) */
             if ( word == 'toon' ) {
-                // stuff
-
+                let toonName = words[++i];
+                if ( started ) {
+                    /* initialise new genus */
+                    this.grow();
+                    ++genus;
+                } else {
+                    started=true;
+                }
+                // TODO: if started, ++genus is out of bounds?
+                this.name[genus] = toonName;
+            }
             /* preferred frame delay in milliseconds */
-            } else if (word == 'delay') {
-                this.delay = parseInt(read_next_word(file_name));
-
-            /* Define default properties of current genus */
-            } else if ( word == 'define' ) {
-                let type = read_next_word(filename);
+            else if (word == 'delay') {
+                this.delay = parseInt(words[++i]);
+            }
+            /* Various types of toon */
+            else if ( word == 'define' ) {
+                let type = words[++i];
+                /* Define default properties of current genus */
                 if ( type == 'default' ) {
-                    current = &def;
-                } else if ( type.match(/^(walker|faller|tumbler|floater|climber|runner|action[0-5]|exit|explosion|splatted|squashed|zapped|angel)$/) ) {
-                    __xpenguins_copy_properties(&def, current=theme->data[genus]+type)
+                    current = def;
+                } 
+                /* other types of toon */
+                else if ( type.match(/^(walker|faller|tumbler|floater|climber|runner|action[0-5]|exit|explosion|splatted|squashed|zapped|angel)$/) ) {
+                    started = 1;
+                    current = this.ToonData[genus][type] = new ToonData(def);
                 } else {
                     warn(_('Warning: unknown type "%s": ignoring'.format(type)));
-                    current = &dummy;
+                    current = dummy;
                 }
                 /* extra configuration */
                 if ( type == 'exit' ) {
-                    current->conf |= (TOON_NOCYCLE | TOON_INVULNERABLE);
+                    current.conf |= (TOON.NOCYCLE | TOON.INVULNERABLE);
                 } else if ( type == 'explosion' ) {
-                    current->conf |= (TOON_NOCYCLE | TOON_INVULNERABLE | TOON_NOBLOCK);
+                    current.conf |= (TOON.NOCYCLE | TOON.INVULNERABLE | TOON.NOBLOCK);
                 } else if ( type == 'splatted' ) {
-                    current->conf |= (TOON_NOCYCLE | TOON_INVULNERABLE);
+                    current.conf |= (TOON.NOCYCLE | TOON.INVULNERABLE);
                 } else if ( type == 'squashed' ) {
-                    current->conf |= (TOON_NOCYCLE | TOON_INVULNERABLE | TOON_NOBLOCK);
+                    current.conf |= (TOON.NOCYCLE | TOON.INVULNERABLE | TOON.NOBLOCK);
                 } else if ( type == 'zapped' ) {
-                    current->conf |= (TOON_NOCYCLE | TOON_INVULNERABLE | TOON_NOBLOCK);
+                    current.conf |= (TOON.NOCYCLE | TOON.INVULNERABLE | TOON.NOBLOCK);
                 } else if ( type == 'angel' ) {
-                    current->conf |= (TOON_INVULNERABLE | TOON_NOBLOCK);
+                    current.conf |= (TOON.INVULNERABLE | TOON.NOBLOCK);
                 }
-
+            } 
             /* Toon Properties */
-            } else if ( word.match(/^(width|height|frames|directions|speed|acceleration|terminal_velocity|loop)$/) ) {
-                current[word] = parseInt(read_next_word(file_name));
-            } else if ( word == 'pixmap' ) {
-                let pixmap = read_next_word(file_name);
-                if ( current == &def ) {
+            else if ( word.match(/^(width|height|speed|acceleration|terminal_velocity|loop)$/) ) {
+                current[word] = parseInt(words[++i]);
+            } 
+            else if ( word.match(/^(frames|directions)/) { 
+                current['n' + word] = parseInt(words[++i]);
+            }
+            /* Pixmap */
+            else if ( word == 'pixmap' ) {
+                let pixmap = words[++i];
+                if ( current == def ) {
                     warn(_('Warning: theme config file may not specify a default pixmap, ignoring'));
-                } else if ( current == &dummy ) {
+                } else if ( current = dummy ) { // don't bother.
                     continue;
                 } else {
                     /* read in pixmap */
-	  int status;
-	  int igenus, itype; /* For scanning for duplicated pixmaps */
-	  char new_pixmap = 1;
-	  if (word[0] == '/') {
-	    xpm_file_name = word;
-	  }
-	  else {
-	    snprintf(file_base, MAX_STRING_LENGTH, word);
-	    xpm_file_name = file_name;
-	  }
-	  if (current->image) {
-	    /* Pixmap is already defined! */
-	    WARNING(stderr, _("Warning: resetting pixmap to %s\n"), word);
-	    if (!current->master) {
-	      /* Free old pixmap if it is not a copy */
-	      XpmFree(current->image);
-	      current->image = NULL;
-	      if (current->filename) {
-		free(current->filename);
-	      }
-	      current->exists = 0;
-	    }
-	  }
+                    if ( pixmap[0] ) != '/' ) {
+                        // convert to absolute path
+                        let tmp = file_name.split('/');
+                        tmp[tmp.length-1] = pixmap;
+                        pixmap = tmp.join('/'); 
+                    }
 
-	  /* Check if the file has been used before, but only look in
-             the pixmaps for the current theme... */
-	  for (igenus = first_genus; igenus <= genus && new_pixmap; ++igenus) {
-	    ToonData *data = theme->data[igenus];
-	    for (itype = 0; itype < PENGUIN_NTYPES && new_pixmap; ++itype) {
-	      if (data[itype].filename && !data[itype].master
-		  && data[itype].exists
-		  && strcmp(xpm_file_name, data[itype].filename) == 0) {
-		current->master = data + itype;
-		current->exists = 1;
-		current->filename = data[itype].filename;
-		current->image = data[itype].image;
-		new_pixmap = 0;
-	      }
-	    }
-	  }
+                    /* Pixmap is already defined! */
+                    if ( current.image ) {
+                        warn(_('Warning: resetting pixmap to %s'.format(pixmap)));
+                        /* Free old pixmap if it is not a copy */
+                        if ( !current.master ) {
+                            // TODO: XpmFree(current.image) (release memory!)
+                            // How to release memory in Javascript?
+                            current.image = null;
+                            current.filename = null;
+                            current.exists = false;
+                        }
+                    }
 
-	  if (new_pixmap) {
-	    status = XpmReadFileToData(xpm_file_name, &(current->image));
-	    switch (status) {
-	    case XpmSuccess:
-	      current->exists = 1;
-	      current->filename = strdup(xpm_file_name);
-	      current->master = NULL;
-	      break;
-	    case XpmNoMemory:
-	      fclose(config);
-	      free(file_name);
-	      xpenguins_free_theme(theme);
-	      return out_of_memory;
-	      break;
-	    case XpmOpenFailed:
-	      WARNING(stderr, _("Warning: could not read %s\n"), xpm_file_name);
-	      break;
-	    case XpmFileInvalid:
-	      WARNING(stderr, _("Warning: %s is not a valid xpm file\n"), xpm_file_name);
-	      break;
-	    }
-	  }
-                } // end pixmap
-                else if ( word == 'number' ) {
-                    theme.number[genus] = parseInt(read_next_word(file_name));
-                } else {
-                    warn(_('Warning: Unrecognised word %s, ignoring'.format(word)));
+                    /* Check if the file has been used before, but only look in
+                       the pixmaps for the current theme... */
+                    let new_pixmap = 1;
+                    for ( let igenus=first_genus; igenus <= genus && new_pixmap; ++igenus ) {
+                        let data = this.ToonData[igenus];
+                        // note: ToonData[igenus] is an *object* type: ToonData
+                        for ( let itype in data ) { 
+                            /* data already exists in theme, set master */
+                            if ( data[itype].filename && !data[itype].master
+                                 && data[itype].exists
+                                 && data[itype].filename == pixmap ) {
+                                     current.master = data[itype];
+                                     current.exists = 1;
+                                     current.filename = data[itype].filename;
+                                     current.image = data[itype].image;
+                                     new_pixmap = 0;
+                                     break;
+                            }
+                        }
+                    }
+
+                    /* If we didn't find the pixmap before, it's new */
+                    if ( new_pixmap ) {
+                        // TODO:
+                        current.image = XpmReadFileToData(pixmap);
+                        // various error messages: no memory, open failed, invalid xpm
+                        // But if it all worked:
+                        current.exists = 1;
+                        current.filename = pixmap;
+                        current.master = null;
+                    }
                 }
+            } // end pixmap
+            /* Number of toons */
+            else if ( word == 'number' ) {
+                theme.number[genus] = parseInt(words[++i]);
+            } 
+            /* unknown word */
+            else {
+                warn(_('Warning: Unrecognised word %s, ignoring'.format(word)));
+            }
         } // while read word
 
-        // close file
-        let themeI = this.ngenera;
-        //update theme.ngenera
-        this.ngenera++;
-        // append to this.data
+        this.ngenera = genus+1;
 
-        /* Now valid our widths, heights etc with the size of the image */
-        // loop through the genera we just added (just one)
-        let data = this.data[themeI];
-        for ( let j=0; j < PENGUINS_NTYPES; j++ ) {
-            let current = data[j];
-            // sscanf first two %d from current->image[0] to width and height
-            let imwidth, imheight;
-            if ( (current.nframes = imwidth/current.width) < 1 ) {
-                if ( imwidth < current.width ) {
-                    throw new Error(_('Width of xpm image too small for even a single frame'));
-                    // free data, remove this theme
-                } else {
-                    warn(_('Warning: width of %s is too small to display all frames'.format(
-                                    current.filename));
+        /* Now valid our widths, heights etc with the size of the image
+         * for all the types of the genera we just added
+         */
+        for ( let i=first_genus; i < theme.ngenera; ++i ) {
+            for ( let j in this.ToonData[i] ) {
+                let current = this.ToonData[i][j];
+                if ( !current.exists ) {
+                    continue;
                 }
-            }
-            if ( imheight < current.height*current.ndirections ) {
-                if ( (current.ndirections = imheight/current.height) < 1 ) {
-                    throw new Error(_('Height of xpm image too small for even a single frame'));
-                    // free data, remove this theme
-                } else {
-                    warn(_('Warning: height of %s is too small to display all frames'.format(
-                                    current.filename));
+                // sscanf first two %d from current->image[0] to width and height
+                let imwidth, imheight;
+                if ( (current.nframes = imwidth/current.width) < 1 ) {
+                    if ( imwidth < current.width ) {
+                        throw new Error(_('Width of xpm image too small for even a single frame'));
+                    } else {
+                        warn(_('Warning: width of %s is too small to display all frames'.format(
+                                        current.filename));
+                    }
                 }
+                if ( imheight < current.height*current.ndirections ) {
+                    if ( (current.ndirections = imheight/current.height) < 1 ) {
+                        throw new Error(_('Height of xpm image too small for even a single frame'));
+                    } else {
+                        warn(_('Warning: height of %s is too small to display all frames'.format(
+                                        current.filename));
+                    }
+                }
+            } // loop through Toon type
+            if ( !this.ToonData[i]['walker'].exists || !this.ToonData[i]['faller'].exists ) {
+                throw new Error(_('Theme must contain at least walkers and fallers'));
             }
-        }
-        if ( !data[PENGIN_WALKER] || !data[PENGUIN_FALLER] ) {
-            // free data, remove theme
-            throw new Error(_('Theme must contain at least walkers and fallers'));
         }
 
         /* Update total number */
-        this.total += this.number[themeI];
-        this.total = Math.max( PENGUIN_MAX, this.total );
+        // NOTE: original code sets theme.total = 0
+        // and only adds the numbers of the genera we *just* added?
+        // i.e. theme.total = sum( theme.number[first_genus:theme.ngenera] )
+        this.total = Math.max( PENGUIN_MAX,
+            this.number.reduce( function(x,y) x+y ) );
+    },  // append_theme
+    /* BIG TODO: grow() already does ++this.ngenera: does this screw things up? */
 
-    }  // append_theme
+    grow = function() {
+        this.name.push('');
+        this.number.push(1);
+        this.ToonData.push({}); // object 'toonType': ToonData
+        ++this.ngenera;
+    },
+
+    _onDestroy: function() {
+        // xpenguins_free_theme
+        // go through everything & deallocate, particularly images
+    }
 }
 

@@ -1,0 +1,82 @@
+# This is the xpenguins config file that defines the theme "Big Penguins".
+# It is the same as "Penguins" but scaled up by a factor of 1.5 using 
+# the gimp script "resize-frames.scm".
+
+# 23 September 2001 Robin Hogan <R.J.Hogan@reading.ac.uk>
+
+delay 60 # Recommended delay between frames, in milliseconds
+
+# First we set some default values. Note that we cannot set a default
+# pixmap. Values not set will take on the system defaults, which are
+# usually quite sensible except for width and height, which cannot
+# really be guessed.
+define default
+	width 45  # Default width of each frame
+	height 45 # Default height of each frame
+	frames 8  # Default number of frames in each pixmap
+	speed 6   # Default speed
+	directions 1 # Default number of directions 
+
+# We have two types of penguin, "normal" and "skateboarder".  The
+# "number" property gives the recommended number of each type to
+# start. If any more are initialised then they will be in roughly the
+# same proportions. If a pixmap filename starts with "/" then it is
+# taken to be an absolute path, otherwise it is taken to be a file in
+# the same directory as the config file.
+
+# First define the "normal" penguin:
+toon normal
+	number 5
+	# Walkers and fallers are required by all toons. Fallers drop
+	# in from the top of the screen at the start. Floaters also
+	# turn into fallers when they hit their head on something.
+	define faller	pixmap faller.xpm speed 5
+	# Walkers trot along the tops of your windows and along the
+	# bottom of your screen. Also possible is a "runner".
+	define walker	pixmap walker.xpm directions 2
+	# When a toon falls off the end of a window, it turns into a tumbler.
+	define tumbler	pixmap tumbler.xpm speed 1 acceleration 1 terminal_velocity 12
+	# When a walker walks into something it can turn round, float off, or climb
+	define climber	pixmap climber.xpm directions 2
+	define floater	pixmap floater.xpm speed 5
+	# A toon can die by being "squashed" (getting caught under a window) "splatted"
+	# (sometimes a tumbler will land with a bang), "zapped" (at some time in the
+	# future I plan to add an option for zapping toons with the mouse) or the
+	# "exit" sequence being called by hitting Ctrl-C. If any of these activities
+	# not defined by a theme, then the generic "explosion" will be called instead
+	# (for example, there is no "squashed" in this theme). Preferably the 
+	# explosion should not be too gory - when the "--no-blood" option is used 
+	# then "explosion" is used for all death sequences.  
+	define explosion	pixmap explosion.xpm width 96 height 96 frames 1
+	define exit	pixmap bomber.xpm width 48 height 48 frames 16 directions 1
+	define zapped	pixmap zapped.xpm frames 10 directions 2 height 48 width 49
+	define splatted	pixmap splat.xpm frames 12 width 48 height 48
+	# Dead toons ascend to heaven before being reborn as fallers...
+	define angel	pixmap angel.xpm frames 4 width 69 speed 5
+
+	# Up to 6 "actions" may be defined (action0 to action5). However, an action
+	# will only be used if all the actions with a lower numerical value also
+	# exist. The "loop" property specifies how many times the action should
+	# be performed. A negative value (-x) means that the probability of
+	# stopping the action every time the loop is performed is 1/x.
+	define action0	pixmap reader.xpm frames 12 speed 0 loop -4
+
+# Now define the skateboarder penguin. Note that the program is smart
+# enough not to load the same pixmap file twice, so it is perfectly
+# efficient to have many toons use the same pixmap in different ways.
+toon skateboarder
+	number 3
+	define walker	pixmap skateboarder.xpm directions 2 frames 1
+			acceleration 1 terminal_velocity 12
+	define faller	pixmap ballooner.xpm speed 3 height 93 width 45
+	define tumbler	pixmap tumbler.xpm speed 1 acceleration 1 terminal_velocity 12
+	define climber	pixmap climber_skateboarder.xpm directions 2 frames 1
+			acceleration 1 terminal_velocity 12
+	define floater	pixmap superpenguin.xpm speed 12 directions 2
+	define exit	pixmap exit.xpm width 48 height 48 frames 9 directions 2
+	define explosion	pixmap explosion.xpm width 96 height 96 frames 1
+	define zapped	pixmap zapped.xpm frames 10 directions 2 height 48 width 49
+	define angel	pixmap angel.xpm frames 4 width 69 speed 5
+	define splatted pixmap splat.xpm frames 12 width 48 height 48
+	define action0	pixmap digger.xpm frames 14 speed 0 loop -6
+			width 48 height 48

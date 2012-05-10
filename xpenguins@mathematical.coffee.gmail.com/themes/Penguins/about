@@ -1,0 +1,30 @@
+# This file describes the default "Penguins" theme.
+
+# The following images were taken from Pingus; the artists are:
+# bomber.xpm     Joel Fauche <joel.fauche@wanadoo.fr>
+# climber.xpm    Joel Fauche <joel.fauche@wanadoo.fr>
+# digger.xpm     Craig Timpany <timpany@es.co.nz>
+# faller.xpm     Joel Fauche <joel.fauche@wanadoo.fr>
+# floater.xpm    Joel Fauche <joel.fauche@wanadoo.fr>
+# tumbler.xpm    Craig Timpany <timpany@es.co.nz>
+# walker.xpm     Joel Fauche <joel.fauche@wanadoo.fr>
+# explosion.xpm  unknown
+# zapped.xpm     unknown
+# exit.xpm       unknown
+# splat.xpm      unknown
+
+# Other images are:
+# angel.xpm        Rob Gietema <tycoon@planetdescent.com> and Robin Hogan <R.J.Hogan@reading.ac.uk>
+# ballooner.xpm    Rob Gietema <tycoon@planetdescent.com> 
+# climber_skateboarder.xpm Rob Gietema <tycoon@planetdescent.com> 
+# reader.xpm       Rob Gietema <tycoon@planetdescent.com> and Robin Hogan <R.J.Hogan@reading.ac.uk>
+# skateboarder.xpm Rob Gietema <tycoon@planetdescent.com> 
+# superpenguin.xpm Rob Gietema <tycoon@planetdescent.com>, Robin Hogan <R.J.Hogan@reading.ac.uk>, Brian Chu <chub@stuy.yi.org>
+
+# Valid fields are "artists", "maintainer", "license", "copyright", "icon", "comment" and "date".
+artist Joel Fauche, Rob Gietema, Craig Timpany, Robin Hogan
+maintainer Robin Hogan <R.J.Hogan@reading.ac.uk>
+license GPL
+comment Many images are from Pingus (http://pingus.seul.org/)
+icon penguin.png
+date 1 October 2001 

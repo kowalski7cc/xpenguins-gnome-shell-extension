@@ -1,0 +1,19 @@
+
+delay 150
+define default
+	width 24  # Default width of each frame
+	height 38 # Default height of each frame
+	frames 4  # Default number of frames in each pixmap
+	speed 4   # Default speed
+	directions 2 # Default number of directions 
+toon Bill
+	number 1
+	define walker pixmap walker.xpm
+	define zapped pixmap splat.xpm frames 5
+	define explosion pixmap explosion.xpm width 64 height 64 frames 1 directions 1
+	define runner pixmap carrier.xpm width 28 height 48
+	define faller pixmap faller.xpm frames 2 terminal_velocity 8 acceleration 1
+	define climber pixmap climber.xpm width 38 height 24
+	define squashed pixmap splat.xpm frames 5 
+	define action0 pixmap hacker.xpm frames 23 width 53 height 45
+		directions 1 speed 0 loop 1
