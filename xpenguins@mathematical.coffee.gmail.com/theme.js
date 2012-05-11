@@ -12,98 +12,9 @@
  *  toon == walker, skater ('genera'), in which there are types
  *   (walker, faller, tumbler, floater, ...)
  *********************/
-warn = function(msg) { 
-    log(msg);
-    global.log(msg);
-};
 
-/***********************
- * ThemeManager object *
- ***********************/
-// TODO: really no need to make this an object/class...
-ThemeManager = {
-    /*
-     * Look for themes in
-     * $HOME/.xpenguins/themes
-     * [xpenguins_directory]/themes
-     */
-    theme_directory: 'themes',
-    system_directory: GET_EXTENSION_PATH, // metadata.path
-    user_directory: '.xpenguins',
-    config_file: 'config',
-
-    /* xpenguins_list_themes */
-    /* Return a NULL-terminated list of names of apparently valid themes -
-     * basically the directory names from either the user or the system
-     * theme directories that contain a file called "config" are
-     * returned. Underscores in the directory names are converted into
-     * spaces, but directory names that already contain spaces are
-     * rejected. This is because the install program seems to choke on
-     * directory names containing spaces, but theme names containing
-     * underscores are ugly. 
-     */
-    list_themes: function() {
-        let home = GLib.get_home_dir();
-
-        let config_path;
-
-        /* first look in $HOME/.xpenguins/themes for config */
-        config_path = '%s/%s/%s/*%s'.format(
-                home, this.user_directory, this.theme_directory, this.config_file);
-        // glob it.
-
-        /* Theme not found in users theme directory... look in [xpenguins_dir]/themes */
-        config_path = '%s/%s/*%s'.format(
-                this.system_directory, this.theme_directory, this.config_file);
-        // TODO
-        // glob it
-        // err don't seem to be able to list children of a dir?
-
-        let themeList = [];
-      /* We convert all underscores in the directory name 
-       * to spaces, but actual spaces in the directory
-       * name are not allowed. */
-        themeList = themeList.filter( function(x) !x.match(' ') );
-        themeList = themeList.map( function(x) x.replace(/_/g,' ');
-
-        // TODO: remove duplicates
-
-        return themeList;
-        // NOTE: themeList has to be *names* not full paths.
-    },
-
-    // xpenguins_theme_info(char *name)
-    theme_info: function(iname) {
-    },
-
-    /* Return the full path of the specified theme.
-     * Spaces in theme name are converted to underscores
-     */
-    get_theme_path: function(iname) {
-        let home = GLib.get_home_dir();
-        let config_path;
-        /* Convert spaces to underscores */
-        let name = iname.replace(/ /g,'_');
-
-        /* first look in $HOME/.xpenguins/themes for config */
-        config_path = '%s/%s/%s/%s/%s'.format(
-                home, this.user_directory, this.theme_directory, name, this.config_file);
-        if ( GLib.file_test(config_path, GLib.FileTest.EXISTS) ) {
-            return config_path;
-        }
-
-        /* Theme not found in users theme directory... look in [xpenguins_dir]/themes */
-        config_path = '%s/%s/%s/%s'.format(
-                this.system_directory, this.theme_directory, name, this.config_file);
-        if ( GLib.file_test(config_path, GLib.FileTest.EXISTS) ) {
-            return config_path;
-        }
-
-        /* Theme not found */
-        return null;
-    } // theme_path
-}; // ThemeManager
-
+/* Namespace */
+const Theme = Theme || {};
 
 /***********************
  *    Theme Object     *
@@ -111,12 +22,12 @@ ThemeManager = {
 /* Contains all the information about the toon,
  * basically an array of ToonData structures.
  */
-function Theme() {
+Theme.Theme = function() {
     this._init.apply(this, arguments);
-}
+};
 
-Theme.prototype = {
-    _init: function( themeList ) {
+Theme.Theme.prototype = {
+    _init: function(themeList) {
         /* members */
         /* Theme: can have one or more genera
          * Genus: class of toons (Penguins has 2: walker & skateboarder).
@@ -131,7 +42,7 @@ Theme.prototype = {
 
         /* Initialise */
         for ( let i=0; i<themeList.length; ++i ) {
-            this.append_theme( themeList[i] );
+            this.append_theme(themeList[i]);
         }
     }, // _init
 
@@ -144,7 +55,7 @@ Theme.prototype = {
         let file_name = ThemeManager.get_theme_path(name);
         if ( !file_name ) {
             throw new Error('Theme ' + name + ' not found or config file not present');
-            return null;
+            return;
         }
 
         /* Read config file, ignoring comments ('#') and whitespace */
@@ -192,6 +103,7 @@ Theme.prototype = {
                 /* other types of toon */
                 else if ( type.match(/^(walker|faller|tumbler|floater|climber|runner|action[0-5]|exit|explosion|splatted|squashed|zapped|angel)$/) ) {
                     started = 1;
+                    /* note: passed by reference. */
                     current = this.ToonData[genus][type] = new ToonData(def);
                 } else {
                     warn(_('Warning: unknown type "%s": ignoring'.format(type)));
@@ -216,7 +128,7 @@ Theme.prototype = {
             else if ( word.match(/^(width|height|speed|acceleration|terminal_velocity|loop)$/) ) {
                 current[word] = parseInt(words[++i]);
             } 
-            else if ( word.match(/^(frames|directions)/) { 
+            else if ( word.match(/^(frames|directions)/) ) { 
                 current['n' + word] = parseInt(words[++i]);
             }
             /* Pixmap */
@@ -224,11 +136,11 @@ Theme.prototype = {
                 let pixmap = words[++i];
                 if ( current == def ) {
                     warn(_('Warning: theme config file may not specify a default pixmap, ignoring'));
-                } else if ( current = dummy ) { // don't bother.
+                } else if ( current == dummy ) { // don't bother.
                     continue;
                 } else {
                     /* read in pixmap */
-                    if ( pixmap[0] ) != '/' ) {
+                    if ( pixmap[0] != '/' ) {
                         // convert to absolute path
                         let tmp = file_name.split('/');
                         tmp[tmp.length-1] = pixmap;
@@ -244,7 +156,7 @@ Theme.prototype = {
                             // How to release memory in Javascript?
                             current.image = null;
                             current.filename = null;
-                            current.exists = false;
+                            //current.exists = false;
                         }
                     }
 
@@ -257,10 +169,10 @@ Theme.prototype = {
                         for ( let itype in data ) { 
                             /* data already exists in theme, set master */
                             if ( data[itype].filename && !data[itype].master
-                                 && data[itype].exists
+                                 //&& data[itype].exists
                                  && data[itype].filename == pixmap ) {
                                      current.master = data[itype];
-                                     current.exists = 1;
+                                     //current.exists = 1;
                                      current.filename = data[itype].filename;
                                      current.image = data[itype].image;
                                      new_pixmap = 0;
@@ -275,7 +187,7 @@ Theme.prototype = {
                         current.image = XpmReadFileToData(pixmap);
                         // various error messages: no memory, open failed, invalid xpm
                         // But if it all worked:
-                        current.exists = 1;
+                        //current.exists = 1;
                         current.filename = pixmap;
                         current.master = null;
                     }
@@ -299,9 +211,8 @@ Theme.prototype = {
         for ( let i=first_genus; i < theme.ngenera; ++i ) {
             for ( let j in this.ToonData[i] ) {
                 let current = this.ToonData[i][j];
-                if ( !current.exists ) {
-                    continue;
-                }
+                //if ( !current.exists ) 
+                //    continue;
                 // sscanf first two %d from current->image[0] to width and height
                 let imwidth, imheight;
                 if ( (current.nframes = imwidth/current.width) < 1 ) {
@@ -309,7 +220,7 @@ Theme.prototype = {
                         throw new Error(_('Width of xpm image too small for even a single frame'));
                     } else {
                         warn(_('Warning: width of %s is too small to display all frames'.format(
-                                        current.filename));
+                                        current.filename)));
                     }
                 }
                 if ( imheight < current.height*current.ndirections ) {
@@ -317,11 +228,11 @@ Theme.prototype = {
                         throw new Error(_('Height of xpm image too small for even a single frame'));
                     } else {
                         warn(_('Warning: height of %s is too small to display all frames'.format(
-                                        current.filename));
+                                        current.filename)));
                     }
                 }
             } // loop through Toon type
-            if ( !this.ToonData[i]['walker'].exists || !this.ToonData[i]['faller'].exists ) {
+            if ( !this.ToonData[i]['walker'] || !this.ToonData[i]['faller'] ) {
                 throw new Error(_('Theme must contain at least walkers and fallers'));
             }
         }
@@ -329,13 +240,13 @@ Theme.prototype = {
         /* Update total number */
         // NOTE: original code sets theme.total = 0
         // and only adds the numbers of the genera we *just* added?
-        // i.e. theme.total = sum( theme.number[first_genus:theme.ngenera] )
-        this.total = Math.max( PENGUIN_MAX,
-            this.number.reduce( function(x,y) x+y ) );
+        // i.e. theme.total = sum(theme.number[first_genus:theme.ngenera] )
+        this.total = Math.max(PENGUIN_MAX,
+            this.number.reduce(function(x,y) x+y));
     },  // append_theme
     /* BIG TODO: grow() already does ++this.ngenera: does this screw things up? */
 
-    grow = function() {
+    grow: function() {
         this.name.push('');
         this.number.push(1);
         this.ToonData.push({}); // object 'toonType': ToonData
@@ -346,5 +257,5 @@ Theme.prototype = {
         // xpenguins_free_theme
         // go through everything & deallocate, particularly images
     }
-}
+};
 
