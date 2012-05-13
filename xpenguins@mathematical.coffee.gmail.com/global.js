@@ -1,5 +1,7 @@
 const Clutter = imports.gi.Clutter;
 
+const PENGUIN_MAX = 256;
+
 /* TODO: namespace? */
 /* The window on which we draw the toons */
 var XPenguinsWindow = {

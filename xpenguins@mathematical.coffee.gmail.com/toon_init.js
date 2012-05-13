@@ -31,7 +31,7 @@ Toon.Init = function( xpenguins_window ) {
      * and the width/height of the window.
      */
     // TODO: listen to resizes
-    GLOBAL.XPenguinsWindow = xpenguins_window.get_input_rect();
+    // GLOBAL.XPenguinsWindow = xpenguins_window.get_input_rect();
 
     /* If we want to squish the toons with the mouse then we must create
      * a window over the root window that has the same properties. */
@@ -49,9 +49,9 @@ Toon.Init = function( xpenguins_window ) {
     /* Notify if the location of XPenguinsWindow changes
      * or if the window we are drawing to changes size
      */
-    XPenguinsWindow.get_compositor_private().connect('position-changed', stub);
-    XPenguinsWindow.get_compositor_private().connect('size-changed', stub);
-    XPenguinsWindow.get_compositor_private().connect('destroy', stub); // terminate XPenguins
+    XPenguinsWindow.connect('position-changed', stub);
+    XPenguinsWindow.connect('size-changed', stub);
+    XPenguinsWindow.connect('destroy', stub); // terminate XPenguins
 }
 
 stub = function() {

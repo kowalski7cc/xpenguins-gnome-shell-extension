@@ -87,46 +87,57 @@ Toon.Toon = function() {
     this._init.apply(this, arguments);
 }
 Toon.Toon.prototype = {
+    __proto__: Clutter.Texture.prototype,
+
     /* __xpenguins_init_penguin( Toon *p ) */
     _init: function() {
-
-        /* new position and velocity */
-        this.x = this.y = this.u = this.v = 0;
-        this.genus = this.type = this.frame = null;
+        // TODO: this.frame
+        // position: in parent. this.x/this.y
+        this.u = this.v = 0; /* velocity */
+        this.genus = this.type = null;
         this.direction = RandInt(2);
+
+        /* properties of the image mapped on the screen */
         this.x_map = this.y_map = null;
         this.width_map = this.height_map = null;
-        /* properties of the image mapped on the screen */
+
+        
         this.associate = false; /* toon is associated with a window */
-        this.xoffset = this.yoffset = 0; /* location relative to window origin */
         this.wid = null; /* window associated with */
+
+        //this.xoffset = this.yoffset = 0; /* location relative to window origin */
+       
+        this.frame = 0; /* Frame we're up to in the animation */
         this.cycle = 0; /* Number of times frame cycle has repeated */
+
         this.pref_direction = null;
         this.pref_climb = null;
-        this.hold = null;
+        this.hold = null;          // <-- TODO
         this.active = false;
         this.terminating = false;
-        this.mapped = false;
+        this.mapped = false;       // <-- TODO (in parent?) (yep)
         this.squished = false;
         //Pixmap background;   /* @@ storing the background so we can repaint where we've been */
 
         this.data = GLOBAL.ToonData[this.genus][this.type];
-        this.SetType('faller',this.direction,Toon.UNASSOCIATED);
-        this.SetPosition( [RandInt(GLOBAL.XPenguinsWindow.width - this.data.width), 1 - data.height] );
-        this.SetAssociation( Toon.UNASSOCIATED );
-        this.SetVelocity( [this.direction*2-1, this.data.speed] );
+        this.set_type('faller',this.direction,Toon.UNASSOCIATED);
+        this.set_position( RandInt(GLOBAL.XPenguinsWindow.width - this.data.width), 1 - data.height );
+        this.set_association( Toon.UNASSOCIATED );
+        this.set_velocity( this.direction*2-1, this.data.speed );
     },
 
-    SetType: function( type, direction, gravity ) {
-        this.SetGenusAndType( this.genus, type, direction, gravity );
+    /* ToonSetType */
+    set_type: function( type, direction, gravity ) {
+        this.set_genus_and_type( this.genus, type, direction, gravity );
     },
 
     /* Change a toons genus and type and activate it. */
     /* Gravity determines position offset of toon if size different from
      * previous type.
-     * Note that there is a ToonSetType macro which doesn't change the genus. */
-    SetGenusAndType: function( genus, type, direction, gravity ) {
-        this.SetPosition(this.CalculateNewPosition(genus, type, gravity));
+     * ToonSetGenusAndType */
+    set_genus_and_type: function( genus, type, direction, gravity ) {
+        let new_position = this.calculate_new_position(genus, type, gravity);
+        this.set_position(new_position[0], new_position[1]);
         this.type = type;
         this.genus = genus;
         this.data = newdata;
@@ -136,28 +147,25 @@ Toon.Toon.prototype = {
         this.active = true;
     },
 
-    SetPosition: function( xy ) {
-        this.x = xy[0];
-        this.y = xy[1];
-    },
-
     /* Set a toons association direction - e.g. Toon_DOWN if the toon
        is walking along the tops the window, Toon_UNASSOCIATED if
        the toon is in free space */
-    SetAssociation: function( assoc ) {
+    // ToonSetAssocation
+    set_association: function( assoc ) {
         toon.associate = direction;
     },
 
-    SetVelocity: function( uv ) { 
-        this.u = uv[0];
-        this.v = uv[1];
+    // ToonSetVelocity
+    set_velocity: function( u, v ) { 
+        this.u = u;
+        this.v = v;
     },
 
     /* Calculates the new x and y when a toon changes type/genus
      * Used in both SetGenusAndType and CheckBlocked.
      * Returns array [newx,newy].
      */
-    CalculateNewPosition: function( genus, type, gravity ) {
+    calculate_new_position: function( genus, type, gravity ) {
         let newdata = GLOBAL.ToonData[genus][type];
         let x=toon.x, y=toon.y;
         if ( this.gravity == Toon.HERE ) {
@@ -189,8 +197,8 @@ Toon.Toon.prototype = {
      *  before ToonSetType(). 
      * ToonCheckBlocked
      */
-    CheckBlocked: function( type, gravity ) {
-        let newpos = this.CalculateNewPosition(this.genus, type, gravity);
+    check_blocked: function( type, gravity ) {
+        let newpos = this.calculate_new_position(this.genus, type, gravity);
         let newdata = GLOBAL.ToonData[this.genus][type];
         // TODO:
         return XRectInRegion(toon_windows, newpos[0], newpos[1], newdata.width, newdata.height);
@@ -199,9 +207,9 @@ Toon.Toon.prototype = {
     /* Turn a penguin into a climber */
     // __xpenguins_make_climber
     make_climber: function() {
-        this.SetType('climber', this.direction, (this.direction ? Toon.DOWNRIGHT : Toon.DOWNLEFT));
+        this.set_type('climber', this.direction, (this.direction ? Toon.DOWNRIGHT : Toon.DOWNLEFT));
         this.SetAssocation( this.direction );
-        this.SetVelocity( [0, -this.data.speed] ); // this.data is now CLIMBER
+        this.set_velocity( 0, -this.data.speed ); // this.data is now CLIMBER
     },
 
     /* Turn a penguin into a walker. To ensure that a climber turning
@@ -218,21 +226,21 @@ Toon.Toon.prototype = {
         if ( GLOBAL.ToonData[this.genus]['runner'] && !RandInt(4) ) {
             newtype = 'runner';
             /* Sometimes runners are larger than walkers: check for immediate squash */
-            if ( this.CheckBlocked( newtype, gravity ) )
+            if ( this.check_blocked( newtype, gravity ) )
                 newtype = 'walker';
         }
-        this.SetType( newtype, this.direction, gravity );
-        this.SetAssociation( Toon.DOWN );
-        this.SetVelocity( [this.data.speed*(2*this.direction-1), 0] );
+        this.set_type( newtype, this.direction, gravity );
+        this.set_association( Toon.DOWN );
+        this.set_velocity( this.data.speed*(2*this.direction-1), 0 );
     },
 
     /* Turn penguin into a faller
      * __xpenguins_make_faller
      */
     make_faller: function() {
-        this.SetType('faller', this.direction, Toon.UP);
-        this.SetVelocity([ this.direction*2-1, this.data.speed ]);
-        this.SetAssociation(Toon.UNASSOCIATED);
+        this.set_type('faller', this.direction, Toon.UP);
+        this.set_velocity( this.direction*2-1, this.data.speed );
+        this.set_association(Toon.UNASSOCIATED);
     },
 
     /* Attempt to move a toon based on its velocity.
@@ -429,13 +437,18 @@ Toon.ToonData = function() {
     this._init.apply(this, arguments);
 }
 /* Glorified object with init function */
+// Hmm - store .image as a Clutter.Texture.
+// That allows one with .master to have .image pointing
+// to the Clutter.Texture. Though one might argue
+// that these could then be a Clutter.Clone?
 Toon.ToonData.prototype = {
+
     /* __xpenguins_copy_properties */
     _init: function(otherToonData) {
         /* Properties: set default values */
         this.conf = Toon.DEFAULTS;      /* bitmask of toon properties such as cycling etc */
         this.image = null;
-        this.filename = null;           /* Name of image file name */
+        this.filename = null;  
         this.master = null;             /* If pixmap data is duplicated from another toon, this is it */
         this.pixmap = this.mask = null; /* pointers to X structures */
         this.nframes = 0;               /* number of frames in image */
@@ -448,6 +461,8 @@ Toon.ToonData.prototype = {
         // this.exists = false;
 
         /* Copy select properties from otherToonData to here. */
+        // TODO: do objects do this by default?
+        /* TODO: listen to load-finished signal & load asynchronously */
         if ( otherToonData ) {
             let propListToCopy = ['nframes', 'ndirections', 'width', 'height',
                                   'acceleration', 'speed', 'terminal_velocity',
@@ -456,7 +471,19 @@ Toon.ToonData.prototype = {
                 this[propListToCopy[i]] = otherToonData[propListToCopy[i]];
             }
         }
+    },
 
-    }
+    load_image: function( filename ) {
+        this.image = new Clutter.Texture.set_from_file(filename);
+        // default synchronous. this.image.[sg]et_load_async()
+    },
+
+    /* bind this.filename to this.image.filename */
+    get filename(): {
+        return this.image.filename;
+    },
+
+    /* TODO: set filename? does this prompt a reload of load_image? make read-only? */
+
 };
 

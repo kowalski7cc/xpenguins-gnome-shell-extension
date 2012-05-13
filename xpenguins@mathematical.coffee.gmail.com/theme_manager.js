@@ -69,18 +69,21 @@ const ThemeManager = {
             let themes_dir = Gio.file_new_for_path(paths[i]);
             if  ( !themes_dir.query_exists(null) ) 
                 continue;
-            fileUtils.listDirAsync(themes_dir,
+            // Note: could do Lang.bind but need two of them!
+            let config_file = this.config_file;
+            fileUtils.listDirAsync(themes_dir, Lang.bind(this,
                     function ( dirInfos ) {
                         // look for config file, return name of dir, append to themeList
                         themeList.push.apply(themeList,
-                            dirInfos.filter(
+                            dirInfos.filter( Lang.bind(this,
                               function(themedirinfo) {
-                                  let configFile = GLib.build_filenamev([ themes_dir.get_path(),
-                                                                          themedirinfo.get_name(),
-                                                                          this.config_file]);
+                                  let configFile = GLib.build_filenamev([themes_dir.get_path(),
+                                                                         themedirinfo.get_name(),
+                                                                         config_file]);
+//                                  print(configFile);
                                   return GLib.file_test(configFile, GLib.FileTest.EXISTS);
-                              }).map(function(dirInfo) { return dirInfo.get_name(); }));
-                    });
+                              })).map(function(dirInfo) { return dirInfo.get_name(); }));
+                    }));
         }
 
       /* We convert all underscores in the directory name 

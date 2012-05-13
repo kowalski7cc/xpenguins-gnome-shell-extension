@@ -1,2 +1,2 @@
-Check if '.exists' is necessary: I think it's because xpenguins allocates *space* for every type and only says it 'exists' if there is one.
-I don't have to allocate memory so I can just do ` if (ToonData[this.genus]['type']) ` instead of `if (ToonData[this.genus]['type'].exists)`
+Themes: No need for separate Theme.names & Theme.ToonData:
+        just make sure that ToonData is an *object* with name [Theme.name]

@@ -12,6 +12,8 @@
  *  toon == walker, skater ('genera'), in which there are types
  *   (walker, faller, tumbler, floater, ...)
  *********************/
+/* Imports */
+const Toon = imports.toon.Toon; 
 
 /* Namespace */
 const Theme = Theme || {};
@@ -67,27 +69,22 @@ Theme.Theme.prototype = {
         /* iterate through the words to parse the config file. */
         let started=false; // whether we've started parsing a toon
 
-        let first_genera = this.ngenera; // original number of genera
-        let genus = this.ngenera; // current index into ToonData etc.
+        let first_genus = this.ngenera; // original number of genera
+        let genus = this.ngenera-1; // current index into ToonData etc.
+                                    // -1 because when we find a new toon it's ++
 
-        let current;   // the current toon
-        let def = {};  // holds the default toon's properties
-        let dummy = {};// any unknown toon's properties.
+        let current;   // the current ToonData
+        let def = {};  // holds the default ToonData
+        let dummy = {};// any unknown ToonData
         // TODO: encase in a tryCatch: config file ended unexpectedly.
         for ( let i=0; i<words.length; ++i ) {
             let word=words[i];
             /* define a new genus of toon (walker, skateboarder, ...) */
             if ( word == 'toon' ) {
                 let toonName = words[++i];
-                if ( started ) {
-                    /* initialise new genus */
-                    this.grow();
-                    ++genus;
-                } else {
-                    started=true;
-                }
-                // TODO: if started, ++genus is out of bounds?
-                this.name[genus] = toonName;
+                /* initialise new genus */
+                this.grow();
+                this.name[++genus] = toonName;
             }
             /* preferred frame delay in milliseconds */
             else if (word == 'delay') {
@@ -104,24 +101,25 @@ Theme.Theme.prototype = {
                 else if ( type.match(/^(walker|faller|tumbler|floater|climber|runner|action[0-5]|exit|explosion|splatted|squashed|zapped|angel)$/) ) {
                     started = 1;
                     /* note: passed by reference. */
-                    current = this.ToonData[genus][type] = new ToonData(def);
+                    this.ToonData[genus][type] = new Toon.ToonData(def);
+                    current = this.ToonData[genus][type];
                 } else {
                     warn(_('Warning: unknown type "%s": ignoring'.format(type)));
                     current = dummy;
                 }
                 /* extra configuration */
                 if ( type == 'exit' ) {
-                    current.conf |= (TOON.NOCYCLE | TOON.INVULNERABLE);
+                    current.conf |= (Toon.NOCYCLE | Toon.INVULNERABLE);
                 } else if ( type == 'explosion' ) {
-                    current.conf |= (TOON.NOCYCLE | TOON.INVULNERABLE | TOON.NOBLOCK);
+                    current.conf |= (Toon.NOCYCLE | Toon.INVULNERABLE | Toon.NOBLOCK);
                 } else if ( type == 'splatted' ) {
-                    current.conf |= (TOON.NOCYCLE | TOON.INVULNERABLE);
+                    current.conf |= (Toon.NOCYCLE | Toon.INVULNERABLE);
                 } else if ( type == 'squashed' ) {
-                    current.conf |= (TOON.NOCYCLE | TOON.INVULNERABLE | TOON.NOBLOCK);
+                    current.conf |= (Toon.NOCYCLE | Toon.INVULNERABLE | Toon.NOBLOCK);
                 } else if ( type == 'zapped' ) {
-                    current.conf |= (TOON.NOCYCLE | TOON.INVULNERABLE | TOON.NOBLOCK);
+                    current.conf |= (Toon.NOCYCLE | Toon.INVULNERABLE | Toon.NOBLOCK);
                 } else if ( type == 'angel' ) {
-                    current.conf |= (TOON.INVULNERABLE | TOON.NOBLOCK);
+                    current.conf |= (Toon.INVULNERABLE | Toon.NOBLOCK);
                 }
             } 
             /* Toon Properties */
@@ -183,8 +181,12 @@ Theme.Theme.prototype = {
 
                     /* If we didn't find the pixmap before, it's new */
                     if ( new_pixmap ) {
+                        // NOTE: with Clutter.Texture I can load a new pixmap per toon.
+                        // However the ToonData idea is that it holds *one* picture and
+                        //  I use the same picture for each toon (?)
+
                         // TODO:
-                        current.image = XpmReadFileToData(pixmap);
+                        // current.image = XpmReadFileToData(pixmap);
                         // various error messages: no memory, open failed, invalid xpm
                         // But if it all worked:
                         //current.exists = 1;
@@ -202,7 +204,6 @@ Theme.Theme.prototype = {
                 warn(_('Warning: Unrecognised word %s, ignoring'.format(word)));
             }
         } // while read word
-
         this.ngenera = genus+1;
 
         /* Now valid our widths, heights etc with the size of the image
@@ -241,7 +242,7 @@ Theme.Theme.prototype = {
         // NOTE: original code sets theme.total = 0
         // and only adds the numbers of the genera we *just* added?
         // i.e. theme.total = sum(theme.number[first_genus:theme.ngenera] )
-        this.total = Math.max(PENGUIN_MAX,
+        this.total = Math.min(global.PENGUIN_MAX,
             this.number.reduce(function(x,y) x+y));
     },  // append_theme
     /* BIG TODO: grow() already does ++this.ngenera: does this screw things up? */
