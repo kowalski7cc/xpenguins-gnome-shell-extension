@@ -7,7 +7,7 @@ const _ = Gettext.gettext;
 
 const TestsToDo = { Theme: true, 
                     ThemeManager: false,
-                    Clutter: false,
+                    Clutter: true,
                     Toon: true
 };
 const Clutter = imports.gi.Clutter;
@@ -89,11 +89,24 @@ if ( TestsToDo['Theme'] ) {
     print('textures equal? : ' + (theme.ToonData[1].explosion.texture == theme.ToonData[2].explosion.texture).toString());
 }
 
+if ( TestsToDo['Toon'] ) {
+    /* This *might* work but Toon is needed in theme.js so
+     * it gets loaded too early, too bad(?)
+     */
+    var toon = new Toon.Toon(theme.ToonData, {genus:1},
+            theme.ToonData[1]['walker'].texture); 
+    toon.set_position(0,0);
+
+    /* initialise empty */
+    toon = new Toon.Toon(theme.ToonData);
+    // BIGTODO: toon.set_genus('genus_name'); & this.theme ?
+    toon.genus = 1;
+    toon.init();
+
+}
+
 /* Try to draw a penguin onto the global stage? */
 if ( TestsToDo['Clutter'] ) {
-// Add it as an actor? Should a Toon subclass an actor?
-// ClutterTexture: an image
-// actor.set_position, actor.set_size
 // The actor's position is relative to the top-left (0, 0) of the 
 // parent container (such as the stage), but this origin can be 
 // changed by calling clutter_actor_set_anchor_point().
@@ -133,6 +146,23 @@ Clutter.init(null);
     XPenguinsStage.add_actor( rect );
     rect.show();
 
+    // let cln = new Clutter.Clone({source:tmp}); 
+
+    /* Cannot display Clutter.Clone unless the ToonData
+     * is also added to the stage first : do in some sort of initalisation.
+     */
+    XPenguinsStage.add_actor( toon.data.texture );
+    toon.data.texture.hide();
+
+    toon.set_position(0,0);
+    toon.set_source(toon.data.texture);
+    XPenguinsStage.add_actor(toon);
+    toon.active = true; // todo: what does that?
+    //print(toon.direction); // note: if i remove this it dies.
+    toon.Draw();
+    toon.show();
+    print(toon.get_clip());
+
     /* Set up a timeline */
     let timeline = new Clutter.Timeline();
     let theTime = new Date().getTime();
@@ -145,14 +175,14 @@ Clutter.init(null);
     timeline.connect('new-frame', function() { 
         rect.move_by( 1, 0 );
         nFrames++;
-        print(timeline.get_delta());
-        print(rect.get_position());
-        print('n frames: ' + nFrames);
+        //print(timeline.get_delta());
+        //print(rect.get_position());
+        //print('n frames: ' + nFrames);
     } );
 
     timeline.connect('completed', function(tl) {
         print('finished!');
-        print( tl.get_elapsed_time() + 'ms ' + nFrames + 'frames ' + tl.get_elapsed_time()/1000/nFrames + 'fps');
+        print( tl.get_elapsed_time() + 'ms ' + nFrames + 'frames ' + nFrames/tl.get_elapsed_time()*1000 + 'fps');
         // can't work out fps
     });
     timeline.start();
@@ -163,21 +193,6 @@ Clutter.init(null);
 Clutter.main();
 };
 
-if ( TestsToDo['Toon'] ) {
-    /* This *might* work but Toon is needed in theme.js so
-     * it gets loaded too early, too bad(?)
-     */
-    var toon = new Toon.Toon(1,theme.ToonData);
-    //print(JSON.stringify(toon,null,4)); 
-    // see if it inherited from Clutter.Clone properly.
-    // toon.set_position(0,0);
-
-    /* following works! 
-    let replica = new Clutter.Clone(theme.ToonData[1]['walker'].texture);
-    replica.set_position(0,0);
-    */
-
-}
 /*
  * Clutter.Texture.new_from_file is an actor loading an image
  * Making your own actors:

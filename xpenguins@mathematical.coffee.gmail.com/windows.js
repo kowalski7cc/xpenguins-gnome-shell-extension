@@ -29,7 +29,7 @@ const Meta = imports.gi.Meta;
 
 // Root window: global.stage.get_allocation_geometry()
 // parentWindow is either root window (stage?!) OR a toplevel window.
-function LocateWindows( parentStage ) {
+function LocateWindows( winActor ) {
 
     let toon_windows = new Meta.Rectangle();
 

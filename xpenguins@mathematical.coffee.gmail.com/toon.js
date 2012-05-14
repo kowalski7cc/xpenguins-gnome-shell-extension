@@ -89,22 +89,28 @@ Toon.DEFAULTMAXRELOCATE = 8;
  * such as its location and speed */
 /**********************************/
 
+Toon.Toon = new Lang.Class({
+    Name: 'Toon',
+    Extends: Clutter.Clone,
+
+/*
 Toon.Toon = function() {
     this._init.apply(this, arguments);
-}
+};
 Toon.Toon.prototype = {
     __proto__: Clutter.Clone.prototype,
-
+*/
     /* __xpenguins_init_penguin( Toon *p ) */
-    _init: function(genus, ToonData, sourceActor) { 
+    _init: function(ToonData, props, params) { 
+        this.parent(params);
         //Clutter.Clone.prototype._init.call(this, sourceActor);
         //error: _init not a function?
 
         // TODO: this.frame
         // position: in parent. this.x/this.y
         this.u = this.v = 0; /* velocity */
-        this.genus = genus;
-        this.type = null;
+        this.genus = null;
+        this.type = 'faller';
         this.direction = GLOBAL.RandInt(2);
 
         /* properties of the image mapped on the screen */
@@ -112,7 +118,7 @@ Toon.Toon.prototype = {
         this.width_map = this.height_map = null;
 
         
-        this.associate = false; /* toon is associated with a window */
+        this.associate = Toon.UNASSOCIATED; /* toon is associated with a window */
         this.wid = null; /* window associated with */
 
         //this.xoffset = this.yoffset = 0; /* location relative to window origin */
@@ -125,22 +131,35 @@ Toon.Toon.prototype = {
         this.hold = null;          // <-- TODO
         this.active = false;
         this.terminating = false;
-        this.mapped = false;       // <-- TODO (in parent?) (yep)
+        //this.mapped = false;       // <-- TODO in parent, not writable.
         this.squished = false;
         //Pixmap background;   /* @@ storing the background so we can repaint where we've been */
 
         // UGLY way to access the ToonData object ?!
+        //this.data = this.ToonData[this.genus][this.type];
         //this.GLOBAL = GLOBALDATA;
         this.ToonData = ToonData;
-        //this.data = this.ToonData[this.genus][this.type];
-       
-        this.set_position(0,0);  // <-- has not inherited properly
-        //this.set_position( GLOBAL.RandInt(GLOBAL.XPenguinsWindow.width - this.data.width), 1 - this.data.height );
-        //this.set_association( Toon.UNASSOCIATED );
-        //this.set_velocity( this.direction*2-1, this.data.speed );
 
+        if ( props ) {
+            for ( prop in props ) {
+                this[prop] = props[prop];
+            }
+        }
+
+        if ( this.genus ) {
+            this.init();
+        }
+        this.set_position(0,0); 
     },
 
+    /* Only call this *after* setting the toon's genus */
+    init: function() {
+        this.set_source( this.data.texture );
+        this.set_position( GLOBAL.RandInt(GLOBAL.XPenguinsWindow.width - this.data.width), 1 - this.data.height );
+        this.set_velocity( this.direction*2-1, this.data.speed );
+    },
+
+    // TODO: get data() vs storing .data (performance)
     get data() {
         if ( this.genus && this.type ) {
             return this.ToonData[this.genus][this.type];
@@ -174,8 +193,8 @@ Toon.Toon.prototype = {
        is walking along the tops the window, Toon_UNASSOCIATED if
        the toon is in free space */
     // ToonSetAssocation
-    set_association: function( assoc ) {
-        toon.associate = direction;
+    set_association: function( direction ) {
+        this.associate = direction;
     },
 
     // ToonSetVelocity
@@ -404,25 +423,30 @@ Toon.Toon.prototype = {
 
     /* Draws the current toon */
     Draw: function() {
-        /* Draw the background on (do I need that?) */
-
         /* Draw the toon on */
         if ( this.active ) {
-            let direction = (this.drection >= this.data.ndirections ? 0 : this.direction);
+            // NOTE: do I set this.direction to direction?
+            let direction = (this.direction >= this.data.ndirections ? 0 : this.direction);
 
+            // BIG TODO: top left/bottom right? how is the coordinate systeM?
             /* Set the clip mask for the penguin,
              * i.e. define the rectangle of the pixmap to show */
-            /* Draw the penguin on the screen */
-            /* Unset the clip mask */
+            this.set_clip( this.x - this.data.width*this.frame, 
+                           this.y - this.data.height*this.direction,
+                           this.data.width,
+                           this.data.height);
+            /* Draw on the screen.... .show() should take care of that already? */
 
             /* update properties */
+            // TODO: what are these for?
             this.x_map = this.x;
             this.y_map = this.y;
             this.width_map = this.data.width;
             this.height_map = this.data.height;
-            this.mapped = true;
+            //this.mapped = true;
         } else {
-            this.mapped = false;
+            //this.mapped = false;
+            // BIGTODO: this.mapped is read only
         }
     }, 
 
@@ -432,6 +456,7 @@ Toon.Toon.prototype = {
      */
     // TODO: Do I need to bother with expose events?
     // Depends on if I draw on the current screen's display or a window sitting over it.
+    // BIG TODO: I don't think I need Erase().
     Erase: function() {
         if ( this.mapped ) {
             // XClearArea( this.x_map, this.y_map, this.width_map, this.height_map );
@@ -444,7 +469,7 @@ Toon.Toon.prototype = {
             }
         }
     },
-}
+});
 
 /**********************************/
 /* The ToonData structure describes the properties of a type of toon,
