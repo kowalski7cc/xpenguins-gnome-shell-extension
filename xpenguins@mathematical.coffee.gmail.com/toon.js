@@ -29,6 +29,12 @@
  * toon.h
  */
 
+// Needs the theme's ToonData loaded already.
+const Gettext = imports.gettext.domain('gnome-shell-extensions');
+const _ = Gettext.gettext;
+const Clutter = imports.gi.Clutter;
+const GLOBAL = imports.global;
+
 /* Use the Toon namespace */
 const Toon = Toon || {};
 
@@ -87,15 +93,19 @@ Toon.Toon = function() {
     this._init.apply(this, arguments);
 }
 Toon.Toon.prototype = {
-    __proto__: Clutter.Texture.prototype,
+    __proto__: Clutter.Clone.prototype,
 
     /* __xpenguins_init_penguin( Toon *p ) */
-    _init: function() {
+    _init: function(genus, ToonData, sourceActor) { 
+        //Clutter.Clone.prototype._init.call(this, sourceActor);
+        //error: _init not a function?
+
         // TODO: this.frame
         // position: in parent. this.x/this.y
         this.u = this.v = 0; /* velocity */
-        this.genus = this.type = null;
-        this.direction = RandInt(2);
+        this.genus = genus;
+        this.type = null;
+        this.direction = GLOBAL.RandInt(2);
 
         /* properties of the image mapped on the screen */
         this.x_map = this.y_map = null;
@@ -119,11 +129,24 @@ Toon.Toon.prototype = {
         this.squished = false;
         //Pixmap background;   /* @@ storing the background so we can repaint where we've been */
 
-        this.data = GLOBAL.ToonData[this.genus][this.type];
-        this.set_type('faller',this.direction,Toon.UNASSOCIATED);
-        this.set_position( RandInt(GLOBAL.XPenguinsWindow.width - this.data.width), 1 - data.height );
-        this.set_association( Toon.UNASSOCIATED );
-        this.set_velocity( this.direction*2-1, this.data.speed );
+        // UGLY way to access the ToonData object ?!
+        //this.GLOBAL = GLOBALDATA;
+        this.ToonData = ToonData;
+        //this.data = this.ToonData[this.genus][this.type];
+       
+        this.set_position(0,0);  // <-- has not inherited properly
+        //this.set_position( GLOBAL.RandInt(GLOBAL.XPenguinsWindow.width - this.data.width), 1 - this.data.height );
+        //this.set_association( Toon.UNASSOCIATED );
+        //this.set_velocity( this.direction*2-1, this.data.speed );
+
+    },
+
+    get data() {
+        if ( this.genus && this.type ) {
+            return this.ToonData[this.genus][this.type];
+        } else {
+            return null;
+        }
     },
 
     /* ToonSetType */
@@ -166,8 +189,8 @@ Toon.Toon.prototype = {
      * Returns array [newx,newy].
      */
     calculate_new_position: function( genus, type, gravity ) {
-        let newdata = GLOBAL.ToonData[genus][type];
-        let x=toon.x, y=toon.y;
+        let newdata = this.ToonData[genus][type];
+        let x=this.x, y=this.y;
         if ( this.gravity == Toon.HERE ) {
             x += Math.round((this.data.width - newdata.width)/2);
             y += Math.round((this.data.height - newdata.height)/2);
@@ -199,7 +222,7 @@ Toon.Toon.prototype = {
      */
     check_blocked: function( type, gravity ) {
         let newpos = this.calculate_new_position(this.genus, type, gravity);
-        let newdata = GLOBAL.ToonData[this.genus][type];
+        let newdata = this.ToonData[this.genus][type];
         // TODO:
         return XRectInRegion(toon_windows, newpos[0], newpos[1], newdata.width, newdata.height);
     },
@@ -223,7 +246,7 @@ Toon.Toon.prototype = {
                         Toon.DOWN);
         let newtype = 'walker';
         // 25%  chance of becoming a runner
-        if ( GLOBAL.ToonData[this.genus]['runner'] && !RandInt(4) ) {
+        if ( this.ToonData[this.genus]['runner'] && !GLOBAL.RandInt(4) ) {
             newtype = 'runner';
             /* Sometimes runners are larger than walkers: check for immediate squash */
             if ( this.check_blocked( newtype, gravity ) )
@@ -263,29 +286,23 @@ Toon.Toon.prototype = {
 
         let result;
 
-        if ( this.data.conf & Toon.NOBLOCK ) {
-            /* Just consider blocking by the sides of the screen */
-            if ( GLOBAL.TOON_EDGE_BLOCK ) {
-                if ( newx < 0 ) {
-                    newx = 0;
-                    result = Toon.PARTIALMOVE;
-                } else if ( newx + this.data.width > GLOBAL.XPenguinsWindow.width ) {
-                    newx = GLOBAL.XPenguinsWindow.width - data.width;
-                    result = Toon.PARTIALMOVE;
-                }
+        if ( GLOBAL.TOON_EDGE_BLOCK ) {
+            if ( newx < 0 ) {
+                newx = 0;
+                result = Toon.PARTIALMOVE;
+            } else if ( newx + this.data.width > GLOBAL.XPenguinsWindow.width ) {
+                newx = GLOBAL.XPenguinsWindow.width - data.width;
+                result = Toon.PARTIALMOVE;
             }
+        }
+        if ( this.data.conf & Toon.NOBLOCK ) {
+            /* Just consider blocking by the sides of the screen,
+             * no further action required than the X direction already done
+             */
         } else {
-        /* Consider all blocking */
-
+            /* Consider all blocking: additionally y */
             if ( GLOBAL.TOON_EDGE_BLOCK ) {
-                if ( newx < 0 ) {
-                    newx = 0;
-                    result = Toon.PARTIALMOVE;
-                } else if ( newx + this.data.width > GLOBAL.XPenguinsWindow.width ) {
-                    newx = GLOBAL.XPenguinsWindow.width - data.width;
-                    result = Toon.PARTIALMOVE;
-                }
-                if ( newy < 0 && GLOBAL.TOON_EDGE_BLOCK != 2 ) {
+                if ( newy < 0 && GLOBAL.TOON_EDGE_BLOCK != Toon.SIDEBOTTOMBLOCK ) {
                     newy = 0;
                     result = Toon.PARTIALMOVE;
                 } else if ( newy + this.data.height > GLOBAL.XPenguinsWindow.height ) {
@@ -436,21 +453,30 @@ Toon.Toon.prototype = {
 Toon.ToonData = function() {
     this._init.apply(this, arguments);
 }
-/* Glorified object with init function */
-// Hmm - store .image as a Clutter.Texture.
-// That allows one with .master to have .image pointing
-// to the Clutter.Texture. Though one might argue
-// that these could then be a Clutter.Clone?
+/* Note:
+ * I tried letting this.pixmap be a the Cogl.Texture of the pixmap,
+ *  so that Toons could be Clutter.Texture with set_cogl_texture == ToonData.image
+ * However Cogl.Texture.new_from_file() isn't introspectible and 
+ *  Clutter.Texture.get_cogl_texture() seems not to work (returns 'undefined').
+ *
+ * Next attempt: ToonData.texture is a Clutter.Texture &
+ *  everything else is a Clutter.Clone.
+ */ 
 Toon.ToonData.prototype = {
 
     /* __xpenguins_copy_properties */
     _init: function(otherToonData) {
         /* Properties: set default values */
         this.conf = Toon.DEFAULTS;      /* bitmask of toon properties such as cycling etc */
-        this.image = null;
-        this.filename = null;  
+
+        // TODO: need this.image or this.pixmap?
+        // this.image = null;
+        // this.pixmap = this.mask = null; /* pointers to X structures */
+
+        this.texture = null; /* Clutter.Texture */
+
+        // .master is needed to make sure all clones point to the one same source.
         this.master = null;             /* If pixmap data is duplicated from another toon, this is it */
-        this.pixmap = this.mask = null; /* pointers to X structures */
         this.nframes = 0;               /* number of frames in image */
         this.ndirections = 1;           /* number directions in image (1 or 2) */
         this.width = this.height = 30;  /* width & height of individual frame/dir */
@@ -461,7 +487,6 @@ Toon.ToonData.prototype = {
         // this.exists = false;
 
         /* Copy select properties from otherToonData to here. */
-        // TODO: do objects do this by default?
         /* TODO: listen to load-finished signal & load asynchronously */
         if ( otherToonData ) {
             let propListToCopy = ['nframes', 'ndirections', 'width', 'height',
@@ -473,17 +498,34 @@ Toon.ToonData.prototype = {
         }
     },
 
-    load_image: function( filename ) {
-        this.image = new Clutter.Texture.set_from_file(filename);
-        // default synchronous. this.image.[sg]et_load_async()
+    set_master: function( master ) {
+        this.master = master;
+        this.texture = master.texture;
     },
 
-    /* bind this.filename to this.image.filename */
-    get filename(): {
-        return this.image.filename;
+    load_texture: function( filename ) {
+        /* store the Cogl texture in this.pixmap.
+         * We can't do Cogl.Texture.new_from_file (not exposed!)
+         * so will have to make a Toon.Texture & do get_cogl_texture
+         */
+        this.texture = Clutter.Texture.new_from_file(filename);
     },
 
-    /* TODO: set filename? does this prompt a reload of load_image? make read-only? */
+    get filename() {
+        if ( this.texture ) {
+            return this.texture.filename;
+        } else {
+            return null;
+        }
+    },
+
+    /* set filename: prompts reloading the texture */
+    set filename(fname) {
+        if ( this.texture.filename != this.fname ) {
+            /* reload texture */
+            this.load_texture(fname);
+        }
+    }
 
 };
 

@@ -1,7 +1,7 @@
 const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
 
-const global = imports.global;
+const GLOBAL = imports.global;
 var fileUtils; // really want const but not in the try/catch...
 try { /* only while using gjs to debug */
     fileUtils = imports.misc.fileUtils;
@@ -93,7 +93,7 @@ const ThemeManager = {
         themeList = themeList.map(function(x) x.replace(/_/g,' '));
 
         /* remove duplicates */
-        themeList = global.removeDuplicates(themeList);
+        themeList = GLOBAL.removeDuplicates(themeList);
 
         return themeList;
     },

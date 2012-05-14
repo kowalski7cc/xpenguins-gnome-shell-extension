@@ -5,6 +5,7 @@
  * - genus == theme (penguins, simpsons, ...)
  * TODO:
  * - what to do about eror handling? at them oment thorw new Error
+ * BIG TODO: is .master needed?
  *
  * GENUS
  *
@@ -14,6 +15,8 @@
  *********************/
 /* Imports */
 const Toon = imports.toon.Toon; 
+const Gettext = imports.gettext.domain('gnome-shell-extensions');
+const _ = Gettext.gettext;
 
 /* Namespace */
 const Theme = Theme || {};
@@ -35,10 +38,18 @@ Theme.Theme.prototype = {
          * Genus: class of toons (Penguins has 2: walker & skateboarder).
          * Each genus has toon types: walker, floater, tumbler, faller, ...
          */
+
+        /*
+         * this.ToonData: array, one per genus (per theme). this.ToonData[i] = { type_of_toon: ToonData }
+         * this.name: array of names, one per genus
+         * this.number: array of numbers, one per genus
+         *
+         * Note: can't have ToonData an object because over multiple themes there can be 
+         *  duplicate genus (for example BigPenguins & Penguins both have 'normal' & 'skateboarder').
+         */
         this.ToonData = []; // data, one per genus
         this.name = [];    // names of genus
         this.number = [];   // theme penguin numbers
-        this.total = 0;     // MIN( sum(numbers), PENGUIN_MAX )
         this.ngenera = 0; // number of different genera
         this.delay = 60;
 
@@ -67,24 +78,36 @@ Theme.Theme.prototype = {
         words = words.trim().split(' ');
 
         /* iterate through the words to parse the config file. */
-        let started=false; // whether we've started parsing a toon
+        // note: the 'toon' keyword may be omitted if there's only one
+        // genus of toon the the config file.
+        let started=false; // whether we've encountered the 'toon' keyword yet.
 
         let first_genus = this.ngenera; // original number of genera
-        let genus = this.ngenera-1; // current index into ToonData etc.
-                                    // -1 because when we find a new toon it's ++
+        let genus = this.ngenera; 
+        /* make space for the next toon */
+        this.grow();
+                                 
 
         let current;   // the current ToonData
         let def = {};  // holds the default ToonData
         let dummy = {};// any unknown ToonData
-        // TODO: encase in a tryCatch: config file ended unexpectedly.
+        try {
         for ( let i=0; i<words.length; ++i ) {
             let word=words[i];
             /* define a new genus of toon (walker, skateboarder, ...) */
+            // note: the 'toon' word is optional in one-genus themes.
+            // If we've already seen the 'toon' word before this must be a
+            //  multi-genus theme so make space for it & increment 'genus' index.
             if ( word == 'toon' ) {
-                let toonName = words[++i];
-                /* initialise new genus */
-                this.grow();
-                this.name[++genus] = toonName;
+                if ( started ) {
+                    this.grow();
+                    ++genus;
+                } else {
+                    // first toon in file, don't have to ++genus.
+                    started = 1;
+                }
+                /* store the genus name */
+                this.name[genus] = words[++i];
             }
             /* preferred frame delay in milliseconds */
             else if (word == 'delay') {
@@ -149,12 +172,15 @@ Theme.Theme.prototype = {
                     if ( current.image ) {
                         warn(_('Warning: resetting pixmap to %s'.format(pixmap)));
                         /* Free old pixmap if it is not a copy */
+                        // BIGTODO: do I need to "free"/destroy it or is JS garbage collection
+                        // good enough that when there are no longer Toon.Datas using this texture
+                        // it will be destroyed?
                         if ( !current.master ) {
-                            // TODO: XpmFree(current.image) (release memory!)
-                            // How to release memory in Javascript?
-                            current.image = null;
-                            current.filename = null;
-                            //current.exists = false;
+                            // BIGTODO: what if this is already the master of others?
+                            // What happens the the clones' pointers?
+                            // (C source: XpmFree(current->image))
+                            // Well, that's what the warning is for.
+                            current.texture.destroy();
                         }
                     }
 
@@ -167,12 +193,9 @@ Theme.Theme.prototype = {
                         for ( let itype in data ) { 
                             /* data already exists in theme, set master */
                             if ( data[itype].filename && !data[itype].master
-                                 //&& data[itype].exists
                                  && data[itype].filename == pixmap ) {
-                                     current.master = data[itype];
-                                     //current.exists = 1;
-                                     current.filename = data[itype].filename;
-                                     current.image = data[itype].image;
+                                     // set .master & .texture (& hence .filename)
+                                     current.set_master( data[itype] );
                                      new_pixmap = 0;
                                      break;
                             }
@@ -181,35 +204,32 @@ Theme.Theme.prototype = {
 
                     /* If we didn't find the pixmap before, it's new */
                     if ( new_pixmap ) {
-                        // NOTE: with Clutter.Texture I can load a new pixmap per toon.
-                        // However the ToonData idea is that it holds *one* picture and
-                        //  I use the same picture for each toon (?)
-
-                        // TODO:
-                        // current.image = XpmReadFileToData(pixmap);
-                        // various error messages: no memory, open failed, invalid xpm
-                        // But if it all worked:
-                        //current.exists = 1;
-                        current.filename = pixmap;
+                        // print('loading new pixmap ' + pixmap);
+                        // Sets this.pixmap to Cogl Texture & this.filename to pixmap
+                        current.load_texture(pixmap);
+                        // If it all worked:
                         current.master = null;
                     }
                 }
             } // end pixmap
             /* Number of toons */
             else if ( word == 'number' ) {
-                theme.number[genus] = parseInt(words[++i]);
+                this.number[genus] = parseInt(words[++i]);
             } 
             /* unknown word */
             else {
                 warn(_('Warning: Unrecognised word %s, ignoring'.format(word)));
             }
         } // while read word
+        } catch (err) {
+            throw new Error(_('Error reading config file: config file ended unexpectedly: Line ' + err.lineNumber + ': ' + err.message));
+        } /* end config file parsing */
         this.ngenera = genus+1;
 
         /* Now valid our widths, heights etc with the size of the image
          * for all the types of the genera we just added
          */
-        for ( let i=first_genus; i < theme.ngenera; ++i ) {
+        for ( let i=first_genus; i < this.ngenera; ++i ) {
             for ( let j in this.ToonData[i] ) {
                 let current = this.ToonData[i][j];
                 //if ( !current.exists ) 
@@ -238,14 +258,14 @@ Theme.Theme.prototype = {
             }
         }
 
-        /* Update total number */
         // NOTE: original code sets theme.total = 0
         // and only adds the numbers of the genera we *just* added?
-        // i.e. theme.total = sum(theme.number[first_genus:theme.ngenera] )
-        this.total = Math.min(global.PENGUIN_MAX,
-            this.number.reduce(function(x,y) x+y));
+        // i.e. theme.total = sum(theme.number[first_genus:theme.ngenera] ) ??
     },  // append_theme
-    /* BIG TODO: grow() already does ++this.ngenera: does this screw things up? */
+
+    get total() {
+        return Math.min(global.PENGUIN_MAX, this.number.reduce(function(x,y) x+y));
+    },
 
     grow: function() {
         this.name.push('');

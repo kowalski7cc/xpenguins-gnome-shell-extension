@@ -8,6 +8,26 @@ const PopupMenu = imports.ui.popupMenu;
 const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
 
+/* GNOME 3.2:
+const ES = imports.ui.extensionSystem
+ES.userExtensionsDir.get_path() : --> .local/share/gnome-shell/extensions
+
+OR 
+init(metadata): metadata.path
+*/
+
+/* GNOME 3.4:
+const EU = imports.misc.extensionUtils
+EU.userExtensionsDir.get_path() : --> .local/share/gnome-shell/extensions
+
+EU.getCurrentExtension() --> nifty! throw an Error & parse the output
+ --> object w/ '.path' & .dir
+ */
+
+/* Importing other .js files:
+ * const Extension = imports.ui.extensionSystem.extensions["My_extension_name@whatever.gnome.org"];
+ * const MyModule = Extension.myModule;
+ */
 
 /* make a status button to click with options */
 let _indicator;

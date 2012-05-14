@@ -2,10 +2,12 @@
 /* NOTE: need to do 
  GJS_PATH=`pwd` gjs mwe.js
  */
+const Gettext = imports.gettext.domain('gnome-shell-extensions');
+const _ = Gettext.gettext;
 
-const TestsToDo = { Theme: false, // passed
-                    ThemeManager: true,
-                    Clutter: true,
+const TestsToDo = { Theme: true, 
+                    ThemeManager: false,
+                    Clutter: false,
                     Toon: true
 };
 const Clutter = imports.gi.Clutter;
@@ -15,7 +17,6 @@ const Gio = imports.gi.Gio;
 const Lang = imports.lang;
 
 /* Import my JS files */
-const global = imports.global;
 const Toon = imports.toon.Toon; 
 const ThemeManager = imports.theme_manager.ThemeManager;
 const Theme = imports.theme.Theme;
@@ -71,15 +72,21 @@ if ( TestsToDo['ThemeManager'] ) {
 /** TEST Theme **/
 if ( TestsToDo['Theme'] ) {
     // create empty theme & append
-    let theme = new Theme.Theme([]);
-    print('empty theme: ' + theme);
+    var theme = new Theme.Theme([]);
+    // print('empty theme: ' + theme);
     theme.append_theme('Penguins');       // seems OK
     print('appended Penguins. printout:');
     print(JSON.stringify(theme,null,4));  // seems OK
-    // create a new theme
-    theme = new Theme.Theme(['Penguins', 'Bill']);
-    print('Penguins & Bill');
+    // create a new theme, include a one-genus theme to test
+    theme = new Theme.Theme(['Turtles', 'Penguins']);
+    print('Turtles & Penguins');
     print(JSON.stringify(theme,null,4));  // seems OK
+
+    // try with *duplicate* ToonData
+    // woohoo!
+    print('testing master stuffs: Penguin[normal].explosion == Penguin[skateboarder].explosion.master: ' +
+           (theme.ToonData[1].explosion == theme.ToonData[2].explosion.master).toString());
+    print('textures equal? : ' + (theme.ToonData[1].explosion.texture == theme.ToonData[2].explosion.texture).toString());
 }
 
 /* Try to draw a penguin onto the global stage? */
@@ -155,6 +162,22 @@ Clutter.init(null);
 /* Start the main loop, so we can respond to events: */
 Clutter.main();
 };
+
+if ( TestsToDo['Toon'] ) {
+    /* This *might* work but Toon is needed in theme.js so
+     * it gets loaded too early, too bad(?)
+     */
+    var toon = new Toon.Toon(1,theme.ToonData);
+    //print(JSON.stringify(toon,null,4)); 
+    // see if it inherited from Clutter.Clone properly.
+    // toon.set_position(0,0);
+
+    /* following works! 
+    let replica = new Clutter.Clone(theme.ToonData[1]['walker'].texture);
+    replica.set_position(0,0);
+    */
+
+}
 /*
  * Clutter.Texture.new_from_file is an actor loading an image
  * Making your own actors:

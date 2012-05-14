@@ -1,12 +1,16 @@
 const Clutter = imports.gi.Clutter;
+// TODO: temporary (use global.xxx instead in G-S-E)
+const Gdk = imports.gi.Gdk;
+const Gtk = imports.gi.Gtk;
+Gtk.init(null);
 
 const PENGUIN_MAX = 256;
 
 /* TODO: namespace? */
 /* The window on which we draw the toons */
 var XPenguinsWindow = {
-    width:  0,
-    height: 0
+    width:  Gdk.Screen.get_default().get_width(),
+    height: Gdk.Screen.get_default().get_height()
 };
 
 /* The global stage. */
@@ -45,6 +49,6 @@ var removeDuplicates = function(arr) {
 
 /* random int from 0 to (max-1) */
 var RandInt = function(max) {
-    return Math.floor( Math.rand()*max );
+    return Math.floor( Math.random()*max );
 }
 
