@@ -1,9 +1,14 @@
+const Lang = imports.lang;
 const Mainloop = imports.mainloop;
 const St = imports.gi.St;
 
 const Main = imports.ui.main;
 const PanelMenu = imports.ui.panelMenu;
 const PopupMenu = imports.ui.popupMenu;
+
+/* my files */
+const Extension = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+const XPenguins = Extension.xpenguins; // how to get?
 
 const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
@@ -24,11 +29,6 @@ EU.getCurrentExtension() --> nifty! throw an Error & parse the output
  --> object w/ '.path' & .dir
  */
 
-/* Importing other .js files:
- * const Extension = imports.ui.extensionSystem.extensions["My_extension_name@whatever.gnome.org"];
- * const MyModule = Extension.myModule;
- */
-
 /* make a status button to click with options */
 let _indicator;
 
@@ -36,7 +36,7 @@ function init(metadata) {
 }
 
 function enable() {
-    _indicator = new XpenguinsMenu();
+    _indicator = new XPenguinsMenu();
     Main.panel.addToStatusArea('xpenguins-menu', _indicator);
 }
 
@@ -47,34 +47,36 @@ function disable() {
 }
 
 /*
- * XpenguinsMenu Object
+ * XPenguinsMenu Object
+ * Should I have a Menu + XPenguins object (separating display/UI from function)
+ *  (but requires a bit of code duplication to pass on parameters)
+ *
+ * OR a combined object (cleaner code)?
  */
-function XpenguinsMenu() {
+function XPenguinsMenu() {
     this._init.apply(this, arguments);
 }
 
-XpenguinsMenu.prototype = {
+XPenguinsMenu.prototype = {
     __proto__: PanelMenu.SystemStatusButton.prototype,
-
-    _log: function(msg) {
-        if ( this._DEBUG ) {
-            global.log(msg);
-            log(msg);
-        }
-    },
 
     _init: function() {
         /* Initialise */
-        PanelMenu.SystemStatusButton.prototype._init.call(this, 'mail-unread');
-     
-        /* variables */  
-        this._DEBUG = true;
-        this._PENGUIN_MAX = 256;
-
-        this._nPenguins = 20;
-        this._ignoreMaximised = true;
-
+        PanelMenu.SystemStatusButton.prototype._init.call(this, 'emblem-favorite');
+    
+        /* items */ 
         this._optionsMenu = null;
+        this._verboseItem = null;
+        this._nPenguinsItem = null;
+        this._ignoreMaximisedItem = null;
+
+        /* variables */  
+        // this._DEBUG & this._PENGUIN_MAX: just store as UI elements?
+        //this._DEBUG = true;
+        this._PENGUIN_MAX = 256;
+        //this._nPenguins = 20;
+        //this._ignoreMaximised = true;
+
 
         /* connect events */
 
@@ -89,55 +91,61 @@ XpenguinsMenu.prototype = {
     	this.menu.removeAll();
 
         /* toggle to start xpenguins */
-        item = new PopupMenu.PopupSwitchMenuItem( _('Xpenguins'), false );
-        item.connect('toggled', Lang.bind( this, this._startXpenguins ));
-        this.menu.addMenuItem(items);
+        item = new PopupMenu.PopupSwitchMenuItem( _('Start'), false );
+        item.connect('toggled', Lang.bind( this, this._startXPenguins ));
+        this.menu.addMenuItem(item);
 
         /* Options menu:
-         * - theme  --> ComboMenuItem (not 3.2 ?)
-         * + npenguins (??)
+         * - theme chooser  --> ComboMenuItem (not 3.2 ?)
+         * + npenguins (??)              --> + 'choose default set by theme'!
          * + ignore maximised windows
          * + verbose toggle
          * - choose window to run in
          */
-        this._optionsMenu = new PopupMenu.PopupSubMenuMenuItem('Options');
+
+        // NOTE: I don't think I need the 'Options' submenu here?
+        this._optionsMenu = new PopupMenu.PopupSubMenuMenuItem(_('Options'));
         this.menu.addMenuItem(this._optionsMenu);
 
         /* DEBUG/VERBOSE toggle. */
-        item = new PopupMenu.PopupSwitchMenuItem( _('Verbose'), this._DEBUG );
-        item.connect('toggled', Lang.bind( this, function() {
-                                            this._DEBUG = !this._DEBUG;
+        this._verboseItem = new PopupMenu.PopupSwitchMenuItem( _('Verbose'), true);
+        this._verboseItem.connect('toggled', Lang.bind( this, function() {
+            // TODO
         }));
-        this._optionsMenu.menu.addMenuItems(item);
+        this._optionsMenu.menu.addMenuItem(this._verboseItem);
 
         /* Number of penguins */
         item = new PopupMenu.PopupMenuItem(_('Max penguins'), { reactive: false });
-        this._nPenguinsLabel = new St.Label({ text: this._nPenguins });
+        this._nPenguinsLabel = new St.Label({ text: this._nPenguins.toString() });
         item.addActor(this._nPenguinsLabel, { align: St.Align.END });
         this._optionsMenu.menu.addMenuItem(item);
 
-        item = new PopupMenu.SliderMenuItem(this._nPenguins/this._PENGUIN_MAX);
-        item.connect('value-changed', Lang.bind(this, this._maxPenguinsSliderChanged));
-        item.connect('drag-end', Lang.bind(this, this._maxPenguinsChanged));
-        this._optionsMenu.menu.addMenuItem(item);
+        this._nPenguinsItem = new PopupMenu.PopupSliderMenuItem(20/this._PENGUIN_MAX);
+        this._nPenguinsItem.connect('value-changed', Lang.bind(this, this._nPenguinsSliderChanged));
+        this._nPenguinsItem.connect('drag-end', Lang.bind(this, this._nPenguinsChanged));
+        this._optionsMenu.menu.addMenuItem(this._nPenguinsItem);
 
         /* Ignore maximised toggle */
-        item = new PopupMenu.PopupSwitchMenuItem( _('Ignore maximised windows'), this._ignoreMaximised );
-        item.connect('toggled', Lang.bind( this, this._ignoreMaximisedWindows ));
-        this._optionsMenu.menu.addMenuItems(item);
+        this._ignoreMaximisedItem = new PopupMenu.PopupSwitchMenuItem(_('Ignore maximised windows'), true));
+        this._ignoreMaximisedItem.connect('toggled', Lang.bind(this, this._ignoreMaximisedWindows));
+        this._optionsMenu.menu.addMenuItem(this._ignoreMaximisedItem);
+
+
+        /* create an Xpenguin Loop object which stores the XPenguins program */
+        this.XPenguinsLoop = new XPenguins.XPenguinsLoop({ verbose: this._verboseItem.state,
+                                                           nPenguins: parseInt(this._nPenguinsLabel.text),
+                                                           ignoreMaximised: this._ignoreMaximisedItem.state 
+        });
     },
 
-    _startXpenguins: function() {
+    _startXPenguins: function() {
     },
     _ignoreMaximisedWindows: function() {
     },
-    _maxPenguinsSliderChanged: function(slider, value) {
-        this._nPenguinsLabel.set_text( Math.ceil( value*this._PENGUIN_MAX ) );
+    _nPenguinsSliderChanged: function(slider, value) {
+        this._nPenguinsLabel.set_text( Math.ceil( value*this._PENGUIN_MAX ).toString() );
     },
-    _maxPenguinsChanged: function(slider,value) {
-        this._log('slider: value is ' + value );
-        this._nPenguins = Math.ceil( value*this._PENGUIN_MAX );
+    _nPenguinsChanged: function(slider,value) {
     }
 };
-// ABOVE: this.xpenguinsProcess = new XpenguinsLoop(); Pipe settings to this.
 

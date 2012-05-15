@@ -17,6 +17,7 @@
 const Toon = imports.toon.Toon; 
 const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
+const ThemeManager = imports.theme_manager.ThemeManager;
 
 /* Namespace */
 const Theme = Theme || {};

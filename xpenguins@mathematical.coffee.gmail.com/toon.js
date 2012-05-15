@@ -84,392 +84,410 @@ Toon.NOBLOCK = (1<<2);
 Toon.MESSAGE_LENGTH = 128;
 Toon.DEFAULTMAXRELOCATE = 8;
 
-/**********************************/
-/* The Toon structure describes the properties of a particular toon,
- * such as its location and speed */
-/**********************************/
 
+/**********************************/
+GLOBAL.TOON_EDGE_BLOCK = Toon.SIDEBOTTOMBLOCK; // in xpenguins_core.c. Don't think it's changeable.
+
+/**********************************
+ * The Toon structure describes the 
+ * properties of a particular toon,
+ * such as its location and speed 
+/**********************************/
+/*
+function TestToon2() {
+//    Clutter.Clone.new.call(this,arguments);
+}
+TestToon2.prototype = new Clutter.Clone;
+var toon = new TestToon2(new Clutter.Rectangle());
+toon.set_position(0,0);
+*/
+
+// Hmm that doesn't work.
+/*
+ * For GNOME 3.4:
 Toon.Toon = new Lang.Class({
     Name: 'Toon',
     Extends: Clutter.Clone,
-
-/*
-Toon.Toon = function() {
-    this._init.apply(this, arguments);
-};
-Toon.Toon.prototype = {
-    __proto__: Clutter.Clone.prototype,
+    _init: ....
+});
+*
 */
+/* For GNOME 3.2 (??) */
+function inherits(Child, Parent) {
+    var Tmp = function() {};
+    Tmp.prototype = Parent.prototype;
+    Child.prototype = new Tmp();
+    Child.prototype.constructor = Child;
+}
+
+Toon.Toon = function(ToonData, props, params) {
     /* __xpenguins_init_penguin( Toon *p ) */
-    _init: function(ToonData, props, params) { 
-        this.parent(params);
-        //Clutter.Clone.prototype._init.call(this, sourceActor);
-        //error: _init not a function?
+    Clutter.Clone.new.call(this,params);
+    /* initialisation */
+    // TODO: this.frame
+    // position: in parent. this.x/this.y
+    this.u = this.v = 0; /* velocity */
+    this.genus = null;
+    this.type = 'faller';
+    this.direction = GLOBAL.RandInt(2);
 
-        // TODO: this.frame
-        // position: in parent. this.x/this.y
-        this.u = this.v = 0; /* velocity */
-        this.genus = null;
-        this.type = 'faller';
-        this.direction = GLOBAL.RandInt(2);
+    /* properties of the image mapped on the screen */
+    this.x_map = this.y_map = 0;
+    this.width_map = this.height_map = 1;
 
-        /* properties of the image mapped on the screen */
-        this.x_map = this.y_map = null;
-        this.width_map = this.height_map = null;
+    
+    this.associate = Toon.UNASSOCIATED; /* toon is associated with a window */
+    this.wid = null; /* window associated with */
 
-        
-        this.associate = Toon.UNASSOCIATED; /* toon is associated with a window */
-        this.wid = null; /* window associated with */
+    //this.xoffset = this.yoffset = 0; /* location relative to window origin */
+   
+    this.frame = 0; /* Frame we're up to in the animation */
+    this.cycle = 0; /* Number of times frame cycle has repeated */
 
-        //this.xoffset = this.yoffset = 0; /* location relative to window origin */
-       
-        this.frame = 0; /* Frame we're up to in the animation */
-        this.cycle = 0; /* Number of times frame cycle has repeated */
+    this.pref_direction = -1;
+    this.pref_climb = false;
+    this.hold = false;          // <-- TODO
+    this.active = false;
+    this.terminating = false;
+    //this.mapped = false;       // <-- TODO in parent, not writable.
+    this.squished = false;
+    //Pixmap background;   /* @@ storing the background so we can repaint where we've been */
 
-        this.pref_direction = null;
-        this.pref_climb = null;
-        this.hold = null;          // <-- TODO
-        this.active = false;
-        this.terminating = false;
-        //this.mapped = false;       // <-- TODO in parent, not writable.
-        this.squished = false;
-        //Pixmap background;   /* @@ storing the background so we can repaint where we've been */
+    // UGLY way to access the ToonData object ?!
+    //this.data = this.ToonData[this.genus][this.type];
+    //this.GLOBAL = GLOBALDATA;
+    this.ToonData = ToonData;
 
-        // UGLY way to access the ToonData object ?!
-        //this.data = this.ToonData[this.genus][this.type];
-        //this.GLOBAL = GLOBALDATA;
-        this.ToonData = ToonData;
-
-        if ( props ) {
-            for ( prop in props ) {
-                this[prop] = props[prop];
-            }
+    if ( props ) {
+        for ( prop in props ) {
+            this[prop] = props[prop];
         }
+    }
+/*
+    if ( this.genus ) {
+        this.init();
+    }
+    this.set_position(0,0); 
+    // TODO: CLONE NEEDS SIZE SET
+*/
+}
+inherits(Toon.Toon, Clutter.Clone);
 
-        if ( this.genus ) {
-            this.init();
+/* Only call this *after* setting the toon's genus */
+Toon.Toon.prototype.init = function() {
+    this.set_source( this.data.texture );
+    this.set_position( GLOBAL.RandInt(GLOBAL.XPenguinsWindow.width - this.data.width), 1 - this.data.height );
+    this.set_velocity( this.direction*2-1, this.data.speed );
+}
+
+// TODO: get data() vs storing .data (performance)
+Toon.Toon.prototype.__defineGetter__('data', function() {
+    if ( this.genus && this.type ) {
+        return this.ToonData[this.genus][this.type];
+    } else {
+        return null;
+    }
+});
+
+/* ToonSetType */
+Toon.Toon.prototype.set_type = function( type, direction, gravity ) {
+    this.set_genus_and_type( this.genus, type, direction, gravity );
+}
+
+/* Change a toons genus and type and activate it. */
+/* Gravity determines position offset of toon if size different from
+ * previous type.
+ * ToonSetGenusAndType */
+Toon.Toon.prototype.set_genus_and_type = function( genus, type, direction, gravity ) {
+    let new_position = this.calculate_new_position(genus, type, gravity);
+    this.set_position(new_position[0], new_position[1]);
+    this.type = type;
+    this.genus = genus;
+    this.data = newdata;
+    this.cycle = 0;
+    this.direction = direction;
+    this.frame = 0;
+    this.active = true;
+}
+
+/* Set a toons association direction - e.g. Toon_DOWN if the toon
+   is walking along the tops the window, Toon_UNASSOCIATED if
+   the toon is in free space */
+// ToonSetAssocation
+Toon.Toon.prototype.set_association = function( direction ) {
+    this.associate = direction;
+}
+
+// ToonSetVelocity
+Toon.Toon.prototype.set_velocity = function( u, v ) { 
+    this.u = u;
+    this.v = v;
+}
+
+/* Calculates the new x and y when a toon changes type/genus
+ * Used in both SetGenusAndType and CheckBlocked.
+ * Returns array [newx,newy].
+ */
+Toon.Toon.prototype.calculate_new_position = function( genus, type, gravity ) {
+    let newdata = this.ToonData[genus][type];
+    let x=this.x, y=this.y;
+    if ( this.gravity == Toon.HERE ) {
+        x += Math.round((this.data.width - newdata.width)/2);
+        y += Math.round((this.data.height - newdata.height)/2);
+    } else if ( this.gravity == Toon.DOWN ) {
+        x += Math.round((this.data.width - newdata.width)/2);
+        y += Math.round((this.data.height - newdata.height));
+    } else if ( this.gravity == Toon.UP ) {
+        x += Math.round((this.data.width - newdata.width)/2);
+    } else if ( this.gravity == Toon.LEFT ) {
+        y += Math.round((this.data.height - newdata.height)/2);
+    } else if ( this.gravity == Toon.RIGHT ) {
+        x += Math.round((this.data.width - newdata.width));
+        y += Math.round((this.data.height - newdata.height)/2);
+    } else if ( this.gravity == Toon.DOWNLEFT ) {
+        y += Math.round((this.data.height - newdata.height));
+    } else if ( this.gravity == Toon.DOWNRIGHT ) {
+        x += Math.round((this.data.width - newdata.width));
+        y += Math.round((this.data.height - newdata.height));
+    } else if ( this.gravity == Toon.UPRIGHT ) {
+        x += Math.round((this.data.width - newdata.width));
+    }
+    return [x,y];
+}
+
+/* Check to see if a toon would be squashed instantly if changed to
+ *  certain type, return 1 if squashed, 0 otherwise. Useful to call
+ *  before ToonSetType(). 
+ * ToonCheckBlocked
+ */
+Toon.Toon.prototype.check_blocked = function( type, gravity ) {
+    let newpos = this.calculate_new_position(this.genus, type, gravity);
+    let newdata = this.ToonData[this.genus][type];
+    // TODO:
+    return XRectInRegion(toon_windows, newpos[0], newpos[1], newdata.width, newdata.height);
+}
+
+/* Turn a penguin into a climber */
+// __xpenguins_make_climber
+Toon.Toon.prototype.make_climber = function() {
+    this.set_type('climber', this.direction, (this.direction ? Toon.DOWNRIGHT : Toon.DOWNLEFT));
+    this.SetAssocation( this.direction );
+    this.set_velocity( 0, -this.data.speed ); // this.data is now CLIMBER
+}
+
+/* Turn a penguin into a walker. To ensure that a climber turning
+ * into a walker does not loose its footing, set shiftforward
+ * to 1 (otherwise 0)
+ */
+// __xpenguins_make_walker
+Toon.Toon.prototype.make_walker = function(shiftforward) {
+    let gravity = (shiftforward ? 
+                    (this.direction ? Toon.DOWNRIGHT : Toon.DOWNLEFT) :
+                    Toon.DOWN);
+    let newtype = 'walker';
+    // 25%  chance of becoming a runner
+    if ( this.ToonData[this.genus]['runner'] && !GLOBAL.RandInt(4) ) {
+        newtype = 'runner';
+        /* Sometimes runners are larger than walkers: check for immediate squash */
+        if ( this.check_blocked( newtype, gravity ) )
+            newtype = 'walker';
+    }
+    this.set_type( newtype, this.direction, gravity );
+    this.set_association( Toon.DOWN );
+    this.set_velocity( this.data.speed*(2*this.direction-1), 0 );
+}
+
+/* Turn penguin into a faller
+ * __xpenguins_make_faller
+ */
+Toon.Toon.prototype.make_faller = function() {
+    this.set_type('faller', this.direction, Toon.UP);
+    this.set_velocity( this.direction*2-1, this.data.speed );
+    this.set_association(Toon.UNASSOCIATED);
+}
+
+/* Attempt to move a toon based on its velocity.
+ * 'mode' can be: 
+ * - Toon.MOVE (move unless blocked),
+ * - Toon.FORCE (move regardless),
+ * - Toon.STILL (test move but don't actually do it).
+ * Returns: 
+ * - Toon.BLOCKED if blocked, 
+ * - Toon.OK if unblocked
+ * - Toon.PARTIALMOVE if limited movement is possible
+ * ToonAdvance
+ */
+Toon.Toon.prototype.Advance = function(mode) {
+    let move_ahead = ( mode == Toon.STILL ? false : true );
+
+    let newx = this.x + this.u;
+    let newy = this.y + this.v;
+    let stationary = ( this.u == 0 && this.v == 0 );
+
+    let result;
+
+    if ( GLOBAL.TOON_EDGE_BLOCK ) {
+        if ( newx < 0 ) {
+            newx = 0;
+            result = Toon.PARTIALMOVE;
+        } else if ( newx + this.data.width > GLOBAL.XPenguinsWindow.width ) {
+            newx = GLOBAL.XPenguinsWindow.width - data.width;
+            result = Toon.PARTIALMOVE;
         }
-        this.set_position(0,0); 
-    },
-
-    /* Only call this *after* setting the toon's genus */
-    init: function() {
-        this.set_source( this.data.texture );
-        this.set_position( GLOBAL.RandInt(GLOBAL.XPenguinsWindow.width - this.data.width), 1 - this.data.height );
-        this.set_velocity( this.direction*2-1, this.data.speed );
-    },
-
-    // TODO: get data() vs storing .data (performance)
-    get data() {
-        if ( this.genus && this.type ) {
-            return this.ToonData[this.genus][this.type];
-        } else {
-            return null;
-        }
-    },
-
-    /* ToonSetType */
-    set_type: function( type, direction, gravity ) {
-        this.set_genus_and_type( this.genus, type, direction, gravity );
-    },
-
-    /* Change a toons genus and type and activate it. */
-    /* Gravity determines position offset of toon if size different from
-     * previous type.
-     * ToonSetGenusAndType */
-    set_genus_and_type: function( genus, type, direction, gravity ) {
-        let new_position = this.calculate_new_position(genus, type, gravity);
-        this.set_position(new_position[0], new_position[1]);
-        this.type = type;
-        this.genus = genus;
-        this.data = newdata;
-        this.cycle = 0;
-        this.direction = direction;
-        this.frame = 0;
-        this.active = true;
-    },
-
-    /* Set a toons association direction - e.g. Toon_DOWN if the toon
-       is walking along the tops the window, Toon_UNASSOCIATED if
-       the toon is in free space */
-    // ToonSetAssocation
-    set_association: function( direction ) {
-        this.associate = direction;
-    },
-
-    // ToonSetVelocity
-    set_velocity: function( u, v ) { 
-        this.u = u;
-        this.v = v;
-    },
-
-    /* Calculates the new x and y when a toon changes type/genus
-     * Used in both SetGenusAndType and CheckBlocked.
-     * Returns array [newx,newy].
-     */
-    calculate_new_position: function( genus, type, gravity ) {
-        let newdata = this.ToonData[genus][type];
-        let x=this.x, y=this.y;
-        if ( this.gravity == Toon.HERE ) {
-            x += Math.round((this.data.width - newdata.width)/2);
-            y += Math.round((this.data.height - newdata.height)/2);
-        } else if ( this.gravity == Toon.DOWN ) {
-            x += Math.round((this.data.width - newdata.width)/2);
-            y += Math.round((this.data.height - newdata.height));
-        } else if ( this.gravity == Toon.UP ) {
-            x += Math.round((this.data.width - newdata.width)/2);
-        } else if ( this.gravity == Toon.LEFT ) {
-            y += Math.round((this.data.height - newdata.height)/2);
-        } else if ( this.gravity == Toon.RIGHT ) {
-            x += Math.round((this.data.width - newdata.width));
-            y += Math.round((this.data.height - newdata.height)/2);
-        } else if ( this.gravity == Toon.DOWNLEFT ) {
-            y += Math.round((this.data.height - newdata.height));
-        } else if ( this.gravity == Toon.DOWNRIGHT ) {
-            x += Math.round((this.data.width - newdata.width));
-            y += Math.round((this.data.height - newdata.height));
-        } else if ( this.gravity == Toon.UPRIGHT ) {
-            x += Math.round((this.data.width - newdata.width));
-        }
-        return [x,y];
-    },
-
-    /* Check to see if a toon would be squashed instantly if changed to
-     *  certain type, return 1 if squashed, 0 otherwise. Useful to call
-     *  before ToonSetType(). 
-     * ToonCheckBlocked
-     */
-    check_blocked: function( type, gravity ) {
-        let newpos = this.calculate_new_position(this.genus, type, gravity);
-        let newdata = this.ToonData[this.genus][type];
-        // TODO:
-        return XRectInRegion(toon_windows, newpos[0], newpos[1], newdata.width, newdata.height);
-    },
-
-    /* Turn a penguin into a climber */
-    // __xpenguins_make_climber
-    make_climber: function() {
-        this.set_type('climber', this.direction, (this.direction ? Toon.DOWNRIGHT : Toon.DOWNLEFT));
-        this.SetAssocation( this.direction );
-        this.set_velocity( 0, -this.data.speed ); // this.data is now CLIMBER
-    },
-
-    /* Turn a penguin into a walker. To ensure that a climber turning
-     * into a walker does not loose its footing, set shiftforward
-     * to 1 (otherwise 0)
-     */
-    // __xpenguins_make_walker
-    make_walker: function(shiftforward) {
-        let gravity = (shiftforward ? 
-                        (this.direction ? Toon.DOWNRIGHT : Toon.DOWNLEFT) :
-                        Toon.DOWN);
-        let newtype = 'walker';
-        // 25%  chance of becoming a runner
-        if ( this.ToonData[this.genus]['runner'] && !GLOBAL.RandInt(4) ) {
-            newtype = 'runner';
-            /* Sometimes runners are larger than walkers: check for immediate squash */
-            if ( this.check_blocked( newtype, gravity ) )
-                newtype = 'walker';
-        }
-        this.set_type( newtype, this.direction, gravity );
-        this.set_association( Toon.DOWN );
-        this.set_velocity( this.data.speed*(2*this.direction-1), 0 );
-    },
-
-    /* Turn penguin into a faller
-     * __xpenguins_make_faller
-     */
-    make_faller: function() {
-        this.set_type('faller', this.direction, Toon.UP);
-        this.set_velocity( this.direction*2-1, this.data.speed );
-        this.set_association(Toon.UNASSOCIATED);
-    },
-
-    /* Attempt to move a toon based on its velocity.
-     * 'mode' can be: 
-     * - Toon.MOVE (move unless blocked),
-     * - Toon.FORCE (move regardless),
-     * - Toon.STILL (test move but don't actually do it).
-     * Returns: 
-     * - Toon.BLOCKED if blocked, 
-     * - Toon.OK if unblocked
-     * - Toon.PARTIALMOVE if limited movement is possible
-     * ToonAdvance
-     */
-    Advance: function(mode) {
-        let move_ahead = ( mode == Toon.STILL ? false : true );
-
-        let newx = this.x + this.u;
-        let newy = this.y + this.v;
-        let stationary = ( this.u == 0 && this.v == 0 );
-
-        let result;
-
+    }
+    if ( this.data.conf & Toon.NOBLOCK ) {
+        /* Just consider blocking by the sides of the screen,
+         * no further action required than the X direction already done
+         */
+    } else {
+        /* Consider all blocking: additionally y */
         if ( GLOBAL.TOON_EDGE_BLOCK ) {
-            if ( newx < 0 ) {
-                newx = 0;
+            if ( newy < 0 && GLOBAL.TOON_EDGE_BLOCK != Toon.SIDEBOTTOMBLOCK ) {
+                newy = 0;
                 result = Toon.PARTIALMOVE;
-            } else if ( newx + this.data.width > GLOBAL.XPenguinsWindow.width ) {
-                newx = GLOBAL.XPenguinsWindow.width - data.width;
+            } else if ( newy + this.data.height > GLOBAL.XPenguinsWindow.height ) {
+                newy = GLOBAL.XPenguinsWindow.height - data.height;
                 result = Toon.PARTIALMOVE;
+            }
+            if ( newx == this.x && newy == this.y && !stationary ) {
+                result = Toon.BLOCKED;
             }
         }
-        if ( this.data.conf & Toon.NOBLOCK ) {
-            /* Just consider blocking by the sides of the screen,
-             * no further action required than the X direction already done
-             */
-        } else {
-            /* Consider all blocking: additionally y */
-            if ( GLOBAL.TOON_EDGE_BLOCK ) {
-                if ( newy < 0 && GLOBAL.TOON_EDGE_BLOCK != Toon.SIDEBOTTOMBLOCK ) {
-                    newy = 0;
-                    result = Toon.PARTIALMOVE;
-                } else if ( newy + this.data.height > GLOBAL.XPenguinsWindow.height ) {
-                    newy = GLOBAL.XPenguinsWindow.height - data.height;
-                    result = Toon.PARTIALMOVE;
-                }
-                if ( newx == this.x && newy == this.y && !stationary ) {
-                    result = Toon.BLOCKED;
-                }
-            }
 
-            /* Is new toon location fully/partially filled with windows? */
-            // TODO. new_zone boolean for now FALSE if RectangleOut TRUE otherwise
-            let new_zone = XRectInRegion(GLOBAL.toon_windows,newx,newy,this.data.width,this.data.height);
-            if ( new_zone && mode == Toon.MOVE &&
-                 result != Toon.BLOCKED && !stationary ) {
-                let tryx, tryy, step=1, u=newx-this.x, v=newy-this.y;
-                result = Toon.BLOCKED;
-                move_ahead=false;
-                /* How far can we move the toon? */
-                if ( Math.abs(v) < Math.abs(u) ) {
-                    if ( newx > this.x ) {
-                        step = -1;
-                    }
-                    for ( tryx = newx+step; tryx != this.x; tryx += step ) {
-                        tryy = this.y + (tryx-this.x)*v/u;
-                        // why the '!'?
-                        if ( !XRectInRegion(GLOBAL.toon_windows, tryx, tryy, this.data.width, this.data.height) ) {
-                            newx = tryx;
-                            newy = tryy;
-                            result = Toon.PARTIALMOVE;
-                            move_ahead=true;
-                            break;
-                        }
-                    }
-                // faster vertically than horiz
-                } else {
-                    if ( newy > this.y ) {
-                        step=-1;
-                    }
-                    for ( tryy = newy+step; tryy != this.y; tryy += step ) {
-                        tryx = this.x + (tryy-this.y)*u/v;
-                        if ( !XRectInRegion(GLOBAL.toon_windows, tryx, tryy, this.data.width, this.data.height) ) {
-                            newx = tryx;
-                            newy = tryy;
-                            result = Toon.PARTIALMOVE;
-                            move_ahead=true;
-                            break;
-                        }
-                    }
-                }
-
-                xy = this.xy;
-                MAJ = ( Math.abs(uv[1]) < Math.abs(uv[0]) ? 0 : 1 );
-                MIN = 1-MAJ;
-                if ( newxy[MAJ] > xy[MAJ] ) {
+        /* Is new toon location fully/partially filled with windows? */
+        // TODO. new_zone boolean for now FALSE if RectangleOut TRUE otherwise
+        let new_zone = XRectInRegion(GLOBAL.toon_windows,newx,newy,this.data.width,this.data.height);
+        if ( new_zone && mode == Toon.MOVE &&
+             result != Toon.BLOCKED && !stationary ) {
+            let tryx, tryy, step=1, u=newx-this.x, v=newy-this.y;
+            result = Toon.BLOCKED;
+            move_ahead=false;
+            /* How far can we move the toon? */
+            if ( Math.abs(v) < Math.abs(u) ) {
+                if ( newx > this.x ) {
                     step = -1;
                 }
-                /*
-                 * Compresses the above into one step.
-                let tryMAX, tryMIN, tryxy=[], step;
-                for ( tryMAX = newxy[MAJ]+step; tryMAX != xy[MAJ]; tryMAX += step ) {
-                    tryMIN = xy[MIN] + (tryMAX-xy[MAJ])*uv[MIN]/uv[MAX];
-                    tryxy[MAX] = tryMAX;
-                    tryxy[MIN] = tryMIN;
-                    if ( !XRectInRegion(GLOBAL.toon_windows, tryxy[0], tryxy[1], this.data.width, this.data.height) ) {
-                        newxy = tryxy;
+                for ( tryx = newx+step; tryx != this.x; tryx += step ) {
+                    tryy = this.y + (tryx-this.x)*v/u;
+                    // why the '!'?
+                    if ( !XRectInRegion(GLOBAL.toon_windows, tryx, tryy, this.data.width, this.data.height) ) {
+                        newx = tryx;
+                        newy = tryy;
                         result = Toon.PARTIALMOVE;
                         move_ahead=true;
                         break;
                     }
                 }
-                */
-            }
-        } /* what sort of blocking to consider */
-
-        if ( move_ahead ) {
-            this.x = newx;
-            this.y = newy;
-            // see if we've scrolled to the end of the filmstrip
-            if ( (++this.frame) >= this.nframes ) {
-                this.frame = 0;
-                ++(this.cycle);
-                if ( GLOBAL.NOCYCLE ) {
-                    this.active = 0;
+            // faster vertically than horiz
+            } else {
+                if ( newy > this.y ) {
+                    step=-1;
+                }
+                for ( tryy = newy+step; tryy != this.y; tryy += step ) {
+                    tryx = this.x + (tryy-this.y)*u/v;
+                    if ( !XRectInRegion(GLOBAL.toon_windows, tryx, tryy, this.data.width, this.data.height) ) {
+                        newx = tryx;
+                        newy = tryy;
+                        result = Toon.PARTIALMOVE;
+                        move_ahead=true;
+                        break;
+                    }
                 }
             }
-        } else if ( GLOBAL.NOCYCLE ) {
-            if ( (++this.frame) >= this.nframes ) {
-                this.frame = 0;
-                this.cycle = 0;
+
+            xy = this.xy;
+            MAJ = ( Math.abs(uv[1]) < Math.abs(uv[0]) ? 0 : 1 );
+            MIN = 1-MAJ;
+            if ( newxy[MAJ] > xy[MAJ] ) {
+                step = -1;
+            }
+            /*
+             * Compresses the above into one step.
+            let tryMAX, tryMIN, tryxy=[], step;
+            for ( tryMAX = newxy[MAJ]+step; tryMAX != xy[MAJ]; tryMAX += step ) {
+                tryMIN = xy[MIN] + (tryMAX-xy[MAJ])*uv[MIN]/uv[MAX];
+                tryxy[MAX] = tryMAX;
+                tryxy[MIN] = tryMIN;
+                if ( !XRectInRegion(GLOBAL.toon_windows, tryxy[0], tryxy[1], this.data.width, this.data.height) ) {
+                    newxy = tryxy;
+                    result = Toon.PARTIALMOVE;
+                    move_ahead=true;
+                    break;
+                }
+            }
+            */
+        }
+    } /* what sort of blocking to consider */
+
+    if ( move_ahead ) {
+        this.x = newx;
+        this.y = newy;
+        // see if we've scrolled to the end of the filmstrip
+        if ( (++this.frame) >= this.nframes ) {
+            this.frame = 0;
+            ++(this.cycle);
+            if ( GLOBAL.NOCYCLE ) {
                 this.active = 0;
             }
         }
-        return result;
-    }, // advance
+    } else if ( GLOBAL.NOCYCLE ) {
+        if ( (++this.frame) >= this.nframes ) {
+            this.frame = 0;
+            this.cycle = 0;
+            this.active = 0;
+        }
+    }
+    return result;
+} // advance
 
-    /* DRAWING */
+/* DRAWING */
 
-    /* Draws the current toon */
-    Draw: function() {
-        /* Draw the toon on */
-        if ( this.active ) {
-            // NOTE: do I set this.direction to direction?
-            let direction = (this.direction >= this.data.ndirections ? 0 : this.direction);
+/* Draws the current toon */
+Toon.Toon.prototype.Draw = function() {
+    /* Draw the toon on */
+    if ( this.active ) {
+        // NOTE: do I set this.direction to direction?
+        let direction = (this.direction >= this.data.ndirections ? 0 : this.direction);
 
-            // BIG TODO: top left/bottom right? how is the coordinate systeM?
-            /* Set the clip mask for the penguin,
-             * i.e. define the rectangle of the pixmap to show */
-            this.set_clip( this.x - this.data.width*this.frame, 
-                           this.y - this.data.height*this.direction,
-                           this.data.width,
-                           this.data.height);
-            /* Draw on the screen.... .show() should take care of that already? */
+        /* set_clip computed from upper left corner of actor */
+        this.set_clip( this.data.width*this.frame, 
+                       this.data.height*this.direction,
+                       this.data.width,
+                       this.data.height);
+        /* Draw on the screen.... .show() should take care of that already? */
 
-            /* update properties */
-            // TODO: what are these for?
-            this.x_map = this.x;
-            this.y_map = this.y;
-            this.width_map = this.data.width;
-            this.height_map = this.data.height;
-            //this.mapped = true;
+        /* update properties */
+        // TODO: what are these for?
+        this.x_map = this.x;
+        this.y_map = this.y;
+        this.width_map = this.data.width;
+        this.height_map = this.data.height;
+        //this.mapped = true;
+    } else {
+        //this.mapped = false;
+        // BIGTODO: this.mapped is read only
+    }
+} 
+
+/* Erase the current toon.
+ * If toon_expose is set then every expose_cycles frame an expose
+ * event is sent to redraw any desktop icons.
+ */
+// TODO: Do I need to bother with expose events?
+// Depends on if I draw on the current screen's display or a window sitting over it.
+// BIG TODO: I don't think I need Erase().
+Toon.Toon.prototype.Erase = function() {
+    if ( this.mapped ) {
+        // XClearArea( this.x_map, this.y_map, this.width_map, this.height_map );
+        // Loop through toons and find {min,max}{x,y}
+        if ( GLOBAL.toon_expose && GLOBAL.expose_count > 100 && maxx > minx && maxy > miny ) {
+            // send expose event
+            GLOBAL.expose_count=0;
         } else {
-            //this.mapped = false;
-            // BIGTODO: this.mapped is read only
+            ++GLOBAL.expose_count;
         }
-    }, 
-
-    /* Erase the current toon.
-     * If toon_expose is set then every expose_cycles frame an expose
-     * event is sent to redraw any desktop icons.
-     */
-    // TODO: Do I need to bother with expose events?
-    // Depends on if I draw on the current screen's display or a window sitting over it.
-    // BIG TODO: I don't think I need Erase().
-    Erase: function() {
-        if ( this.mapped ) {
-            // XClearArea( this.x_map, this.y_map, this.width_map, this.height_map );
-            // Loop through toons and find {min,max}{x,y}
-            if ( GLOBAL.toon_expose && GLOBAL.expose_count > 100 && maxx > minx && maxy > miny ) {
-                // send expose event
-                GLOBAL.expose_count=0;
-            } else {
-                ++GLOBAL.expose_count;
-            }
-        }
-    },
-});
+    }
+}
 
 /**********************************/
 /* The ToonData structure describes the properties of a type of toon,

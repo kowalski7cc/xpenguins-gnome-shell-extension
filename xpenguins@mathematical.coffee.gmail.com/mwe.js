@@ -95,13 +95,17 @@ if ( TestsToDo['Toon'] ) {
      */
     var toon = new Toon.Toon(theme.ToonData, {genus:1},
             theme.ToonData[1]['walker'].texture); 
-    toon.set_position(0,0);
+    toon.set_position(0,0); // ARGH why does this say it can't do it?
 
+    /* CAN'T WORK OUT HOW TO INITIALISE EMPTY IN GNOME 3.2 */
     /* initialise empty */
+    /*
     toon = new Toon.Toon(theme.ToonData);
     // BIGTODO: toon.set_genus('genus_name'); & this.theme ?
     toon.genus = 1;
     toon.init();
+    */
+
 
 }
 
@@ -161,6 +165,7 @@ Clutter.init(null);
     //print(toon.direction); // note: if i remove this it dies.
     toon.Draw();
     toon.show();
+    // toon.Advance(Toon.MOVE)
     print(toon.get_clip());
 
     /* Set up a timeline */
