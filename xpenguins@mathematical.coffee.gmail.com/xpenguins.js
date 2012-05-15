@@ -33,7 +33,7 @@ function XPenguinsLoop() {
 
 XPenguinsLoop.prototype = {
     log: function(msg) {
-        if ( this.DEBUG ) {
+        if ( this.options.DEBUG ) {
             global.log(msg);
             print(msg);
             log(msg);
@@ -66,7 +66,7 @@ XPenguinsLoop.prototype = {
             When there are no  toons  on  the screen, XPenguins uses only a miniscule amount of CPU time - 
             it just wakes up every 5 seconds to recheck the load.
         */
-        load_check_interval : 5000000, /* 5s between load average checks */
+        load_check_interval : 5000, /* ms between load average checks */
         load_cycles, /* number of frames between load average checks */
         load1 : -1.0, /* Start killing penguins if load reaches this amount */
         load2 : -1.0, /* All gone by this amount (but can come back!) */
@@ -100,7 +100,7 @@ XPenguinsLoop.prototype = {
         max_relocate_right: 16,
 
         // possibly unnecessary/can't be implemented/depreciate
-        sleep_usec : 0, // <-- delay in milliseconds between each frame.
+        sleep_msec : 0, // <-- delay in milliseconds between each frame.
         /* Toons  regard  all  windows  as  rectangular.  */
         /* Possible slight speedup but if you use a window manager with shaped windows */
         /*  your toons might look like they're walking on thin air. */
@@ -131,6 +131,7 @@ XPenguinsLoop.prototype = {
         this._theme = null;
         this._active = false;
         this._penguins = [];
+        this._sleepID = null;
 
         /* See if load averaging will work */ 
         if ( this.options.load1 >= 0 ) {
@@ -140,7 +141,7 @@ XPenguinsLoop.prototype = {
                 this.options.load1 = -1;
                 this.options.load2 = -1;
             } else {
-                this.options.load_cycles = this.options.load_check_interval/this.options.sleep_usec;
+                this.options.load_cycles = this.options.load_check_interval/this.options.sleep_msec;
             }
         }
 
@@ -185,9 +186,11 @@ XPenguinsLoop.prototype = {
         // TODO: check that it loaded properly
 
         /* theme-specific options */
-        if ( !opt.sleep_usec ) {
-            opt.sleep_usec = 1000*this._theme.delay;
+        if ( !opt.sleep_msec ) {
+            opt.sleep_msec = this._theme.delay;
         }
+        this.timeline.set_duration(opt.sleep_msec); // ??
+        // BIGTODO: I ONLY WANT *ONE FRAME* PER TIMELINE?
         if ( opt.nPenguins < 0 ) {
         // TODO: initially set the slider to the default from the theme
             opt.nPenguins = this._theme.total;
@@ -233,64 +236,442 @@ XPenguinsLoop.prototype = {
                 function() {
                     /* insert main loop here? */
                     // xpenguins_frame() ?
+                    // BIGTODO: frames_active = xpenguins_frame() || !interupts?
                 }
         );
-        let interupts = false;
-        let cycle=0;
-        while ( let frames_active = xpenguins_frame() || !interupts ) {
-            if ( interupts && this._DEBUG ) {
-                this.log('.');
-            }
-      
-            if (ToonSignal()) {
-                if (++interupts > 1) {
-                    break;
-                } 
-                this.log(_('Interrupt received: Exiting.'));
-                ToonConfigure(TOON_EXITGRACEFULLY);
-                this.set_number(0);
-            
-            } else if (!interupts && cycle > this.load_cycles && this.load1 >= 0.0) {
-                let load = loadAverage();
-                let newp;
-                if ( this.load2 > this.load1 ) {
-                    newp = Math.round(((this.load2-load)*this.nPenguins)/(this.load2-this.load1));
-                    // TODO: change to max/min?
-                    if ( newp > this.nPenguins ) {
-                        newp = this.nPenguins;
-                    } else if ( newp < 0 ) {
-                        newp = 0;
-                    }
-                } else if ( load < this.load1 ) {
-                    newp = this.nPenguins;
-                } else {
-                    newp = 0;
-                }
-        
-                if ( this.nPenguins != newp ) {
-                    this.set_number(newp);
-                }
-        
-                this.log(_('Adjusting number according to load'));
-                cycle = 0;
-            } else if (!frames_active) {
-                /* No frames active! Hybernate for 5 seconds... */
-                this.sleep(this.load_check_interval);
-                cycle = this.load_cycles;
-            }
-            this.sleep(this.sleep_usec);
-            ++cycle;
-        }
-        this.log(' Done.');
-        this.exit();
-    }, // start
-
-    _frame: function() {
-        // one frame of the xpenguins iteration.
+        this.frames_active = 0; // <- necessary?
+        this.cycle = 0;
+        this._interupts = 0; // replaced by:
+        this._exiting = false;
     },
+
+    _onInterrupt: function() {
+        if ( this.options.DEBUG ) {
+            this.log('.');
+        }
+
+        this.log(_('Interrupt received: Exiting.'));
+       
+        /* set the 'exit gracefully flag' */ 
+        // TODO
+        ToonConfigure(TOON_EXITGRACEFULLY);
+        this.set_number(0);
+
+        this._exiting = true;
+    },
+
+    /* if ToonWindowsMoved() then this occurs.
+     * In xpenguins_frame.
+     */
+    _onToonWindowsMoved: function() {
+        /* check for squashed toons */
+        // TODO:
+        //ToonCalculateAssociations(penguin, penguin_number);
+        //ToonLocateWindows();
+        //ToonRelocateAssociated(penguin, penguin_number);
+    },
+    
+    _frame: function(timeline, elapsed_time) {
+        /* xpenguins_frame() */
+        let sstatus, direction, last_active = -1;
+        
+        /* Loop through all the toons */
+        // BIG BIG TODO: this.nPenguins is the number of penguins meant to be
+        // active, not including the dying ones.
+        // This._penguins.length can include dead penguins up to the max for the theme
+        // (????????)
+        // Do I need a this.currentPenguins?
+        for ( let i=0; i<this._penguins.length; ++i ) {
+            if ( !this._penguins[i].active ) {
+                if (!this._penguins[i].terminating) {
+                    // it's done terminating and needs to be reborn! :D
+                    this._penguins[i].init();
+                    last_active = i; // TODO: what for?
+                }
+            }
+            /*
+            // TODO: else if ( in god mode & you squished a penguin )
+            else if (toon_button_x >= 0
+                 && type != PENGUIN_EXPLOSION && type != PENGUIN_ZAPPED
+                 && type != PENGUIN_SQUASHED && type != PENGUIN_ANGEL
+                 && type != PENGUIN_SPLATTED && type != PENGUIN_EXIT
+                 && !penguin[i].terminating
+                 && toon_button_x > penguin[i].x_map
+                 && toon_button_y > penguin[i].y_map
+                 && toon_button_x < penguin[i].x_map + penguin[i].width_map
+                 && toon_button_y < penguin[i].y_map + penguin[i].height_map) {
+                  // Toon has been hit by a button press 
+                if (xpenguins_blood && gdata[PENGUIN_ZAPPED].exists) {
+                    ToonSetType(penguin+i, PENGUIN_ZAPPED,
+                        penguin[i].direction, TOON_DOWN);
+                } else if (gdata[PENGUIN_EXPLOSION].exists) {
+                    ToonSetType(penguin+i, PENGUIN_EXPLOSION,
+                        penguin[i].direction, TOON_HERE);
+                } else {
+                    penguin[i].active = 0;
+                }
+                ToonSetAssociation(penguin+i, TOON_UNASSOCIATED);
+                last_active = i;
+            }
+            */
+            else {
+                /* laziness */
+                let toon = this._penguins[i];
+                let data = GLOBAL.ToonData[toon.genus];
+                last_active = i; // TODO: seems to be set to i always?
+
+                // TODO: this.conf
+                /* see if the toon is squashed */
+                if ( !((this.conf & Toon.NOBLOCK) | (this.conf & Toon.INVULNERABLE))
+                        && toon.blocked(Toon.HERE) ) {
+                    if ( o.blood && data['squashed'] ) {
+                        toon.set_type('squashed', toon.direction, Toon.HERE);
+                    } else if ( data['explosion'] ) {
+                        toon.set_type('explosion', toon.direction, Toon.HERE);
+                    } else {
+                        toon.active = 0;
+                    }
+                    toon.set_velocity(0, 0);
+                    toon.set_association( Toon.UNASSOCIATED );
+                } else { // whether squashed
+                    /* move the toon */
+                    sstatus = toon.Advance(Toon.MOVE);
+                    // switch ( toon.type )
+                    if ( toon.type == 'faller' ) {
+                        if ( sstatus != Toon.OK ) {
+                            /* if it has landed change type appropriately */
+                            if ( toon.blocked(Toon.DOWN) ) {
+                                toon.direction = ( toon.pref_direction > -1 ?
+                                                   toon.pref_direction : GLOBAL.RandInt(2) );
+                                toon.make_walker(false);
+                                toon.pref_direction = -1;
+                            } else {
+                                /* turn into climber (if exists) or bounce off */
+                                if ( !data['climber'] || GLOBAL.RandInt(2) ) {
+                                    toon.set_velocity(-toon.u, data['faller'].speed);
+                                } else {
+                                    toon.direction = (toon.u>0);
+                                    toon.make_climber();
+                                }
+                            }
+                            // TODO: data[toon.type] vs toon.data: speedup?
+                        } else if (toon.v < toon.data.terminal_velocity) {
+                        /* status is OK, accelerate */
+                            toon.v += toon.data.acceleration;
+                        }
+                    }
+                    /* tumbler */
+                    else if ( toon.type == 'tumbler' ) {
+                        if ( sstatus != Toon.OK ) {
+                            /* should it splat? (33% chance if reached terminal velocity) */
+                            if ( o.blood && data['splatted'] &&
+                                 toon.v >= toon.data.terminal_velocity &&
+                                 !GLOBAL.RandInt(3) ) {
+                                toon.set_type('splatted', Toon.LEFT, Toon.DOWN);
+                                toon.set_association(Toon.DOWN);
+                                toon.set_velocity(0, 0);
+                            } else {
+                                /* got lucky - didn't splat: walk */
+                                toon.direction = ( toon.pref_direction > -1 ?
+                                                   toon.pref_direction : GLOBAL.RandInt(2) );
+                                toon.make_walker(false);
+                                toon.pref_direction = -1;
+                            } 
+                        } else if ( toon.v < toon.data.terminal_velocity ) {
+                            /* toon is OK to move, accelerate */
+                            toon.v += toon.data.acceleration;
+                        }
+                    } 
+                    /* walker or runner */
+                    else if ( toon.type == 'walker' || toon.type == 'runner' ) {
+                        if ( sstatus != Toon.OK ) {
+                            if ( sstatus == Toon.BLOCKED ) {
+                                /* try to step up... */
+                                let u = toon.u;
+                                // TODO: PENGUIN_JUMP
+                                if ( !toon.OffsetBlocked(u, -PENGUIN_JUMP) ) {
+                                    toon.moveby(u, -PENGUIN_JUMP);
+                                    toon.set_velocity(0, PENGUIN_JUMP-1);
+                                    toon.Advance( Toon.MOVE );
+                                    toon.set_velocity( u, 0 );
+                                    /* don't forget to accelerate! */
+                                    if ( Math.abs(u) < toon.data.terminal_velocity ) {
+                                        if ( toon.direction ) {
+                                            toon.u +=  toon.data.acceleration;
+                                        } else {
+                                            toon.u -=  toon.data.acceleration;
+                                        }
+                                    } else {
+                                        /* can't jump! we can turn around,
+                                         * fly or climb... */
+                                        let n = GLOBAL.RandInt(8)*(1-toon.pref_climb);
+                                        if ( n < 2 ) {
+                                            if ( (n==0 || !data['floater']) && data['climber'] ) {
+                                                toon.make_climber();
+                                                //break
+                                            } else if ( data['floater'] ) {
+                                                /* make floater */
+                                                let newdir = +!penguin.direction; // coerce to int
+                                                toon.set_type('floater', newdir, Toon.DOWN);
+                                                toon.set_association( Toon.UNASSOCIATED );
+                                                toon.set_velocity( (RandInt(5)+1)*(newdir*2-1),
+                                                                   -data['floater'].speed );
+                                                // break
+                                            }
+                                        } else {
+                                          /* Change direction *after* creating toon to make sure
+                                          that a runner doesn't get instantly squashed... */
+                                            toon.make_walker(false);
+                                            toon.direction = +!toon.direction; //coerce to int
+                                            toon.u = -toon.u;
+                                        }
+                                    }
+                                }
+                            }
+                        } else if ( !toon.blocked( Toon.DOWN ) ) {
+                            /* try to step (tumble/fall) down... */
+                            let u = toon.u;
+                            toon.set_velocity(0, PENGUIN_JUMP);
+                            sstatus = toon.Advance( Toon.MOVE );
+                            if ( sstatus == Toon.OK ) {
+                                toon.pref_direction = toon.direction;
+                                if ( data['tumbler'] ) {
+                                    toon.set_type('tumbler', toon.direction, Toon.DOWN);
+                                    toon.set_assocation( Toon.UNASSOCIATED );
+                                    toon.set_velocity( data['tumbler'].speed );
+                                } else {
+                                    toon.make_faller();
+                                    toon.u = 0;
+                                }
+                                toon.pref_climb = false;
+                            } else { /* couldn't tumble down */
+                                toon.set_velocity(u, 0);
+                            } 
+                        /* 1/100 chance of becoming actionX */
+                        } else if ( data['action0'] && !GLOBAL.RandInt(100) ) {
+                            let action = 1;
+                            /* find out how many actions exist */
+                            // TODO: store this in ToonData to prevent recalculating *every frame & genus*?
+                            while ( data['action%i'.format(action)] && ++action ) {};
+                            /* pick a random one */
+                            action = GLOBAL.RandInt(action);
+                            let actionN = 'action%i'.format(action);
+                            /* If we have enough space, start the action: */
+                            if ( !toon.CheckBlocked(actionN, Toon.DOWN) ) {
+                                toon.set_type(actionN, toon.direction, Toon.DOWN);
+                                toon.set_velocity(data[actionN].speed*(2*toon.direction-1), 0);
+                            }
+                        } else if ( Math.abs(toon.u) < toon.data.terminal_velocity ) {
+                        /* otherwise, just keep walking/running & accelerate. */
+                            if ( toon.direction )
+                                toon.u += toon.data.acceleration;
+                            else
+                                toon.u -= toon.data.acceleration;
+                        }
+                    }
+                    /* a toon engaged in an action */
+                    else if ( toon.type.match(/^action[0-9]+$/) ) {
+                        // UPTO
+                    } // switch( toon.type )
+            } // toon state
+        } // penguin loop
+        // BIG BIG TODO: put ToonData & penguins on the stage!
+
+	switch (type) {
+	case PENGUIN_ACTIONX:
+	  if (status != TOON_OK) {
+	    /* Try to drift up... */
+	    int u = penguin[i].u;
+	    if (!ToonOffsetBlocked(penguin+i, u, -PENGUIN_JUMP)) {
+	      ToonMove(penguin+i, u, -PENGUIN_JUMP);
+	      ToonSetVelocity(penguin+i, 0, PENGUIN_JUMP - 1);
+	      ToonAdvance(penguin+i, TOON_MOVE);
+	      ToonSetVelocity(penguin+i, u, 0);
+	    }
+	    else {
+	      /* Blocked! Turn back into a walker: */
+	      __xpenguins_make_walker(penguin+i, 0);
+	    }
+	  }
+	  else if (!ToonBlocked(penguin+i, TOON_DOWN)) {
+	    /* Try to drift down... */
+	    ToonSetVelocity(penguin+i, 0, PENGUIN_JUMP);
+	    status=ToonAdvance(penguin+i, TOON_MOVE);
+	    if (status == TOON_OK) {
+	      if (gdata[PENGUIN_TUMBLER].exists) {
+		ToonSetType(penguin+i, PENGUIN_TUMBLER,
+			    penguin[i].direction, TOON_DOWN);
+		ToonSetAssociation(penguin+i, TOON_UNASSOCIATED);
+		ToonSetVelocity(penguin+i, 0,
+				gdata[PENGUIN_TUMBLER].speed);
+	      }
+	      else {
+		__xpenguins_make_faller(penguin+i);
+	      }
+	      penguin[i].pref_climb = 0;
+	    }
+	    else {
+	      ToonSetVelocity(penguin+i, data->speed
+			      * ((2*penguin[i].direction)-1), 0);
+	    }
+	  }
+	  else if (penguin[i].frame == 0) {
+	    int loop = data->loop;
+	    if (!loop) {
+	      loop = -10;
+	    }
+	    if (loop < 0) {
+	      if (!RandInt(-loop)) {
+		__xpenguins_make_walker(penguin+i, 0);
+	      }
+	    }
+	    else if (penguin[i].cycle >= loop) {
+	      __xpenguins_make_walker(penguin+i, 0);
+	    }
+	  }
+	  break;
+
+	case PENGUIN_CLIMBER:
+	  direction = penguin[i].direction;
+	  if (penguin[i].y < 0) {
+	    penguin[i].direction = (!direction);
+	    __xpenguins_make_faller(penguin+i);
+	    penguin[i].pref_climb = 0;
+	  }
+	  else if (status == TOON_BLOCKED) {
+	    /* Try to step out... */
+	    int v = penguin[i].v;
+	    int xoffset = (1-direction*2) * PENGUIN_JUMP;
+	    if (!ToonOffsetBlocked(penguin+i, xoffset, v)) {
+	      ToonMove(penguin+i, xoffset, v);
+	      ToonSetVelocity(penguin+i, -xoffset-(1-direction*2), 0);
+	      ToonAdvance(penguin+i, TOON_MOVE);
+	      ToonSetVelocity(penguin+i, 0, v);
+	    }
+	    else {
+	      penguin[i].direction = (!direction);
+	      __xpenguins_make_faller(penguin+i);
+	      penguin[i].pref_climb = 0;
+	    }
+	  }
+	  else if (!ToonBlocked(penguin+i, direction)) {
+	    if (ToonOffsetBlocked(penguin+i, ((2*direction)-1)
+				  * PENGUIN_JUMP, 0)) {
+	      ToonSetVelocity(penguin+i, ((2*direction)-1)
+			      * (PENGUIN_JUMP - 1), 0);
+	      ToonAdvance(penguin+i, TOON_MOVE);
+	      ToonSetVelocity(penguin+i, 0, -data->speed);
+	    }
+	    else {
+	      __xpenguins_make_walker(penguin+i, 1);
+	      ToonSetPosition(penguin+i, penguin[i].x + (2*direction)-1,
+			      penguin[i].y);
+	      penguin[i].pref_direction = direction;
+	      penguin[i].pref_climb = 1;
+	    }
+	  }
+	  else if (penguin[i].v > -data->terminal_velocity) {
+	    penguin[i].v -= data->acceleration;
+	  }
+	  break;
+
+	case PENGUIN_FLOATER:
+	  if (penguin[i].y < 0) {
+	    penguin[i].direction = (penguin[i].u > 0);
+	    __xpenguins_make_faller(penguin+i);
+	  }
+	  else if (status != TOON_OK) {
+	    if (ToonBlocked(penguin+i, TOON_UP)) {
+	      penguin[i].direction = (penguin[i].u>0);
+	      __xpenguins_make_faller(penguin+i);
+	    }
+	    else {
+	      penguin[i].direction = !penguin[i].direction;
+	      ToonSetVelocity(penguin+i,-penguin[i].u,
+			      -data->speed);
+	    }
+	  }
+	  break;
+	case PENGUIN_EXPLOSION:
+	  if (xpenguins_angels && !penguin[i].terminating
+	     && gdata[PENGUIN_ANGEL].exists) {
+	    ToonSetType(penguin+i, PENGUIN_ANGEL,
+			penguin[i].direction, TOON_HERE);
+	    ToonSetVelocity(penguin+i, RandInt(5) -2,
+			    -gdata[PENGUIN_ANGEL].speed);
+	    ToonSetAssociation(penguin+i, TOON_UNASSOCIATED);
+	  }
+	case PENGUIN_ANGEL:
+	  if (penguin[i].y < -((int) data->height)) {
+	    penguin[i].active = 0;
+	  }
+	  if (status != TOON_OK) {
+	    penguin[i].u = -penguin[i].u;
+	  } 
+	}
+      }
+    }
+  }
+  /* First erase them all, then draw them all
+   * - greatly reduces flickering */
+  ToonErase(penguin, penguin_number);
+  ToonDraw(penguin, penguin_number);
+  ToonFlush();
+
+  penguin_number = last_active + 1;
+
+  /* Clear any button press information */
+  toon_button_x = toon_button_y = -1;
+
+  return penguin_number;
+}
+
+        // TODO: timeline.get_current_repeat() could be this.cycle,
+        // if only there were one frame per repeat?
+
+        // small todo: code cleanup. all the this. & this._
+        // & o.
+        // TODO: it's a 'while'
+        /*
+        if ( frames_active != ??_frame() && interupts ) {
+            //stop the timeline!
+            return;
+        }
+        */
+        let o = this.options;
+        /* check the CPU loading */
+        if ( !this._exiting && this.cycle > o.load_cycles &&
+                o.load1 >= 0 ) {
+            let load = loadAverage();
+            let newp;
+            if ( o.load2 > o.load1 ) {
+                newp = Math.round(((o.load2-load)*o.nPenguins)/(o.load2-o.load1));
+                newp = Math.min( o.nPenguins, Math.max( 0, newp ) );
+            } else if ( load < o.load1 ) {
+                newp = o.nPenguins;
+            } else {
+                newp = 0;
+            }
+            if ( o.nPenguins != newp ) {
+                this.set_number(newp);
+            }
+            this.log(_('Adjusting number according to load'));
+            this.cycle = 0;
+        } else if (!this.frames_active) {
+            /* No frames active! Hybernate for 5 seconds... */
+            this.cycle = o.load_cycles;
+
+            // TODO: pause timer for specified time.
+            timeline.pause();
+            this._sleepID = Mainloop.timeout_add( o.load_check_interval,
+                    function () { timeline.start(); } );
+        }
+        ++this.cycle;
+    }, // _frame
 
     set_number: function(n) {
         if ( !this._xpenguins_active ) {
+            this.nPenguins = n;
             return;
         }
         // want to spawn more penguins
@@ -328,6 +709,7 @@ XPenguinsLoop.prototype = {
                     this.penguins[i].terminating = true;
                 }
             }
+            // BIG TODO: set this.nPenguins = n in this case?
           /*
           ToonErase(this._penguins, this.nPenguins);
           ToonDraw(this._penguins, this.nPenguins);

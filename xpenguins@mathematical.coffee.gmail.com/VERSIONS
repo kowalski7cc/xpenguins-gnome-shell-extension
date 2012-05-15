@@ -1,0 +1,7 @@
+GNOME 3.4:
+Toon extends Clutter.Clone
+Timeline.set_repeat_count
+
+GNOME 3.2
+Toon.actor is the Clutter.Clone (cannot extend)
+Timeline.set_loop
