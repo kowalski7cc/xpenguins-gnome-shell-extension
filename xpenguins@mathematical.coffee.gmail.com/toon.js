@@ -59,11 +59,18 @@ Toon.BLOCKED = -1;
 Toon.SQUASHED = -2;
 
 /* General configuration options */
-Toon.DEFAULTS = 0;
-
 Toon.NOEDGEBLOCK = (1<<0);
 Toon.EDGEBLOCK = (1<<1);
 Toon.SIDEBOTTOMBLOCK = (1<<2);
+
+/* Configuration for individual toon types */
+Toon.DEFAULTS = 0;
+Toon.NOCYCLE = (1<<0);
+Toon.INVULNERABLE = (1<<1);
+Toon.NOBLOCK = (1<<2);
+
+
+/* Not needed/can't implement/depreciated/superceded
 Toon.NOSOLIDPOPUPS = (1<<4);
 Toon.SOLIDPOPUPS = (1<<5);
 Toon.NOSHAPEDWINDOWS = (1<<6);
@@ -75,13 +82,9 @@ Toon.NOCATCHSIGNALS = (1<<16);
 Toon.CATCHSIGNALS = (1<<17);
 Toon.EXITGRACEFULLY = (1<<18);
 
-/* Configuration for individual toon types */
-Toon.NOCYCLE = (1<<0);
-Toon.INVULNERABLE = (1<<1);
-Toon.NOBLOCK = (1<<2);
-
 Toon.MESSAGE_LENGTH = 128;
 Toon.DEFAULTMAXRELOCATE = 8;
+*/
 
 
 /**********************************/
@@ -155,7 +158,7 @@ Toon.Toon.prototype = {
          * BIG BIG BIG BIGTODO: .ToonData references are now bad.
          *  (also, is it *expensive* to carry a reference around in each toon?)
          */
-        this.this.GLOBAL = globalvars;
+        this.GLOBAL = globalvars;
 
         if ( props ) {
             for ( prop in props ) {
@@ -192,7 +195,7 @@ Toon.Toon.prototype = {
         this.actor.set_source( this.data.texture );
         this.direction = XPUtil.RandInt(2);
         this.set_type('faller', this.direction, Toon.UNASSOCIATED);
-        this.actor.set_position( XPUtil.RandInt(this.this.GLOBAL.XPenguinsStageWidth - this.data.width), 1 - this.data.height );
+        this.actor.set_position( XPUtil.RandInt(this.GLOBAL.XPenguinsStageWidth - this.data.width), 1 - this.data.height );
         this.set_association(Toon.UNASSOCIATED);
         this.set_velocity( this.direction*2-1, this.data.speed );
         this.terminating = false;
@@ -203,7 +206,7 @@ Toon.Toon.prototype = {
     // TODO: get data() vs storing .data (performance)
     get data() { 
         if ( this.genus && this.type ) {
-            return this.ToonData[this.genus][this.type];
+            return this.GLOBAL.ToonData[this.genus][this.type];
         } else {
             return null;
         }
@@ -250,7 +253,7 @@ Toon.Toon.prototype = {
      * Returns array [newx,newy].
      */
     calculate_new_position: function( genus, type, gravity ) {
-        let newdata = this.ToonData[genus][type];
+        let newdata = this.GLOBAL.ToonData[genus][type];
         let x=this.x, y=this.y;
         if ( this.gravity == Toon.HERE ) {
             x += Math.round((this.data.width - newdata.width)/2);
@@ -283,7 +286,7 @@ Toon.Toon.prototype = {
      */
     check_blocked: function( type, gravity ) {
         let newpos = this.calculate_new_position(this.genus, type, gravity);
-        let newdata = this.ToonData[this.genus][type];
+        let newdata = this.GLOBAL.ToonData[this.genus][type];
         // TODO:
         return XRectInRegion(toon_windows, newpos[0], newpos[1], newdata.width, newdata.height);
     },
@@ -307,7 +310,7 @@ Toon.Toon.prototype = {
                         Toon.DOWN);
         let newtype = 'walker';
         // 25%  chance of becoming a runner
-        if ( this.ToonData[this.genus]['runner'] && !XPUtil.RandInt(4) ) {
+        if ( this.GLOBAL.ToonData[this.genus]['runner'] && !XPUtil.RandInt(4) ) {
             newtype = 'runner';
             /* Sometimes runners are larger than walkers: check for immediate squash */
             if ( this.check_blocked( newtype, gravity ) )
@@ -347,7 +350,7 @@ Toon.Toon.prototype = {
 
         let result;
 
-        if ( this.GLOBAL.TOON_EDGE_BLOCK ) {
+        if ( this.GLOBAL.edge_block ) {
             if ( newx < 0 ) {
                 newx = 0;
                 result = Toon.PARTIALMOVE;
@@ -362,8 +365,8 @@ Toon.Toon.prototype = {
              */
         } else {
             /* Consider all blocking: additionally y */
-            if ( this.GLOBAL.TOON_EDGE_BLOCK ) {
-                if ( newy < 0 && this.GLOBAL.TOON_EDGE_BLOCK != Toon.SIDEBOTTOMBLOCK ) {
+            if ( this.GLOBAL.edge_block ) {
+                if ( newy < 0 && this.GLOBAL.edge_block != Toon.SIDEBOTTOMBLOCK ) {
                     newy = 0;
                     result = Toon.PARTIALMOVE;
                 } else if ( newy + this.data.height > this.GLOBAL.XPenguinsStageHeight ) {
@@ -447,11 +450,11 @@ Toon.Toon.prototype = {
                 this.frame = 0;
                 ++(this.cycle);
                 // NOCYCLE is associated with a ToonData.
-                if ( this.GLOBAL.NOCYCLE ) {
+                if ( this.data.conf & Toon.NOCYCLE ) {
                     this.active = 0;
                 }
             }
-        } else if ( this.GLOBAL.NOCYCLE ) {
+        } else if ( this.data.conf & Toon.NOCYCLE ) {
             if ( (++this.frame) >= this.nframes ) {
                 this.frame = 0;
                 this.cycle = 0;
@@ -492,8 +495,8 @@ Toon.Toon.prototype = {
      * is taken care of by the actor) */
 
     destroy: function() {
-        /* remove reference to ToonData */
-        this.ToonData = null;
+        /* remove reference to global vars */
+        this.GLOBAL = null;
 
         /* destroy actor (in GNOME 3.4: destroy is Clutter.Clone.destroy) */
         this.actor.destroy();

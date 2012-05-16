@@ -75,7 +75,7 @@ function LocateWindows( winActor ) {
     /* Add windows to region */
     let winList = global.get_window_actors().map( function(w) { return w.meta_window; } );
 
-    if ( !GLOBAL.TOON_SOLID_POPUPS ) {
+    if ( GLOBAL.options.ignorePopups ) {
         // TODO: may want to include other window types too!
         winList = winList.filter( function(w) {
             return w.meta_window.get_window_type() == Meta.WindowType.NORMAL;

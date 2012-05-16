@@ -66,6 +66,9 @@ XPenguinsLoop.prototype = {
         angels : true, 
         /* Do not show gory death sequences */
         blood : true, 
+
+
+        /* ToonConfigure */
         /* Ignore maximised windows */
         ignoreMaximised : true,
         /* Ignore popup windows */
@@ -73,6 +76,7 @@ XPenguinsLoop.prototype = {
         /* Enable the penguins to be squished using any of the mouse buttons.  */
         /* Note that disables any existing function of the mouse buttons. */
         squish : false,
+        edge_block : Toon.SIDEBOTTOMBLOCK,
 
 
         /* maximum amount a window can move and the penguin can still cling on */
@@ -148,6 +152,8 @@ XPenguinsLoop.prototype = {
         this.init();
     },
 
+    /* ToonFinishUp in toon_end.c
+     */
     clean_up: function() {
         /* stop timeline if it's running */
         if ( this._timeline.is_playing() ) {
@@ -248,11 +254,8 @@ XPenguinsLoop.prototype = {
             opt.nPenguins = this._theme.total;
         }
 
-        /* TODO: set up global variables: ToonConfigure, toonwindows, ...
-        ToonConfigure(TOON_SIDEBOTTOMBLOCK);
-        ToonConfigure(TOON_CATCHSIGNALS);
-        ToonConfigure(TOON_SQUISH);
-        */
+        /* TODO: if (opt.squish) set up a new window connect things up etc */
+        /* TODO: toonwindows */
 
         /* set up global vars to feed in to the toons */
         this._stage = global.stage;
@@ -260,8 +263,8 @@ XPenguinsLoop.prototype = {
             XPenguinsStageWidth: global.get_width(),
             XPenguinsStageHeight: global.get_width(),
             ToonData: this._theme.ToonData,
-            /* TODO */
-            TOON_EDGE_BLOCK: Toon.SIDEBOTTOMBLOCK, // in xpenguins_core.c Don't think it's changeable.
+            edge_block: opt.edge_block, // <-- TODO
+            toon_windows: ???
         };
 
         /* set the genus of each penguin, respecting the ratios in theme.number? */
@@ -278,7 +281,7 @@ XPenguinsLoop.prototype = {
         for ( let i=0; i<genus_numbers.length; ++i ) {
             while ( genus_numbers[i] ) {
                 /* Initialise toons */
-                this._penguins.push( new Toon.Toon( this._theme.ToonData,
+                this._penguins.push( new Toon.Toon( global,
                                                     {genus:i} ); // will call .init() automatically
                 genus_numbers[i]--;
             }
@@ -305,12 +308,35 @@ XPenguinsLoop.prototype = {
                 Lang.bind( this, this._frame ));
     },
 
+    /* ToonConfigure, the signals section
+     * not needed: listens to SIGINT/SIGTERM/SIGHUP and:
+     * - if Toon.CATCHSIGNALS: when signal received, just store in toon_signal
+     * - if Toon.EXITGRACEFULLY (set to this when interupt received in main loop
+     *   & we wish to signal ending sequence): when signal recieved, disable receiving
+     *   further signals & call this.destroy()
+     * - if Toon.NOCATCHSIGNALS: doesn't catch any signals.
+     * 
+     * We don't need this: the user can't Ctrl+C to destroy it, just
+     *  use the toggle switch.
+     */
+
+    _onChangeIgnorePopups: function(yn) {
+        this.options.ignorePopups = yn;
+        if ( this._timeline.is_playing() ) {
+            //TODO
+            //for ( let i=0; i<this._toon_number; ++i ) {
+            //  ToonCalculateAssociations
+            //  ToonLocateWindows
+            //  ToonRelocateAssociated
+            //}
+        }
+    }
+
     _onInterrupt: function() {
         this.log(_('Interrupt received: Exiting.'));
        
         /* set the 'exit gracefully flag' */ 
-        // TODO
-        ToonConfigure(Toon.EXITGRACEFULLY);
+        //ToonConfigure(Toon.EXITGRACEFULLY);
         this._exiting = true;
         this.set_number(0);
     },
