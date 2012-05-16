@@ -14,10 +14,13 @@
  *   (walker, faller, tumbler, floater, ...)
  *********************/
 /* Imports */
-const Toon = imports.toon.Toon; 
+const Extension = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+const XPUtil = Extension.util; 
+const Toon   = Extension.toon.Toon;
+const ThemeManager = Extension.theme_manager.ThemeManager;
+
 const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
-const ThemeManager = imports.theme_manager.ThemeManager;
 
 /* Namespace */
 const Theme = Theme || {};
@@ -94,6 +97,8 @@ Theme.Theme.prototype = {
         let dummy = {};// any unknown ToonData
         try {
         for ( let i=0; i<words.length; ++i ) {
+            // BIG TODO: this.name.length could be < this.ngenera,
+            //           because not every genus has a name (e.g. turtles)
             let word=words[i];
             /* define a new genus of toon (walker, skateboarder, ...) */
             // note: the 'toon' word is optional in one-genus themes.
@@ -170,7 +175,7 @@ Theme.Theme.prototype = {
                     }
 
                     /* Pixmap is already defined! */
-                    if ( current.image ) {
+                    if ( current.texture ) {
                         warn(_('Warning: resetting pixmap to %s'.format(pixmap)));
                         /* Free old pixmap if it is not a copy */
                         // BIGTODO: do I need to "free"/destroy it or is JS garbage collection
@@ -275,9 +280,14 @@ Theme.Theme.prototype = {
         ++this.ngenera;
     },
 
-    _onDestroy: function() {
-        // xpenguins_free_theme
-        // go through everything & deallocate, particularly images
+    destroy: function() {
+        /* de-allocate all the ToonData textures */
+        let i=this.ToonData.length;
+        while ( i-- ) {
+            for ( let type on this.ToonData[i] ) {
+                this.ToonData[type].destroy();
+            }
+        }
     }
 };
 

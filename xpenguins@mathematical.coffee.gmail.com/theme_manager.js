@@ -1,35 +1,10 @@
 const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
 
-const GLOBAL = imports.global;
-var fileUtils; // really want const but not in the try/catch...
-try { /* only while using gjs to debug */
-    fileUtils = imports.misc.fileUtils;
-} catch(err) {
-    fileUtils = {
-        listDirAsync: function(file, callback) {
-            let allFiles = [];
-            file.enumerate_children_async(Gio.FILE_ATTRIBUTE_STANDARD_NAME,
-                                          Gio.FileQueryInfoFlags.NONE,
-                                          GLib.PRIORITY_LOW, null, function (obj, res) {
-                let enumerator = obj.enumerate_children_finish(res);
-                function onNextFileComplete(obj, res) {
-                    let files = obj.next_files_finish(res);
-                    if (files.length) {
-                        allFiles = allFiles.concat(files);
-                        enumerator.next_files_async(100, GLib.PRIORITY_LOW, null, onNextFileComplete);
-                    } else {
-                        enumerator.close(null);
-                        callback(allFiles);
-                    }
-                }
-                enumerator.next_files_async(100, GLib.PRIORITY_LOW, null, onNextFileComplete);
-            });
-        }
-    };
-}
-// namespace
-// const ThemeManager = ThemeManager || {};
+const fileUtils = imports.misc.fileUtils;
+
+const Extension = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+const XPUtil = Extension.util;
 
 /***********************
  * ThemeManager object *
@@ -93,7 +68,7 @@ const ThemeManager = {
         themeList = themeList.map(function(x) x.replace(/_/g,' '));
 
         /* remove duplicates */
-        themeList = GLOBAL.removeDuplicates(themeList);
+        themeList = XPUtil.removeDuplicates(themeList);
 
         return themeList;
     },
