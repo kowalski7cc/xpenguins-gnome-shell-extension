@@ -88,13 +88,13 @@ XPenguinsLoop.prototype = {
          * hmm, just store workspace instead? 
          */
         workspace: 0, // -1: always on visible. Otherwise, index of workspace.
-        alwaysOnVisibleWorkspace: false, // uhh... this works best with XPenguinsLoop.
+        onAllWorkspaces: false, // uhh... this works best with XPenguinsLoop.
 
         // trigger an _onUpdateWindows only:
         // ignoreMaximised
         // ignorePopups
         // Triggers more
-        // alwaysOnVisibleWorkspace: _onUpdateWindows + pause/resume
+        // onAllWorkspaces: _onUpdateWindows + pause/resume
         // ???
         // angels, blood: what about existing toons?
         // squish: enables god mode
@@ -146,6 +146,7 @@ XPenguinsLoop.prototype = {
         /* Note: to set up the rest of the variables,
          * pick set a theme, and *then* call init().
          */
+        this._signals = [];
     },
 
     /* when you send the stop signal to xpenguins (through the toggle) */
@@ -174,6 +175,26 @@ XPenguinsLoop.prototype = {
         this._timeline.start();
     },
 
+    /* pauses the timeline & temporarily stops listening for events */
+    pause: function() {
+        if ( !this._timeline.is_playing() )
+            return;
+        /* pause timeline */
+        this._timeline.pause();
+        /* temporarily disconnect events */
+        this._disconnectWindowEvents();
+    }
+
+    /* resumes timeline, connects up events */
+    resume: function() {
+        if ( this._timeline.is_playing() )
+            return;
+        /* resume timeline */
+        this._timeline.start();
+        /* reconnect events */
+        this._connectWindowEvents();
+    }
+
     reset: function() {
         this.clean_up();
         this.init();
@@ -200,7 +221,9 @@ XPenguinsLoop.prototype = {
         if ( this._newFrameID ) {
             this._timeline.disconnect(this._newFrameID);
         }
+        this._disconnectWindowEvents();
 
+        /*
         // technically just look at this.options.workspace
         i=global.screen.n_workspaces;
         while ( i-- ) {
@@ -210,6 +233,7 @@ XPenguinsLoop.prototype = {
                 ws._XPenguinsWindowAddedId = null;
             }
         }
+        */
 
         /* remove toons from stage & destroy */
         i = this._penguins.length;
@@ -367,17 +391,11 @@ XPenguinsLoop.prototype = {
         // signals to update toon windows:
         // windows moved, mapped, unmapped.
         // Want to know when XPenguinsWindow CHANGES
+
+        this._connectSignalEvents();
         this._signals = [];
-        /* when a window moves, is max/unmax/min/state changes *at all*, recalculate ToonWindows */
-        this._signals.push(global.window_manager.connect('maximize', Lang.bind(this, this.stub)));
-        this._signals.push(global.window_manager.connect('unmaximize', Lang.bind(this, this.stub)));
-        this._signals.push(global.window_manager.connect('minimize', Lang.bind(this, this.stub)));
-        /* when the workspace changes, either hibernate or recalculate */
-        if ( this.options.workspace == -1 ) {
-            this._signals.push(global.window_manager.connect('minimize', Lang.bind(this, this._updateToonWindows)));
-        } else {
-            this._signals.push(global.window_manager.connect('minimize', Lang.bind(this, this._onWorkspaceChanged)));
-        }
+
+        /****************************************/
         //windows-changed
         //NOTE: it might be easier to just recalculate
 
@@ -401,6 +419,120 @@ XPenguinsLoop.prototype = {
          */
         // BIG TODO: this.windowActor ???
     },
+
+    /***** UPDATING TOON WINDOWS *****/
+    /* connects up events required to maintain toon_windows as an accurate
+     * snapshot of what the windows on the workspace look like
+     */
+    _connectWindowEvents: function() {
+        /* when windows are added, removed, maximise, unmaximise, minimise: recalculate. */
+        // TODO: trying to replace workspace::window-added and window-removed with map/destroy.
+        this._signals.push(global.window_manager.connect('maximize', Lang.bind(this, this._dirtyToonWindows)));
+        this._signals.push(global.window_manager.connect('unmaximize', Lang.bind(this, this._dirtyToonWindows)));
+        this._signals.push(global.window_manager.connect('minimize', Lang.bind(this, this._dirtyToonWindows)));
+        this._signals.push(global.window_manager.connect('map', Lang.bind(this, this._dirtyToonWindows)));
+        this._signals.push(global.window_manager.connect('destroy', Lang.bind(this, this._dirtyToonWindows)));
+        // TODO: more efficient to only listen on the xpenguins workspace?
+        /* NOTES: 
+         * new window, unminimize => map 
+         * close window => destroy
+         * maximize   => maximize
+         * unmaximize => unmaximize
+         * **Includes file menus and message tray**
+         *
+         * SUMMARY:
+         * use windowtracker. map/destroy to include message tray + popup menus
+         * use workspace. window-added window-removed to just add windows (including popups).
+         */
+
+        /* When the workspace changes, either pause XPenguins until it changes back,
+         * or recalculate windows (depends on this.onAllWorkspaces)
+         */
+        this._signals.push(global.window_manager.connect('switch-workspace', Lang.bind(this, this._onWorkspaceChanged)));
+
+        // Note: if we want to connect to a *workspace*-specific event
+        //  (such as window-added or window-removed),
+        // might need to listen to notify::n-workspaces too
+
+        // window: position-changed, size-changed, 
+        /*
+         * Display: window-created, grab-op-begin, grab-op-end
+         * Screen: restacked, workspace-added, workspace-removed, workspace-switched, workareas-changed
+         *         RESTACKED: stacking order changed. Doesn't appear to be immediate***
+         *         WORKAREASCHANGED: nah don't want that.
+         * Window: workspace-changed, focus, raise, unmanaged
+         *
+         * actor.connect('event'): 
+         * - key presses
+         * - button presses
+         * - everything! (don't connect I think - it's too much)
+         */
+         */
+    },
+
+    /* disconnects the events that are listened for */
+    this._disconnectWindowEvents: function() {
+        if ( this._signals ) {
+            let i=this._signals.length;
+            while ( i-- ) {
+                // err what do we disconnect *from*? TODO
+                global.window_manager.disconnect(this._signals[i]);
+            }
+            this._signals = [];
+        }
+    },
+
+    // BIG TODO: listen to "our" workspace being destroyed.
+    // Note: 'Desktop' window workspace is -1.
+    _onWorkspaceChanged: function() {
+        // TODO: what happens if you're in god mode?
+        if ( this.onAllWorkspaces ) {
+            this._dirtyToonWindows();
+        } else {
+            // TODO: workspace vs workspace index
+            if ( global.screen.get_active_workspace() == THIS.WORKSPACE ) {
+                /* resume & reconnect */
+                this.resume();
+            } else {
+                /* pause & temporarily disconnect */
+                this.pause();
+            }
+        }
+    },
+
+    _dirtyToonWindows: function(shellwm, actor) {
+        // TODO: how to discover the firing event to log?
+        this._toon_windows_dirty = true;
+    },
+
+    /* Whenever the number of workspaces is changed,
+     * listen to an 'add window' event in case it starts
+     * maximised.
+     */
+    _onChangeNWorkspaces: function() {
+        // what if #workspaces *decreases* - do we still have to disconnect?
+        if ( this.options.workspace == -1 ) {
+            let i=global.screen.n_workspaces;
+            let ws;
+            while ( i-- ) {
+                let ws = global.screen.get_workspace_by_index(i);
+                if ( !ws._XPenguinsWindowAddedId ) {
+                    ws._XPenguinsWindowAddedId = ws.connect('window-added', Lang.bind(this, this.stub));
+                }
+            }
+        } else {
+            // store a *workspace* in this.options.workspace.? (otherwise what if the index changes?)
+            ws._XPenguinsWindowAddedId = ws.connect('window-added', Lang.bind(this, this.stub));
+            // TODO: what if the xpenguins workspace was deleted?
+        }
+    }
+// shell_app_signals (window changed)
+
+    stub: function() {},
+
+    _updateToonWindows: function() {
+    },
+
 
     /***** GOD MODE ****/
     _onEnableGodMode: function() {
@@ -472,35 +604,6 @@ XPenguinsLoop.prototype = {
         }
         /* change cursor back */
         global.unset_cursor();
-    },
-
-    /***** UPDATING TOON WINDOWS *****/
-    /* Whenever the number of workspaces is changed,
-     * listen to an 'add window' event in case it starts
-     * maximised.
-     */
-    _onChangeNWorkspaces: function() {
-        // what if #workspaces *decreases* - do we still have to disconnect?
-        if ( this.options.workspace == -1 ) {
-            let i=global.screen.n_workspaces;
-            let ws;
-            while ( i-- ) {
-                let ws = global.screen.get_workspace_by_index(i);
-                if ( !ws._XPenguinsWindowAddedId ) {
-                    ws._XPenguinsWindowAddedId = ws.connect('window-added', Lang.bind(this, this.stub));
-                }
-            }
-        } else {
-            // store a *workspace* in this.options.workspace.? (otherwise what if the index changes?)
-            ws._XPenguinsWindowAddedId = ws.connect('window-added', Lang.bind(this, this.stub));
-            // TODO: what if the xpenguins workspace was deleted?
-        }
-    }
-// shell_app_signals (window changed)
-
-    stub: function() {},
-
-    _updateToonWindows: function() {
     },
 
     /* ToonConfigure, the signals section
@@ -960,12 +1063,12 @@ XPenguinsLoop.prototype = {
             this._cycle = o.load_cycles;
 
             // TODO: pause timer for specified time.
-            timeline.pause();
+            this.pause();
             this._sleepID = Mainloop.timeout_add(o.load_check_interval,
-                    function () { 
-                        timeline.start(); 
+                    Lang.bind(this, function() { 
+                        this.resume(); 
                         return false;  // return false to call just once.
-                    });
+                    }));
         }
         ++this._cycle;
         // TODO: set this to run again in o.sleep_msec? or trust to the timeline?

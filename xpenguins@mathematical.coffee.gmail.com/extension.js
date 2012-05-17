@@ -70,12 +70,12 @@ XPenguinsMenu.prototype = {
         this._nPenguinsItem = null;
         //this._verboseItem = null;
         //this._ignoreMaximisedItem = null;
-        //this._alwaysOnVisibleWorkspaceItem = null;
+        //this._onAllWorkspacesItem = null;
         this._items = {};
         this._toggles = { 
                          ignorePopups   : _('Ignore popups'),
                          ignoreMaximised: _('Ignore maximised windows'),
-                         alwaysOnVisibleWorkspace: _('Always on visible workspace'), // <-- this is the only one
+                         onAllWorkspaces: _('Always on visible workspace'), // <-- this is the only one
                          blood          : _('Show blood'),
                          angels         : _('Show angels'),
                          squish         : _('God Mode'),
@@ -141,15 +141,17 @@ XPenguinsMenu.prototype = {
         this._nPenguinsItem.connect('drag-end', Lang.bind(this, this.stub));
         this._optionsMenu.menu.addMenuItem(this._nPenguinsItem);
 
-        /* always on visible workspace toggle */
-        this._alwaysOnVisibleWorkspaceItem = new PopupMenu.PopupSwitchMenuItem(_('Always on visible workspace'), false);
-        this._alwaysOnVisibleWorkspaceItem.connect('toggled', Lang.bind(this, this.stub));
-        this._optionsMenu.menu.addMenuItem(this._alwaysOnVisibleWorkspaceItem);
+        /* always on visible workspace toggle 
+        this._onAllWorkspacesItem = new PopupMenu.PopupSwitchMenuItem(_('Always on visible workspace'), false);
+        this._onAllWorkspacesItem.connect('toggled', Lang.bind(this, this.stub));
+        this._optionsMenu.menu.addMenuItem(this._onAllWorkspacesItem);
+        */
 
-        /* Ignore maximised toggle */
+        /* Ignore maximised toggle 
         this._ignoreMaximisedItem = new PopupMenu.PopupSwitchMenuItem(_('Ignore maximised windows'), true));
         this._ignoreMaximisedItem.connect('toggled', Lang.bind(this, this.stub));
         this._optionsMenu.menu.addMenuItem(this._ignoreMaximisedItem);
+        */
 
         /* God mode */
         /* Angels */
