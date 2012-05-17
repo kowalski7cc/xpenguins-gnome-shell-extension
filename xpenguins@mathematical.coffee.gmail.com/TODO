@@ -1,2 +1,3 @@
 Themes: No need for separate Theme.names & Theme.ToonData:
         just make sure that ToonData is an *object* with name [Theme.name]
+on throw error: exitgracefully

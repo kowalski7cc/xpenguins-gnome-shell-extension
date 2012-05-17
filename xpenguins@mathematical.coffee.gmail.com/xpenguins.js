@@ -4,6 +4,7 @@ const Extension = imports.ui.extensionSystem.extensions['xpenguins@mathematical.
 const XPUtil = Extension.util; 
 const Toon   = Extension.toon.Toon;
 const Theme  = Extension.theme.Theme;
+const Region = Extension.region;
 
 
 /************************
@@ -19,6 +20,12 @@ XPenguinsLoop.prototype = {
             global.log(msg);
             print(msg);
             log(msg);
+            // make popup
+            let label = new St.Label({ text: msg }); // style-class
+            global.stage.add_actor(label);
+            let monitor = Main.layoutManager.primaryMonitor;
+            label.set_position(Math.floor (monitor.width / 2 - label.width / 2), Math.floor(monitor.height / 2 - label.height / 2));
+            Mainloop.timeout_add(1000, function () { label.destroy(); });
         }
     },
 
@@ -34,7 +41,8 @@ XPenguinsLoop.prototype = {
      * ignore maximised windows
      * npenguins
      */
-    defaultOptions: {
+    defaultOptions: function() {
+        return {
         DEBUG: true,
         PENGUIN_MAX: 256,
 
@@ -60,23 +68,37 @@ XPenguinsLoop.prototype = {
         nPenguins : -1,
         // What theme to use. default Penguins
         themes : [],
+        edge_block : Toon.SIDEBOTTOMBLOCK,
 
         /* flags */
         /* Do not show any cherubim flying up to heaven when a toon gets squashed. */
         angels : true, 
         /* Do not show gory death sequences */
         blood : true, 
-
-
-        /* ToonConfigure */
         /* Ignore maximised windows */
         ignoreMaximised : true,
-        /* Ignore popup windows */
+        /* Ignore popup windows [FIXME:  not implemented]*/
         ignorePopups : false,
-        /* Enable the penguins to be squished using any of the mouse buttons.  */
-        /* Note that disables any existing function of the mouse buttons. */
-        squish : false,
-        edge_block : Toon.SIDEBOTTOMBLOCK,
+        /* Enable the penguins to be squished using any of the mouse buttons.
+         * Note that disables any existing function of the mouse buttons.
+         * Used to be toon_squish, TOON_SQUISH.
+         */
+        squish : false, // [FIXME: not implemented]
+        /* what happens when we switch workspaces
+         * hmm, just store workspace instead? 
+         */
+        workspace: 0, // -1: always on visible. Otherwise, index of workspace.
+        alwaysOnVisibleWorkspace: false, // uhh... this works best with XPenguinsLoop.
+
+        // trigger an _onUpdateWindows only:
+        // ignoreMaximised
+        // ignorePopups
+        // Triggers more
+        // alwaysOnVisibleWorkspace: _onUpdateWindows + pause/resume
+        // ???
+        // angels, blood: what about existing toons?
+        // squish: enables god mode
+        //
 
 
         /* maximum amount a window can move and the penguin can still cling on */
@@ -94,7 +116,12 @@ XPenguinsLoop.prototype = {
         rectangularWindows : false,
         /* Load all available themes and run them simultaneously */
         all : false
+        };
     },
+
+    is_playing: function() {
+        return this._timeline.is_playing();
+    }
 
         // TODO: if xpenguins_active then do something.
     set_themes: function( themeList ) {
@@ -104,7 +131,7 @@ XPenguinsLoop.prototype = {
     _init: function(i_options) {
 
         /* set options */
-        let options = this.defaultOptions;
+        let options = this.defaultOptions();
         /* copy over custom options */
         for ( opt in i_options ) {
             // warn of unknown options
@@ -155,9 +182,15 @@ XPenguinsLoop.prototype = {
     /* ToonFinishUp in toon_end.c
      */
     clean_up: function() {
+        let i;
         /* stop timeline if it's running */
         if ( this._timeline.is_playing() ) {
             this._timeline.stop();
+        }
+
+        /* remove god mode */
+        if ( opt.squish || this._godModeID ) {
+            this._onDisableGodMode();
         }
 
         /* disconnect events */
@@ -168,8 +201,18 @@ XPenguinsLoop.prototype = {
             this._timeline.disconnect(this._newFrameID);
         }
 
+        // technically just look at this.options.workspace
+        i=global.screen.n_workspaces;
+        while ( i-- ) {
+            let ws = global.screen.get_workspace_by_index(i);
+            if ( ws._XPenguinsWindowAddedId ) {
+                ws.disconnect(ws._XPenguinsWindowAddedId);
+                ws._XPenguinsWindowAddedId = null;
+            }
+        }
+
         /* remove toons from stage & destroy */
-        let i = this._penguins.length;
+        i = this._penguins.length;
         while ( i-- ) {
             this._stage.remove_actor( this._penguins[i].actor );
             this._penguins[i].destroy();
@@ -185,6 +228,7 @@ XPenguinsLoop.prototype = {
         if ( this._theme ) {
             this._theme.destroy();
         }
+
     },
 
     /* Initialise all variables & load themes & initialise toons.
@@ -240,7 +284,6 @@ XPenguinsLoop.prototype = {
 
         /* Load theme into this._theme */
         this._theme = new Theme.Theme( opt.themes );
-        // TODO: check that it loaded properly
 
         /* theme-specific options */
         if ( !opt.sleep_msec ) {
@@ -254,17 +297,30 @@ XPenguinsLoop.prototype = {
             opt.nPenguins = this._theme.total;
         }
 
-        /* TODO: if (opt.squish) set up a new window connect things up etc */
-        /* TODO: toonwindows */
+        /* set up god mode */
+        if ( opt.squish ) {
+            this._onEnableGodMode();
+        }
+
+        /* set up toon_windows */
+        this._toon_windows = new Region.Region();
+        this._updateToonWindows();
+
 
         /* set up global vars to feed in to the toons */
         this._stage = global.stage;
-        let global = {
+        if ( opt.workspace >= 0 ) {
+            opt.workspace = global.screen.get_active_workspace();
+        }
+        this.global = {
             XPenguinsStageWidth: global.get_width(),
             XPenguinsStageHeight: global.get_width(),
             ToonData: this._theme.ToonData,
-            edge_block: opt.edge_block, // <-- TODO
-            toon_windows: ???
+            //options: opt, // <-- do I really want to lug the *whole* structure around?!
+            edge_block: opt.edge_block,
+            toon_windows: this._toon_windows, // NOTE: if I update it externally will the pointer update?
+            // TODO: must change when window changes workspace!
+            workspace: opt.workspace
         };
 
         /* set the genus of each penguin, respecting the ratios in theme.number? */
@@ -288,7 +344,9 @@ XPenguinsLoop.prototype = {
         }
 
         /* set the stage */
-        // TODO: other windows.
+        // TODO: other windows. Want the stage + the window actor?
+        // You can set actor == stage if it's a window: add_actor works.
+        // *HOWEVER* adding a rectangel to (0,0) of a window appears to set it a bit outside its bounds.
         let i = this._theme.ToonData.length;
         /* add ToonDatas to the stage so clones can be added properly */
         while ( i-- ) {
@@ -306,6 +364,143 @@ XPenguinsLoop.prototype = {
         /* Connect signals */
         this._newFrameID = this._timeline.connect('new-frame',
                 Lang.bind( this, this._frame ));
+        // signals to update toon windows:
+        // windows moved, mapped, unmapped.
+        // Want to know when XPenguinsWindow CHANGES
+        this._signals = [];
+        /* when a window moves, is max/unmax/min/state changes *at all*, recalculate ToonWindows */
+        this._signals.push(global.window_manager.connect('maximize', Lang.bind(this, this.stub)));
+        this._signals.push(global.window_manager.connect('unmaximize', Lang.bind(this, this.stub)));
+        this._signals.push(global.window_manager.connect('minimize', Lang.bind(this, this.stub)));
+        /* when the workspace changes, either hibernate or recalculate */
+        if ( this.options.workspace == -1 ) {
+            this._signals.push(global.window_manager.connect('minimize', Lang.bind(this, this._updateToonWindows)));
+        } else {
+            this._signals.push(global.window_manager.connect('minimize', Lang.bind(this, this._onWorkspaceChanged)));
+        }
+        //windows-changed
+        //NOTE: it might be easier to just recalculate
+
+        /* When the number of workspaces is changed, update listeners */
+        this._signals.push(global.screen.connect('notify::n-workspaces', Lang.bind(this, this.stub)));
+        // captured-event?
+        /* When a workspace is added, listen for window-added/removed events on that workspace */
+        /* when the XPenguins window closes, exit straight away */
+        /* when the XPenguins window moves, we need to change origins?! */
+        /* when the XPenguins window changes workspace, we need to re-jig the event listeners */
+
+        /* Have a look at a list of window-event chantges here, because gfxmonk
+         * also maintains an up-to-date window region
+        https://github.com/gfxmonk/shellshape/blob/master/shellshape/workspace.js
+         - window-added
+         - window-removed
+         - notify::minimized on a window
+         - position-changed on a window
+         - size-changed on a window
+         * Jasper notes: grab-op-{begin,end} for move/resize.
+         */
+        // BIG TODO: this.windowActor ???
+    },
+
+    /***** GOD MODE ****/
+    _onEnableGodMode: function() {
+        // BIG TODO:
+        // you can connect a window properly up to a button-press-event.
+        // *BUT* when you connect the global.stage up it doesn't get the events,
+        // even on the desktop window.
+        // ** Also ** try on nautilus-managed desktops.
+        
+        /* listen for clicks on the stage */
+        /* NOTE: if you get the global stage you can do global.stage.grab_key_focus()
+         * to collect clicks.
+         * Otherwise it won't.
+         * But *DANGER DANGER*: this disables all other keyboard/mouse clicks, better make sure you
+         * have something listening to 'Esc' to exit!
+         */
+        this._godModeID = this.XPenguinsWindow.connect('button-press-event', this._onSmite);
+        /* change cursor to something suitably god-like */
+        // FIXME: ICING: change it to a bolt of lightning :D
+        global.set_cursor(Shell.Cursor.POINTING_HAND);
+
+    },
+    _onSmite: function(actor, event) {
+        // Event coordinates are relative to the stage
+        // that received the event, and can be transformed
+        // into actor-relative coordinates using actor.transform_stage_point()
+        // Not in Clutter-gir. button 1 == PRIMARY, 2 == MIDDLE, 3 == SECONDARY
+        if ( event.button != 1 ) {
+            return;
+        }
+        let [stageX, stageY] = event.get_coords();
+        // note: should sanity check that actor.get_stage() is this.XPenguinsStage!
+        /* This appears to get the top-most actor that has been *added to XPenguinsStage directly* */
+        let act = actor.get_stage().get_actor_at_pos(Clutter.PickMode.ALL, stageX, stageY);
+        /* if no toon underneath go away */
+        if ( !act || !('toon_object' in act) ) {
+            return;
+        }
+
+        this.log('SMITE at %i, %i'.format(x,y));
+
+        /* xpenguins_frame() bit in here */
+        let toon == act.toon_object;
+        let gdata = this._theme.ToonData[toon.genus];
+        /* squash if it's not already dead/dying.
+         * Gosh, that's a lot of ways for the toons to die, isn't it? 
+         */
+        if ( toon.type != 'explosion' && toon.type != 'zapped' &&
+             toon.type != 'squashed' && toon.type != 'angel' &&
+             toon.type != 'splatted' && toon.type != 'exit' &&
+             !toon.terminating ) {
+            // TODO: I think .x & .y & .width & .height vs _map are to do with the toon being
+            // at (x,y) and (width,height) == pixmap, BUT the toon *itself*  is only at (x,y) (?) and (data.width,data.height).
+            /* Kill the toon */
+            if ( this.options.blood && gdata['zapped'] ) {
+                toon.set_type('zapped', toon.direction, Toon.DOWN);
+            } else if ( gdata['explosion'] ) {
+                toon.set_type('explosion', toon.direction, Toon.HERE);
+            } else {
+                toon.active = false;
+            }
+            toon.set_association(Toon.UNASSOCIATED);
+        }            
+    },
+
+    _onDisableGodMode: function() {
+        if ( this._godModeID ) {
+            this.XPenguinsWindow.disconnect(this._godModeID);
+        }
+        /* change cursor back */
+        global.unset_cursor();
+    },
+
+    /***** UPDATING TOON WINDOWS *****/
+    /* Whenever the number of workspaces is changed,
+     * listen to an 'add window' event in case it starts
+     * maximised.
+     */
+    _onChangeNWorkspaces: function() {
+        // what if #workspaces *decreases* - do we still have to disconnect?
+        if ( this.options.workspace == -1 ) {
+            let i=global.screen.n_workspaces;
+            let ws;
+            while ( i-- ) {
+                let ws = global.screen.get_workspace_by_index(i);
+                if ( !ws._XPenguinsWindowAddedId ) {
+                    ws._XPenguinsWindowAddedId = ws.connect('window-added', Lang.bind(this, this.stub));
+                }
+            }
+        } else {
+            // store a *workspace* in this.options.workspace.? (otherwise what if the index changes?)
+            ws._XPenguinsWindowAddedId = ws.connect('window-added', Lang.bind(this, this.stub));
+            // TODO: what if the xpenguins workspace was deleted?
+        }
+    }
+// shell_app_signals (window changed)
+
+    stub: function() {},
+
+    _updateToonWindows: function() {
     },
 
     /* ToonConfigure, the signals section
@@ -442,7 +637,7 @@ XPenguinsLoop.prototype = {
                 // TODO: this.conf
                 /* see if the toon is squashed */
                 if ( !((this.conf & Toon.NOBLOCK) | (this.conf & Toon.INVULNERABLE))
-                        && toon.blocked(Toon.HERE) ) {
+                        && toon.Blocked(Toon.HERE) ) {
                     if ( o.blood && gdata['squashed'] ) {
                         toon.set_type('squashed', toon.direction, Toon.HERE);
                     } else if ( gdata['explosion'] ) {
@@ -459,7 +654,7 @@ XPenguinsLoop.prototype = {
                     if ( toon.type == 'faller' ) {
                         if ( sstatus != Toon.OK ) {
                             /* if it has landed change type appropriately */
-                            if ( toon.blocked(Toon.DOWN) ) {
+                            if ( toon.Blocked(Toon.DOWN) ) {
                                 toon.direction = ( toon.pref_direction > -1 ?
                                                    toon.pref_direction : XPUtil.RandInt(2) );
                                 toon.make_walker(false);
@@ -547,7 +742,7 @@ XPenguinsLoop.prototype = {
                                     }
                                 }
                             }
-                        } else if ( !toon.blocked( Toon.DOWN ) ) {
+                        } else if ( !toon.Blocked( Toon.DOWN ) ) {
                             /* try to step (tumble/fall) down... */
                             let u = toon.u;
                             toon.set_velocity(0, PENGUIN_JUMP);

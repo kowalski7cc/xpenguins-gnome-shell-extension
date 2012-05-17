@@ -59,7 +59,7 @@ Toon.BLOCKED = -1;
 Toon.SQUASHED = -2;
 
 /* General configuration options */
-Toon.NOEDGEBLOCK = (1<<0);
+Toon.NOEDGEBLOCK = 0; // (1<<0);
 Toon.EDGEBLOCK = (1<<1);
 Toon.SIDEBOTTOMBLOCK = (1<<2);
 
@@ -117,10 +117,10 @@ Toon.Toon.prototype = {
         /* __xpenguins_init_penguin( Toon *p ) */
         // For GNOME 3.2, will have to store this.actor.
         this.actor = new Clutter.Clone(params);
+        // mark it as mine
+        this.actor.toon_object = this;
 
         /* initialisation */
-        // TODO: this.frame
-        // position: in parent. this.x/this.y
         this.u = this.v = 0; /* velocity */
         this.genus = null;
         this.type = 'faller';
@@ -141,9 +141,8 @@ Toon.Toon.prototype = {
 
         this.pref_direction = -1;
         this.pref_climb = false;
-        this.hold = false;          // <-- TODO
         this.active = false;
-        this.terminating = false;
+        this.terminating = false; /* whether toon is not to be respawned */
         //this.mapped = false;       // <-- TODO in parent, not writable.
         this.squished = false;
         //Pixmap background;   /* @@ storing the background so we can repaint where we've been */
@@ -153,8 +152,8 @@ Toon.Toon.prototype = {
          * XPenguinsStageWidth
          * XPenguinsStageHeight
          * ToonData
-         * TOON_EDGE_BLOCK
-         * NOCYCLE
+         * toon_windows
+         * etc.
          * BIG BIG BIG BIGTODO: .ToonData references are now bad.
          *  (also, is it *expensive* to carry a reference around in each toon?)
          */
@@ -187,11 +186,10 @@ Toon.Toon.prototype = {
     },
     get y() {
         return this.actor.x;
-    }<
+    },
 
     /* Only call this *after* setting the toon's genus */
     init: function() {
-        // TODO: set active?
         this.actor.set_source( this.data.texture );
         this.direction = XPUtil.RandInt(2);
         this.set_type('faller', this.direction, Toon.UNASSOCIATED);
@@ -212,6 +210,7 @@ Toon.Toon.prototype = {
         }
     },
 
+    /**** ASSIGNMENT FUNCTIONS (toon_set.c) ****/
     /* ToonSetType */
     set_type: function( type, direction, gravity ) {
         this.set_genus_and_type( this.genus, type, direction, gravity );
@@ -248,6 +247,7 @@ Toon.Toon.prototype = {
         this.v = v;
     },
 
+    /**** QUERY FUNCTIONS (toon_query.c) ****/
     /* Calculates the new x and y when a toon changes type/genus
      * Used in both SetGenusAndType and CheckBlocked.
      * Returns array [newx,newy].
@@ -279,18 +279,77 @@ Toon.Toon.prototype = {
         return [x,y];
     },
 
-    /* Check to see if a toon would be squashed instantly if changed to
-     *  certain type, return 1 if squashed, 0 otherwise. Useful to call
-     *  before ToonSetType(). 
-     * ToonCheckBlocked
+    /* Returns 1 if the toon is blocked in the specified direction,
+     * 0 if not blocked and -1 if the direction argument was out of bounds
+     * ToonBlocked
      */
-    check_blocked: function( type, gravity ) {
-        let newpos = this.calculate_new_position(this.genus, type, gravity);
-        let newdata = this.GLOBAL.ToonData[this.genus][type];
-        // TODO:
-        return XRectInRegion(toon_windows, newpos[0], newpos[1], newdata.width, newdata.height);
+    Blocked: function( direction ) {
+        if ( this.GLOBAL.edge_block ) {
+            if ( direction == Toon.LEFT ) {
+                if ( this.x <= 0 ) 
+                    return 1;
+            } else if ( direction == Toon.RIGHT ) {
+                if ( this.x + this.data.width >= this.GLOBAL.XPenguinsStageWidth )
+                    return 1;
+            } else if ( direction == Toon.UP ) {
+                if ( this.y <= 0 ) 
+                    return 1;
+            } else if ( direction == Toon.DOWN ) {
+                if ( this.y + this.data.height >= this.GLOBAL.XPenguinsStageHeight )
+                    return 1;
+            } // switch(direction)
+        } // if edge_block
+
+        if ( direction == Toon.HERE ) {
+            return this.GLOBAL.toon_windows.overlaps( this.x, this.y,
+                        this.data.width, this.data.height );
+        } else if ( direction == Toon.LEFT ) {
+            return this.GLOBAL.toon_windows.overlaps(this.x-1, this.y,
+                      1, this.data.height);
+        } else if ( direction == Toon.RIGHT ) {
+            return this.GLOBAL.toon_windows.overlaps(this.x+this.data.width, 
+                      this.y, 1,this.data.height);
+        } else if ( direction == Toon.UP ) {
+            return this.GLOBAL.toon_windows.overlaps(this.x, this.y-1,
+                      this.data.width, 1);
+        } else if ( direction == Toon.DOWN ) {
+            return this.GLOBAL.toon_windows.overlaps(this.x, 
+                      this.y+this.data.height, 
+                      this.data.width, 1);
+        } else {
+            return -1;
+        }
+    }, // Blocked
+
+    /* Returns true the toon would be in an occupied area
+     * if moved by xoffset and yoffset, false otherwise.
+     * ToonOffsetBlocked
+     */
+    OffsetBlocked: function( xoffset, yoffset ) {
+        if ( this.GLOBAL.edge_block ) {
+            if (    (this.x + xoffset <= 0)
+                 || (this.x + this.data.width + xoffset >= this.GLOBAL.XPenguinsStageWidth)
+                 || ((this.y + yoffset <= 0) && this.GLOBAL.edge_block != Toon.SIDEBOTTOMBLOCK)
+                 || (this.y + this.data.height + yoffset >= this.GLOBAL.XPenguinsStageHeight) ) {
+                     return true;
+            }
+        }
+        return this.GLOBAL.toon_windows.overlaps(this.x + xoffset, this.y + yoffset,
+                    this.data.width, this.data.height);
     },
 
+    /* Check to see if a toon would be squashed instantly if changed to
+     *  certain type, return true if squashed, false otherwise. 
+     *  Useful to call before ToonSetType(). 
+     * ToonCheckBlocked
+     */
+    CheckBlocked: function( type, gravity ) {
+        let newpos = this.calculate_new_position(this.genus, type, gravity);
+        let newdata = this.GLOBAL.ToonData[this.genus][type];
+        return this.GLOBAL.toon_windows.overlaps(newpos[0], newpos[1], newdata.width, newdata.height);
+    },
+
+    /**** MORPHING FUNCTIONS ****/
     /* Turn a penguin into a climber */
     // __xpenguins_make_climber
     make_climber: function() {
@@ -313,7 +372,7 @@ Toon.Toon.prototype = {
         if ( this.GLOBAL.ToonData[this.genus]['runner'] && !XPUtil.RandInt(4) ) {
             newtype = 'runner';
             /* Sometimes runners are larger than walkers: check for immediate squash */
-            if ( this.check_blocked( newtype, gravity ) )
+            if ( this.CheckBlocked( newtype, gravity ) )
                 newtype = 'walker';
         }
         this.set_type( newtype, this.direction, gravity );
@@ -330,6 +389,95 @@ Toon.Toon.prototype = {
         this.set_association(Toon.UNASSOCIATED);
     },
 
+    /**** HANDLING TOON ASSOCIATIONS WITH MOVING WINDOWS (toon_associate.c) ****/
+    /* The first thing to be done when the windows move is to work out 
+       which windows the associated toons were associated with just before
+       the windows moved
+       ToonCalculateAssocations.
+       Currently this function always returns 0 */
+    CalculateAssociations: function() {
+        if ( this.associate != Toon.UNASSOCIATED && this.active ) {
+            /* determine the position of a line of pixels that
+             * the associated window should at least partially enclose
+             */
+            let x,y, width, height;
+            if ( this.associate == Toon.DOWN ) {
+                x = this.x;
+                y = this.y + this.data.height;
+                width = this.data.width;
+                height = 1;
+            } else if ( this.associate == Toon.UP ) {
+                x = this.x;
+                y = this.y-1;
+                width = this.data.width;
+                height = 1;
+            } else if ( this.associate == Toon.LEFT ) {
+                x = this.x-1;
+                y = this.y;
+                width = 1;
+                height = this.data.height;
+            } else if ( this.associate == Toon.RIGHT ) {
+                x = this.x + this.data.width;
+                y = this.y;
+                width = 1;
+                height = this.dat.height;
+            } else {
+                throw new Error(_('Error: illegal direction %d'.format(this.associate)));
+                return;
+            } // switch( this.associate )
+            this.wid = 0;
+
+            // TODO
+            let w = this.GLOBAL.toon_windows;
+            for ( let i=0; i<this.GLOBAL.toon_windows.length; ++i ) {
+                // TODO: solid?
+                if ( w[i].solid && 
+                     w[i].x < x + width &&
+                     w[i].x + w[i].width > x &&
+                     w[i].y < y + height &&
+                     w[i].y + w[i].height < y ) {
+                    this.wid = w[i].wid;
+                    this.xoffset = this.x - w[i].x;
+                    this.yoffset = this.y - w[i].y;
+                    break;
+                }
+            }
+            // BIG TODO: what's the xoffset/yoffset for? do I need it?
+        }
+    }, // CalculateAssociations
+
+    /* After calling ToonLocateWindows() we relocate 
+     * all the toons that were
+     * associated with particular windows
+     * ToonRelocateAssociated
+     */
+    RelocateAssociated: function() {
+        let wx;
+        let w = this.GLOBAL.toon_windows;
+        if ( this.associate != Toon.UNASSOCIATED &&
+             this.wid != 0 && this.active ) {
+            wx=this.GLOBAL.toon_windows.length;
+            for ( let i=0; i<this.GLOBAL.toon_windows.length; ++i ) {
+                // TODO: I don't need to loop. just store the index??
+                // or does toon_windows change in between
+                if ( this.wid == w[i].wid && w[i].solid ) {
+                    dx = this.xoffset + w[i].x - this.x;
+                    dy = this.yoffset + w[i].y - this.y;
+                    if ( dx < this.GLOBAL.toon_max_relocate_right &&
+                         -dx < this.GLOBAL.toon_max_relocate_left &&
+                         dy < this.GLOBAL.toon_max_relocate_down &&
+                         -dy < this.GLOBAL.toon_max_relocate_up ) {
+                        if ( !this.OffsetBlocked(dx, dy) ) {
+                            this.actor.move_by(dx, dy);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    },
+
+    /***** CORE FUNCTIONS *****/
     /* Attempt to move a toon based on its velocity.
      * 'mode' can be: 
      * - Toon.MOVE (move unless blocked),
@@ -379,9 +527,7 @@ Toon.Toon.prototype = {
             }
 
             /* Is new toon location fully/partially filled with windows? */
-            // TODO. new_zone boolean for now FALSE if RectangleOut TRUE otherwise
-            let new_zone = XRectInRegion(this.GLOBAL.toon_windows,newx,newy,this.data.width,this.data.height);
-            if ( new_zone && mode == Toon.MOVE &&
+            if ( this.GLOBAL.toon_windows.overlaps(newx, newy, this.data.width, this.data.height) && mode == Toon.MOVE &&
                  result != Toon.BLOCKED && !stationary ) {
                 let tryx, tryy, step=1, u=newx-this.x, v=newy-this.y;
                 result = Toon.BLOCKED;
@@ -394,7 +540,7 @@ Toon.Toon.prototype = {
                     for ( tryx = newx+step; tryx != this.x; tryx += step ) {
                         tryy = this.y + (tryx-this.x)*v/u;
                         // why the '!'?
-                        if ( !XRectInRegion(this.GLOBAL.toon_windows, tryx, tryy, this.data.width, this.data.height) ) {
+                        if ( !this.GLOBAL.toon_windows.overlaps(tryx, tryy, this.data.width, this.data.height) ) {
                             newx = tryx;
                             newy = tryy;
                             result = Toon.PARTIALMOVE;
@@ -409,7 +555,7 @@ Toon.Toon.prototype = {
                     }
                     for ( tryy = newy+step; tryy != this.y; tryy += step ) {
                         tryx = this.x + (tryy-this.y)*u/v;
-                        if ( !XRectInRegion(this.GLOBAL.toon_windows, tryx, tryy, this.data.width, this.data.height) ) {
+                        if ( !this.GLOBAL.toon_windows.overlaps(tryx, tryy, this.data.width, this.data.height) ) {
                             newx = tryx;
                             newy = tryy;
                             result = Toon.PARTIALMOVE;
@@ -432,7 +578,7 @@ Toon.Toon.prototype = {
                     tryMIN = xy[MIN] + (tryMAX-xy[MAJ])*uv[MIN]/uv[MAX];
                     tryxy[MAX] = tryMAX;
                     tryxy[MIN] = tryMIN;
-                    if ( !XRectInRegion(this.GLOBAL.toon_windows, tryxy[0], tryxy[1], this.data.width, this.data.height) ) {
+                    if ( !this.GLOBAL.toon_windows.overlaps(tryxy[0], tryxy[1], this.data.width, this.data.height) ) {
                         newxy = tryxy;
                         result = Toon.PARTIALMOVE;
                         move_ahead=true;
@@ -525,12 +671,7 @@ Toon.ToonData.prototype = {
     _init: function(otherToonData) {
         /* Properties: set default values */
         this.conf = Toon.DEFAULTS;      /* bitmask of toon properties such as cycling etc */
-
-        // TODO: need this.image or this.pixmap?
-        // this.image = null;
-        // this.pixmap = this.mask = null; /* pointers to X structures */
-
-        this.texture = null; /* Clutter.Texture */
+        this.texture = null; /* Clutter.Texture, replaces .image, .mask and .pixmap */
 
         // .master is needed to make sure all clones point to the one same source.
         this.master = null;             /* If pixmap data is duplicated from another toon, this is it */
@@ -540,8 +681,6 @@ Toon.ToonData.prototype = {
         this.acceleration = this.terminal_velocity = 0;
         this.speed = 4;
         this.loop = 0;                  /* Number of times to repeat cycle */
-        // TODO (small) : need 'exists' ?
-        // this.exists = false;
 
         /* Copy select properties from otherToonData to here. */
         /* TODO: listen to load-finished signal & load asynchronously */

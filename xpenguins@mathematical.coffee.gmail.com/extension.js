@@ -42,6 +42,7 @@ function enable() {
 
 function disable() {
     if ( _indicator ) {
+        // _indicator.penguinLoop.FREE/EXITNOW
         _indicator.destroy();
     }
 }
@@ -66,9 +67,20 @@ XPenguinsMenu.prototype = {
     
         /* items */ 
         this._optionsMenu = null;
-        this._verboseItem = null;
         this._nPenguinsItem = null;
-        this._ignoreMaximisedItem = null;
+        //this._verboseItem = null;
+        //this._ignoreMaximisedItem = null;
+        //this._alwaysOnVisibleWorkspaceItem = null;
+        this._items = {};
+        this._toggles = { 
+                         ignorePopups   : _('Ignore popups'),
+                         ignoreMaximised: _('Ignore maximised windows'),
+                         alwaysOnVisibleWorkspace: _('Always on visible workspace'), // <-- this is the only one
+                         blood          : _('Show blood'),
+                         angels         : _('Show angels'),
+                         squish         : _('God Mode'),
+                         DEBUG          : _('Verbose')
+        }
 
         /* variables */  
         // this._DEBUG & this._PENGUIN_MAX: just store as UI elements?
@@ -99,6 +111,10 @@ XPenguinsMenu.prototype = {
          * - theme chooser  --> ComboMenuItem (not 3.2 ?)
          * + npenguins (??)              --> + 'choose default set by theme'!
          * + ignore maximised windows
+         * + always on visible workspace
+         * + god mode
+         * + angels
+         * + blood
          * + verbose toggle
          * - choose window to run in
          */
@@ -122,14 +138,28 @@ XPenguinsMenu.prototype = {
 
         this._nPenguinsItem = new PopupMenu.PopupSliderMenuItem(20/this._PENGUIN_MAX);
         this._nPenguinsItem.connect('value-changed', Lang.bind(this, this._nPenguinsSliderChanged));
-        this._nPenguinsItem.connect('drag-end', Lang.bind(this, this._nPenguinsChanged));
+        this._nPenguinsItem.connect('drag-end', Lang.bind(this, this.stub));
         this._optionsMenu.menu.addMenuItem(this._nPenguinsItem);
+
+        /* always on visible workspace toggle */
+        this._alwaysOnVisibleWorkspaceItem = new PopupMenu.PopupSwitchMenuItem(_('Always on visible workspace'), false);
+        this._alwaysOnVisibleWorkspaceItem.connect('toggled', Lang.bind(this, this.stub));
+        this._optionsMenu.menu.addMenuItem(this._alwaysOnVisibleWorkspaceItem);
 
         /* Ignore maximised toggle */
         this._ignoreMaximisedItem = new PopupMenu.PopupSwitchMenuItem(_('Ignore maximised windows'), true));
-        this._ignoreMaximisedItem.connect('toggled', Lang.bind(this, this._ignoreMaximisedWindows));
+        this._ignoreMaximisedItem.connect('toggled', Lang.bind(this, this.stub));
         this._optionsMenu.menu.addMenuItem(this._ignoreMaximisedItem);
 
+        /* God mode */
+        /* Angels */
+        /* Blood */
+        let defaults = XPenguins.XPenguinsLoop.prototype.defaultOptions();
+        for ( let propName in this._toggles ) {
+            this._items[propName].push(new PopupMenu.PopupSwitchMenuItem(this._toggles[propName], defaults[propName]));
+            this._items[propName].connect('toggled', Lang.bind(this, function() { this.confChanged(propName); })); // TODO: how to curry better?
+            this._optionsMenu.menu.addMenuItem(this._items[propName]); 
+        }
 
         /* create an Xpenguin Loop object which stores the XPenguins program */
         this.XPenguinsLoop = new XPenguins.XPenguinsLoop({ verbose: this._verboseItem.state,
@@ -138,14 +168,22 @@ XPenguinsMenu.prototype = {
         });
     },
 
-    _startXPenguins: function() {
+    confChanged: function(whatChanged) {
+        if ( !this.XPenguinsLoop.is_playing() ) {
+            this.XPenguinsLoop.options[whatChanged] = this._items[whatChanged].state;
+        } else {
+            /* TODO: send to XPenguins.loop */
+        }
     },
-    _ignoreMaximisedWindows: function() {
+    
+    stub: function() {
+        /* handles configuration changes */
+    },
+
+    _startXPenguins: function() {
     },
     _nPenguinsSliderChanged: function(slider, value) {
         this._nPenguinsLabel.set_text( Math.ceil( value*this._PENGUIN_MAX ).toString() );
     },
-    _nPenguinsChanged: function(slider,value) {
-    }
 };
 
