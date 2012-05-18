@@ -170,6 +170,7 @@ XPenguinsMenu.prototype = {
         });
     },
 
+        // BIG TODO: onAllWorkspaces only applies for on the desktop toons.
     confChanged: function(whatChanged) {
         if ( !this.XPenguinsLoop.is_playing() ) {
             this.XPenguinsLoop.options[whatChanged] = this._items[whatChanged].state;

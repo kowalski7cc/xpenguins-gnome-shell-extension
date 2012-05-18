@@ -111,6 +111,8 @@ function updateWindows( winActor, options ) {
      * The only windows that have a chance of being on top of you are after you on the list.
      * This handles windows spread over two monitors too.
      */
+    // NOTE: global.get_window_actors() already sorts by stacking.
+    // Window.Actor is a Clutter.Group in Meta-3.0.gir
     winList = global.display.sort_windows_by_stacking( winList );
 
     /* iterate through backwards: every window up to winList[i]==winActor has a chance
