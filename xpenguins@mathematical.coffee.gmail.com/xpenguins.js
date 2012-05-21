@@ -29,6 +29,17 @@ function XPenguinsLoop() {
     this._init.apply(this, arguments);
 };
 
+/* When to recalculate window position/size changes.
+ * ALWAYS: always (even during the resize/move)
+ * PAUSE : pause until resize/move has finished, then recalc at the end.
+ * END   : run while resize/move is in progress, but only recalculate at the end. (So toons could walk off-window).
+ */
+XPenguins.RECALC = {
+    ALWAYS: 1 << 0,
+    PAUSE : 1 << 1,
+    END   : 1 << 2
+};
+
 XPenguinsLoop.prototype = {
     log: function(msg) {
         if ( this.options.DEBUG ) {
@@ -108,6 +119,10 @@ XPenguinsLoop.prototype = {
         workspace: 0, // -1: always on visible. Otherwise, index of workspace.
         onAllWorkspaces: false, // uhh... this works best with XPenguinsLoop.
         onDesktop: true, /* whether it's running on the desktop or in a window */
+     
+        recalcMode: XPenguins.RECALC.ALWAYS, 
+
+
 
         // trigger an _onUpdateWindows only:
         // ignoreMaximised
@@ -167,6 +182,7 @@ XPenguinsLoop.prototype = {
          */
         this._signals = [];
         this._workspaces = [];
+        this._currentWorkspace = null;
     },
 
     /* when you send the stop signal to xpenguins (through the toggle) */
@@ -204,7 +220,7 @@ XPenguinsLoop.prototype = {
         /* recalculate toon windows on resume */
         this._dirtyToonWindows();
         /* temporarily disconnect events */
-        this._disconnectWindowEvents();
+        this._disconnectSignals();
     }
 
     /* resumes timeline, connects up events */
@@ -212,7 +228,7 @@ XPenguinsLoop.prototype = {
         if ( this._timeline.is_playing() )
             return;
         /* reconnect events */
-        this._connectWindowEvents();
+        this._connectSignals();
         /* recalculate toon windows */
         this._dirtyToonWindows();
         /* resume timeline */
@@ -245,7 +261,7 @@ XPenguinsLoop.prototype = {
         if ( this._newFrameID ) {
             this._timeline.disconnect(this._newFrameID);
         }
-        this._disconnectWindowEvents();
+        this._disconnectSignals();
 
         /*
         // technically just look at this.options.workspace
@@ -376,7 +392,14 @@ XPenguinsLoop.prototype = {
                 /* temporary only - just to initially connect the window's workspace to listen
                  * to window-added & window-removed events
                  */
-                this.XPenguinsWindow.get_workspace = global.screen.get_active_workspace;
+                if ( this.options.onAllWorkspaces ) {
+                    // always return "current" workspace.
+                    this.XPenguinsWindow.get_workspace = global.screen.get_active_workspace;
+                } else {
+                    // return the starting workspace.
+                    let ws = global.screen.get_active_workspace();
+                    this.XPenguinsWindow.get_workspace = function() { return ws; };
+                }
             }
         } else {
             // TODO: specify somehow.
@@ -384,7 +407,7 @@ XPenguinsLoop.prototype = {
 
         /* store the workspaces we're interested in, 
          * i.e. populate this._workspaces.
-         * done in connectWindowEvents 
+         * done in connectSignals 
          */
 
         /* set up god mode */
@@ -458,8 +481,9 @@ XPenguinsLoop.prototype = {
         // windows moved, mapped, unmapped.
         // Want to know when XPenguinsWindow CHANGES
 
-        this._connectWindowEvents();
         this._signals = [];
+        this._windowSignals = [];
+        this._connectSignals();
 
         /****************************************/
         //windows-changed
@@ -489,24 +513,25 @@ XPenguinsLoop.prototype = {
     /* connects up events required to maintain toon_windows as an accurate
      * snapshot of what the windows on the workspace look like
      */
-    _connectWindowEvents: function() {
+    _connectSignals: function() {
         /* NOTES: 
          * new window   => window-added, map
          * close window => window-removed, destroy
          *
-         * maximize     => maximize
-         * unmaximize   => unmaximize
-         * minimize     => minimize
-         * unminimize   => map, WINDOW:notify::minimize
+         * maximize     => maximize, 2xposition change, 1xsize change. Why 2? decoration?
+         * unmaximize   => unmaximize, 2xposition change, 1xsize change
+         * minimize     => minimize, position change
+         * unminimize   => map, WINDOW:notify::minimize, position change
+         * (MORE IF MAXIMUS IS ON)
+         * CHROME: 4x position change! (maximize: 2 for win + deco, then 2 for undeco?)
          *
          * window moves workspace => nothing (map/destroy/max/unmax/min/map).
          * **Includes file menus and message tray**
          *
-         * TODO: size changes not the result of interactive, e.g. keybindings?
-         *
          * resize => WINDOW:notify::size-changed, (if interactive) grab-op-begin/end
          * move   => WINDOW:notify::position-changed, (if interactive) grab-op-begin/end
-         *
+         *        * Also depends: do you want to recalculate while resize/move in progress?
+         *          (say you do it slowly).
          *
          * tracker:   maximize, unmaximize, minimize, map, destroy
          * workspace: window-added, window-removed
@@ -548,6 +573,45 @@ XPenguinsLoop.prototype = {
         /* NOTE: listening to unminimize appears to be a per-window thing... */
         // BIG TODO: on unminimize, what signal gets sent to window_manager? Don't want to listen to 'map' in particular
         // as that covers not just unmaximizing.
+
+        /** window resize/move **/
+        if ( this.options.recalcMode == XPenguins.RECALC.ALWAYS ) {
+            // BIG TODO: does this cover maximize/unmaximize/minimize/unminimize?
+            /* recalc every frame of the resize, i.e. every time position-{changed,moved} is fired even if
+             * it is during a grab operation.
+             * Requires listening to notify::position-changed & notify::size-changed *for each window*.
+             * This will cover maximize, unmaximize, minimize, restore, ...
+             */
+            /* connect *each window* */
+            this._windowSignals.push('notify::size-changed');
+            this._windowSignals.push('notify::position-changed');
+
+            let winList = global.get_window_actors();
+            for ( let i=0; i<winList.length; ++i ) {
+                this._connectWindowSignals(winList.meta_window);
+            }
+            /* Listen to window-added on current workspace in order to add per-window signals,
+             * and listen to workspace-switch to reset these signals
+             */
+            this._signals.push(global.window_manager.connect('switch-workspace', Lang.bind(this, this._onWorkspaceChanged)));
+            let ws = this.XPenguinsWindow.get_workspace();
+            ws._XPenguinsWindowAddedID = ws.connect('window-added', Lang.bind(this, this._onWindowAdded));
+        } else {
+            /* Wait for grab operation to end before recalculating.
+             * If PAUSE, pause during grab operation. If END, run during grab operation.
+             * Only requires listening to grab-op-begin and grab-op-end.
+             */
+            if ( this.options.recalcMode == XPenguins.RECALC.PAUSE ) {
+                this._signals.push(global.screen.connect('grab-op-begin', Lang.bind(this, this._grabOpStarted)));
+            }
+            this._signals.push(global.screen.connect('grab-op-end', Lang.bind(this, this._grabOpEnded)));
+        }
+
+        /**
+/* **** **** MOVE **** **** */
+
+/* **** **** /MOVE **** **** */
+           
 
         /** Window creation/removal **/
         // BIG TODO: dirtyToonWindows should check whether the window is valid to do dirtying...
@@ -608,29 +672,96 @@ XPenguinsLoop.prototype = {
          */
     },
 
+    /* Connect specified window to all signals in this._windowSignals */
+    _connectWindowSignals: function( metaWin ) {
+        if ( !metaWin ) return;
+        if ( metaWin._XPenguinWindowSignals &&
+              metaWin._XPenguinWindowSignals.length>0 ) {
+            /* TODO: already connected, return?? 
+             * Or out of date, disconnect?? */
+            return;
+        }
+        metaWin._XPenguinWindowSignals = [];
+        let i=this._windowSignals.length;
+        while ( i-- ) {
+            metaWin._XPenguinWindowSignals.push(
+                    metaWin.connect(this._windowSignals[i], Lang.bind(this, this._dirtyToonWindows))
+                    );
+        }
+    },
+
+    /* Disconnect specified window from all signals in this._windowSignals */
+    _disconnectWindowSignals: function( metaWin ) {
+        if ( !metaWin ) return;
+        if ( !metaWin._XPenguinWindowSignals ||
+              metaWin._XPenguinWindowSignals.length == 0 ) {
+                  return;
+        }
+        let i=metaWin._XPenguinWindowSignals.length;
+        while ( i-- ) {
+            metaWin.disconnect(metaWin._XPenguinWindowSignals[i]);
+        }
+        metaWin._XPenguinWindowSignals = null;
+    },
+
+    _grabOpStarted: function() {
+        this.pause();
+    },
+    _grabOpEnded: function() {
+        if ( !this._timeline.is_playing() ) {
+            /* unpause if paused (i.e. options.recalcMode == XPenguins.RECALC.PAUSE */
+            this.resume(); // already dirties toon windows
+        } else {
+            this._dirtyToonWindows();
+        }
+    },
+
     /* disconnects the events that are listened for */
-    this._disconnectWindowEvents: function() {
+    this._disconnectSignals: function() {
+        let i;
         if ( this._signals ) {
-            let i=this._signals.length;
+            i=this._signals.length;
             while ( i-- ) {
                 // err what do we disconnect *from*? TODO
                 global.window_manager.disconnect(this._signals[i]);
             }
             this._signals = [];
         }
+        if ( this._windowSignals ) {
+            let winList = global.get_window_actors();
+            i = winList.length;
+            while ( i-- ) {
+                this._disconnectWindow( winList[i].meta_window );
+            }
+            this._windowSignals = [];
+            /* TODO: disconnect workspace listeners */
+        }
     },
 
     // BIG TODO: listen to "our" workspace being destroyed.
-    _onWorkspaceChanged: function() {
+    /* Remove the window-added/removed listeners from the old workspace:
+     * - add them to the current one (if onAllWorkspaces)
+     * - resume (if switched to XPenguinWindow's workspace)
+     * - pause (if switched away from XPenguinWindow's workspace)
+     * and add them to the current one
+     */
+    _onWorkspaceChanged: function(shellwm, from, to, direction) {
         // TODO: what happens if you're in god mode?
-
         /* If you've changed workspaces, you need to change window-added/removed listeners. */
         if ( this.options.onAllWorkspaces ) {
             /* update the toon region */
             this._dirtyToonWindows();
+
+            /* disconnect old, reconnect new */
+            if ( from._XPenguinsWindowAddedID ) {
+                from.disconnect( from._XPenguinsWindowAddedID );
+                from._XPenguinsWindowAddedID = null;
+            }
+
+            to._XPenguinsWindowAddedID = to.connect('window-added', Lang.bind(this, this._onWindowAdded));
         } else {
             /* hide the toons & pause if we've switched to another workspace */
-            if ( global.screen.get_active_workspace() != this._workspaces[0] ) {
+            if ( to != this.XPenguinsWindow.get_workspace() ) {
                 this.hideToons();
                 this.pause();
             } else {
@@ -640,30 +771,6 @@ XPenguinsLoop.prototype = {
         }
     },
 
-    /* Whenever the number of workspaces is changed,
-     * listen to an 'add window' event in case it starts
-     * maximised.
-     */
-    _onChangeNWorkspaces: function() {
-        if ( !this.options.onAllWorkspaces )
-            return;
-
-        let i,ws;
-        i = this._workspaces.length;
-        while ( i-- ) {
-            this._workspaces[i].disconnect(this._workspaces[i]._XPenguinsWindowAddedId);
-            this._workspaces[i].disconnect(this._workspaces[i]._XPenguinsWindowRemovedId);
-        }
-
-        this._workspaces = [];
-        i = global.screen.n_workspaces;
-        while ( i-- ) {
-            ws = global.screen.get_workspace_by_index(i);
-            this._workspaces.push(ws);
-            ws._XPenguinsWindowAddedId = ws.connect('window-added', Lang.bind(this, this._dirtyToonWindows));
-            ws._XPenguinsWindowRemovedId = ws.connect('window-removed', Lang.bind(this, this._dirtyToonWindows));
-        }
-    },
 
     /* whenever the XPenguins window changes workspace.
      * This may or may not involve the *user* also switching workspaces.
@@ -1273,6 +1380,32 @@ XPenguinsLoop.prototype = {
                 this.penguins[i].terminating = true;
             }
             this._penguins[i].Draw();
+        }
+    },
+
+    /***** DEPRECIATED *****/
+    /* Whenever the number of workspaces is changed,
+     * listen to an 'add window' event in case it starts
+     * maximised.
+     */
+    _onChangeNWorkspaces: function() {
+        if ( !this.options.onAllWorkspaces )
+            return;
+
+        let i,ws;
+        i = this._workspaces.length;
+        while ( i-- ) {
+            this._workspaces[i].disconnect(this._workspaces[i]._XPenguinsWindowAddedId);
+            this._workspaces[i].disconnect(this._workspaces[i]._XPenguinsWindowRemovedId);
+        }
+
+        this._workspaces = [];
+        i = global.screen.n_workspaces;
+        while ( i-- ) {
+            ws = global.screen.get_workspace_by_index(i);
+            this._workspaces.push(ws);
+            ws._XPenguinsWindowAddedId = ws.connect('window-added', Lang.bind(this, this._dirtyToonWindows));
+            ws._XPenguinsWindowRemovedId = ws.connect('window-removed', Lang.bind(this, this._dirtyToonWindows));
         }
     },
 

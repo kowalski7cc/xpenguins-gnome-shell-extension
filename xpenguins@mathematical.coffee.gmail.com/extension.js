@@ -153,15 +153,16 @@ XPenguinsMenu.prototype = {
         this._optionsMenu.menu.addMenuItem(this._ignoreMaximisedItem);
         */
 
-        /* God mode */
-        /* Angels */
-        /* Blood */
+        /* ignore maximised, always on visible workspace, angels, blood, god mode */
         let defaults = XPenguins.XPenguinsLoop.prototype.defaultOptions();
         for ( let propName in this._toggles ) {
             this._items[propName].push(new PopupMenu.PopupSwitchMenuItem(this._toggles[propName], defaults[propName]));
             this._items[propName].connect('toggled', Lang.bind(this, function() { this.confChanged(propName); })); // TODO: how to curry better?
             this._optionsMenu.menu.addMenuItem(this._items[propName]); 
         }
+
+        /* TODO: "Resize behaviour": {calculate on resize, calculate on resize-end, pause during resize} */
+
 
         /* create an Xpenguin Loop object which stores the XPenguins program */
         this.XPenguinsLoop = new XPenguins.XPenguinsLoop({ verbose: this._verboseItem.state,
