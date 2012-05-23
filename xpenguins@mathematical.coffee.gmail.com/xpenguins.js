@@ -221,7 +221,7 @@ XPenguinsLoop.prototype = {
         this._dirtyToonWindows();
         /* temporarily disconnect events */
         this._disconnectSignals();
-    }
+    },
 
     /* resumes timeline, connects up events */
     resume: function() {
@@ -233,7 +233,7 @@ XPenguinsLoop.prototype = {
         this._dirtyToonWindows();
         /* resume timeline */
         this._timeline.start();
-    }
+    },
 
     reset: function() {
         this.clean_up();

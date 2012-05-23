@@ -55,22 +55,109 @@ WindowListener.prototype = {
         };
         this.XPenguinsWindow = global.stage;
         this.XPenguinsWindow.get_workspace = global.screen.get_active_workspace;
-
+        this._timeline = {
+            _playing: false,
+            start: function() { this._playing = true; },
+            end: function() { this._playing = false; },
+            is_playing: function() { return this._playing }
+        };
         this._listeningPerWindow = false; /* whether we have to listen to individual windows for signals */
 
-
         /* connect signals */
+        this.connectSignals();
+    },
+
+    /* add other initialisation code here,
+     * stuff that has to get reset whenever the timeline restarts.
+     */
+    init: function() {
+        this._connectSignals();
+        // like this._timeline.rewind
+    },
+
+    destroy: function() {
+        this.clean_up();
+    },
+
+    clean_up: function() {
+        let i;
+        /* stop timeline if it's running */
+        if ( this._timeline.is_playing() ) {
+            this._timeline.stop();
+        }
+
+        /* disconnect events */
+        this._disconnectSignals();
+    },
+/* start the main xpenguins loop: main.c 
+     * init() should have been called by now.
+     */
+    start: function() {
+        if ( this._timeline.is_playing() ) 
+            return;
+        this.init();
+        this._timeline.start();
+    },
+
+    /* why not 'stop' ? */
+    exit: function() {
+        if ( !this._timeline.is_playing() ) 
+            return;
+
+        this.clean_up(); // <- disconnect, stop timeline, ...
+    },
+
+
+    /* pauses the timeline & temporarily stops listening for events */
+    pause: function() {
+        if ( !this._timeline.is_playing() )
+            return;
+        /* pause timeline */
+        this._timeline.pause();
+        /* recalculate toon windows on resume */
+        this._dirtyToonWindows('pause');
+        /* temporarily disconnect events */
+        this._disconnectSignals();
+    },
+
+    /* resumes timeline, connects up events */
+    resume: function() {
+        if ( this._timeline.is_playing() )
+            return;
+        /* reconnect events */
+        this._connectSignals();
+        /* recalculate toon windows */
+        this._dirtyToonWindows('resume');
+        /* resume timeline */
+        this._timeline.start();
+    },
+
+    /* called when configuration is changed.
+     * ignorePopups, ignoreMaximised, onAllWorkspaces, onDesktop (TRUE FOR NOW),
+     * ignored: blood, angels, squish, DEBUG.
+     */
+    // TODO: move to signal interface instead?
+    changeOptions: function(propName, propVal) {
+        if ( this.options.hasOwnProperty(propName) && this.options[propName] != propVal ) {
+            this.options[propName] = propVal;
+        }
+        /* TRIGGER SOMETHING */
+        // UPTO TODO
+    },
+
+    _connectSignals: function() {
+        this._listeningPerWindow = false; /* whether we have to listen to individual windows for signals */
         let ws = this.XPenguinsWindow.get_workspace();
 
         /* new or destroyed windows */
         if ( this.options.ignorePopups ) {
             /* Listen to 'window-added' and '-removed': these are the only windows that count. */
-            this.connect_and_track(this, ws, 'window-added', Lang.bind(this, this._dirtyToonWindows));
-            this.connect_and_track(this, ws, 'window-removed', Lang.bind(this, this._dirtyToonWindows));
+            this.connect_and_track(this, ws, 'window-added', Lang.bind(this, function() { this._dirtyToonWindows('window-added') }));
+            this.connect_and_track(this, ws, 'window-removed', Lang.bind(this, function() { this._dirtyToonWindows('window-removed') }));
         } else {
             /* Listen to 'mapped' and 'destroyed': every window here counts */
-            this.connect_and_track(this, global.window_manager, 'map', Lang.bind(this, this._dirtyToonWindows));
-            this.connect_and_track(this, global.window_manager, 'destroy', Lang.bind(this, this._dirtyToonWindows));
+            this.connect_and_track(this, global.window_manager, 'map', Lang.bind(this, function() { this._dirtyToonWindows('map')}));
+            this.connect_and_track(this, global.window_manager, 'destroy', Lang.bind(this, function() { this._dirtyToonWindows('destroy') }));
         }
 
 
@@ -89,9 +176,9 @@ WindowListener.prototype = {
         /* maximize, unmaximize, minimize */
         if ( this.options.recalcMode == XPenguins.RECALC.ALWAYS ) {
             /* TODO: ignoreMaximised: do not connect 'maximize' signal up? */
-            this.connect_and_track(this, global.window_manager, 'maximize', Lang.bind(this, this._dirtyToonWindows));
-            this.connect_and_track(this, global.window_manager, 'unmaximize', Lang.bind(this, this._dirtyToonWindows));
-            this.connect_and_track(this, global.window_manager, 'minimize', Lang.bind(this, this._dirtyToonWindows));
+            this.connect_and_track(this, global.window_manager, 'maximize', Lang.bind(this, function() { this._dirtyToonWindows('maximize') }));
+            this.connect_and_track(this, global.window_manager, 'unmaximize', Lang.bind(this, function() { this._dirtyToonWindows('unmaximize') }));
+            this.connect_and_track(this, global.window_manager, 'minimize', Lang.bind(this, function() { this._dirtyToonWindows('minimize') }));
         } else {
             /* allocation-changed covers all of the above. */
         }
@@ -100,7 +187,7 @@ WindowListener.prototype = {
          * TODO: check focus-app vs notify::minimize
          */
         if ( this.options.ignorePopups ) {
-            this.connect_and_track(this, global.WindowTracker.get_default(), 'notify::focus-app', Lang.bind(this, this._dirtyToonWindows));
+            this.connect_and_track(this, global.WindowTracker.get_default(), 'notify::focus-app', Lang.bind(this, function() { this._dirtyToonWindows('notify::focus-app') }));
         } else {
             /* map covers this */
         }
@@ -116,7 +203,7 @@ WindowListener.prototype = {
                  * and hope for the best.
                  * Don't connect if we've already done so in this.options.ignorePopups above (for unminimize)
                  */
-                this.connect_and_track(this, global.WindowTracker.get_default(), 'notify::focus-app', Lang.bind(this, this._dirtyToonWindows));
+                this.connect_and_track(this, global.WindowTracker.get_default(), 'notify::focus-app', Lang.bind(this, function() { this._dirtyToonWindows('notify::focus-app') }));
             }
         }
 
@@ -139,8 +226,22 @@ WindowListener.prototype = {
         // FIXME LATER: reduce cases. This RECALC business is silly - just recalc *always* !
         // FIXME LATER: events for the XPenguins Window.
 
+    }, // _connectSignals
+
+    _disconnectSignals: function() {
+        /* disconnect all signals */
+        this.disconnect_tracked_signals(this);
+        if ( this._listeningPerWindow ) {
+            let ws = this.XPenguinsWindow.get_workspace();
+            ws.list_windows().map(Lang.bind(this, function(metaWin) { this._onWindowRemoved(null, metaWin); }));
+            this._listeningPerWindow = false;
+        }
+
     },
 
+    /***********
+     * SIGNALS *
+     ***********/
     /* Note: for now, per-window signals are *all* stored in the relevant actor. */
     _onWindowAdded: function(workspace, metaWin) {
         LOG('_onWindowAdded for %s', metaWin.get_title());
@@ -158,12 +259,12 @@ WindowListener.prototype = {
         
         /* Stacking order. If we're not running on the deskopt & listening to 'raised' */
         if  ( !this.options.onDesktop && this.options.recalcMode == XPenguins.RECALC.ALWAYS ) {
-           this.connect_and_track(winActor, metaWin, 'raised', Lang.bind(this, this._dirtyToonWindows));
+           this.connect_and_track(winActor, metaWin, 'raised', Lang.bind(this, function() { this._dirtyToonWindows('raised') }));
         }
 
         /* resized/moved windows */
         if ( this.options.recalcMode == XPenguins.RECALC.ALWAYS ) {
-            this.connect_and_track(winActor, winActor, 'allocation-changed', Lang.bind(this, this._dirtyToonWindows));
+            this.connect_and_track(winActor, winActor, 'allocation-changed', Lang.bind(this, function() { this._dirtyToonWindows('allocation-changed') }));
         }
     },
 
@@ -173,15 +274,53 @@ WindowListener.prototype = {
         this.disconnect_tracked_signals(metaWin.get_compositor_private());
     },
 
-    /* TODO: _onWorkspaceChanged */
+    // BIG TODO: listen to "our" workspace being destroyed.
+    /* Remove the window-added/removed listeners from the old workspace:
+     * - add them to the current one (if onAllWorkspaces)
+     * - resume (if switched to XPenguinWindow's workspace)
+     * - pause (if switched away from XPenguinWindow's workspace)
+     * and add them to the current one
+     */
     _onWorkspaceChanged: function(shellwm, from, to, direction) {
-        LOG('_onWorkspaceChanged');
+        // TODO: what happens if you're in god mode?
+        /* If you've changed workspaces, you need to change window-added/removed listeners. */
+        if ( this.options.onAllWorkspaces ) {
+            /* update the toon region */
+            this._dirtyToonWindows('_onWorkspaceChanged');
+
+            /* disconnect/reconnect window-added & window-removed events we were listening to */
+            if ( this._listeningPerWindow ) {
+                this.disconnect_tracked_signals(from);
+
+                this.connect_and_track(this, to, 'window-added', Lang.bind(this, this._onWindowAdded));
+                this.connect_and_track(this, to, 'window-removed', Lang.bind(this, this._onWindowRemoved)); 
+
+                /* connect up existing windows */
+                to.list_windows().map(Lang.bind(this, function(metaWin) { this._onWindowAdded(null, metaWin); }));
+            }
+        } else {
+            /* hide the toons & pause if we've switched to another workspace */
+            if ( to != this.XPenguinsWindow.get_workspace() ) {
+                //this.hideToons();
+                this.pause(); // TODO: also pause signals??
+            } else {
+                //this.showToons();
+                this.resume();
+            }
+        }
     },
 
-    _dirtyToonWindows: function() {
-        LOG('_dirtyToonWindows');
+    /*********************
+     *     FUNCTION      *
+     *********************/
+    _dirtyToonWindows: function(msg) {
+        // hmm, in debugging mode I'd also like to track why.
+        LOG('_dirtyToonWindows' + msg);
     },
 
+    /*********************
+     *      UTILITY      *
+     *********************/
     /* Note : my connect/disconnect tracker takes ideas from shellshape extension:
      * signals are stored by the owner, storing both the target & the id to clean up later
      */
@@ -204,13 +343,4 @@ WindowListener.prototype = {
         delete owner._XPenguins_bound_signals;
     },
 
-    _disable: function() {
-        /* disconnect all signals */
-        this.disconnect_tracked_signals(this);
-        if ( this._listeningPerWindow ) {
-            let ws = this.XPenguinsWindow.get_workspace();
-            ws.list_windows().map(Lang.bind(this, function(metaWin) { this._onWindowRemoved(null, metaWin); }));
-            this._listeningPerWindow = false;
-        }
-    },
 }
