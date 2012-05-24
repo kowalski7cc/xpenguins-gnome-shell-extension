@@ -8,7 +8,8 @@ const PopupMenu = imports.ui.popupMenu;
 
 /* my files */
 const Extension = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-const XPenguins = Extension.xpenguins; // how to get?
+const XPenguins = Extension.xpenguins; 
+const WindowListener = Extension.windowListener;
 
 const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
@@ -94,7 +95,35 @@ XPenguinsMenu.prototype = {
 
         /* Create menus */
         this._createMenu();
+
+        /* create an Xpenguin Loop object which stores the XPenguins program */
+        let opts = this.getConf(); 
+        // opts.nPenguins = parseInt(this._nPenguinsLabel.text); <-- by default don't do it??
+        this.XPenguinsLoop = new XPenguins.XPenguinsLoop( this.getConf() );
+        // TODO: load default theme ('Penguins', set n toons from that).
+
+        this.windowListener = new WindowListener.WindowListener();
     },
+
+    getConf: function() { 
+        let opts = {};
+        for ( let propName in this._toggles ) {
+            opts[propName] = this._items[propName].state;
+        }
+        return opts;
+    },
+
+    // BIG TODO: onAllWorkspaces only applies for on the desktop toons.
+    confChanged: function(whatChanged) {
+        if ( !this.XPenguinsLoop.is_playing() ) {
+            this.XPenguinsLoop.options[whatChanged] = this._items[whatChanged].state;
+        } else {
+            /* TODO: send to XPenguins.loop: signal or direct call? */
+            // this.XPenguinsLoop.changeOption(whatChanged, this._items[whatChange].state);
+            this.windowListener.changeOption(whatChanged, this._items[whatChange].state);
+        }
+    },
+    
 
     _createMenu: function() {
         let item;
@@ -132,7 +161,7 @@ XPenguinsMenu.prototype = {
 
         /* Number of penguins */
         item = new PopupMenu.PopupMenuItem(_('Max penguins'), { reactive: false });
-        this._nPenguinsLabel = new St.Label({ text: this._nPenguins.toString() });
+        this._nPenguinsLabel = new St.Label({ text: '-1' });
         item.addActor(this._nPenguinsLabel, { align: St.Align.END });
         this._optionsMenu.menu.addMenuItem(item);
 
@@ -156,7 +185,7 @@ XPenguinsMenu.prototype = {
         /* ignore maximised, always on visible workspace, angels, blood, god mode */
         let defaults = XPenguins.XPenguinsLoop.prototype.defaultOptions();
         for ( let propName in this._toggles ) {
-            this._items[propName].push(new PopupMenu.PopupSwitchMenuItem(this._toggles[propName], defaults[propName]));
+            this._items[propName] = new PopupMenu.PopupSwitchMenuItem(this._toggles[propName], defaults[propName]);
             this._items[propName].connect('toggled', Lang.bind(this, function() { this.confChanged(propName); })); // TODO: how to curry better?
             this._optionsMenu.menu.addMenuItem(this._items[propName]); 
         }
@@ -164,28 +193,22 @@ XPenguinsMenu.prototype = {
         /* TODO: "Resize behaviour": {calculate on resize, calculate on resize-end, pause during resize} */
 
 
-        /* create an Xpenguin Loop object which stores the XPenguins program */
-        this.XPenguinsLoop = new XPenguins.XPenguinsLoop({ verbose: this._verboseItem.state,
-                                                           nPenguins: parseInt(this._nPenguinsLabel.text),
-                                                           ignoreMaximised: this._ignoreMaximisedItem.state 
-        });
     },
 
-        // BIG TODO: onAllWorkspaces only applies for on the desktop toons.
-    confChanged: function(whatChanged) {
-        if ( !this.XPenguinsLoop.is_playing() ) {
-            this.XPenguinsLoop.options[whatChanged] = this._items[whatChanged].state;
-        } else {
-            /* TODO: send to XPenguins.loop */
-        }
-    },
-    
     stub: function() {
         /* handles configuration changes */
     },
 
-    _startXPenguins: function() {
+    _startXPenguins: function(item, state) {
+        if ( state == this.windowListener.is_playing() ) return;
+        // temporary
+        if ( state ) {
+            this.windowListener.start();
+        } else {
+            this.windowListener.stop();
+        }
     },
+
     _nPenguinsSliderChanged: function(slider, value) {
         this._nPenguinsLabel.set_text( Math.ceil( value*this._PENGUIN_MAX ).toString() );
     },

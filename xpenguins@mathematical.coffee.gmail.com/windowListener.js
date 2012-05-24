@@ -1,11 +1,23 @@
+const Lang = imports.lang;
+const Mainloop = imports.mainloop;
+/* Preliminary testing results.
+ * NOTE: focus-app is NOT BEING CONNECTED W/ CURRENT DEFAULTS!
+ * Notify::focus-app is not enough - need more like notify::focus-*window*.
+ *  --> check StatusTitleBar.
+ *
+ */
+
 /*
  * An object that tests the firing/connecting of all the signals.
  * For debugging.
+ * Not to be included in the final extension.
  */
-XPenguins.RECALC = {
-    ALWAYS: 1 << 0,
-    PAUSE : 1 << 1,
-    END   : 1 << 2
+const XPenguins = {
+    RECALC: {
+        ALWAYS: 1 << 0,
+        PAUSE : 1 << 1,
+        END   : 1 << 2
+    }
 };
 
 function LOG() {
@@ -24,7 +36,7 @@ function WindowListener() {
 };
 
 WindowListener.prototype = {
-    _init: function() {
+    _init: function(i_options) {
          /*
           * Everyone:
           * RESTACKING: either notify::focus-app OR {for each win: "raised"}
@@ -48,29 +60,51 @@ WindowListener.prototype = {
           */
 
         /* dummy stuff for XPenguinsLoop compatibility */
+        // TODO: run in particular window (i.e. onDesktop=false)
+        // ignoreMaximised.
         this.options = {
             ignorePopups: false,
             recalcMode: XPenguins.RECALC.ALWAYS,
-            onDesktop: true
+            onDesktop: true,
+            onAllWorkspaces: false
         };
+        for ( let opt in i_options ) {
+            if ( this.options.hasOwnProperty(opt) ) {
+                this.options[opt] = i_options[opt];
+            } else {
+                LOG('  option %s not supported yet', opt);
+            }
+        }
         this.XPenguinsWindow = global.stage;
-        this.XPenguinsWindow.get_workspace = global.screen.get_active_workspace;
+        if ( !this.XPenguinsWindow.get_workspace ) {
+            /* just to initially connect the window's workspace to listen
+             * to window-added & window-removed events
+             */
+            if ( this.options.onAllWorkspaces ) {
+                // always return "current" workspace.
+                this.XPenguinsWindow.get_workspace = global.screen.get_active_workspace;
+            } else {
+                // return the starting workspace.
+                let ws = global.screen.get_active_workspace();
+                this.XPenguinsWindow.get_workspace = function() { return ws; };
+            }
+        }
+
         this._timeline = {
             _playing: false,
             start: function() { this._playing = true; },
             end: function() { this._playing = false; },
+            pause: function() { this._playing = false; },
             is_playing: function() { return this._playing }
         };
         this._listeningPerWindow = false; /* whether we have to listen to individual windows for signals */
-
-        /* connect signals */
-        this.connectSignals();
     },
 
     /* add other initialisation code here,
      * stuff that has to get reset whenever the timeline restarts.
      */
     init: function() {
+        LOG('init');
         this._connectSignals();
         // like this._timeline.rewind
     },
@@ -80,6 +114,7 @@ WindowListener.prototype = {
     },
 
     clean_up: function() {
+        LOG('clean_up');
         let i;
         /* stop timeline if it's running */
         if ( this._timeline.is_playing() ) {
@@ -93,6 +128,7 @@ WindowListener.prototype = {
      * init() should have been called by now.
      */
     start: function() {
+        LOG('start');
         if ( this._timeline.is_playing() ) 
             return;
         this.init();
@@ -107,9 +143,13 @@ WindowListener.prototype = {
         this.clean_up(); // <- disconnect, stop timeline, ...
     },
 
-
+    stop: function () {
+        LOG('stop');
+        this.exit();
+    },
     /* pauses the timeline & temporarily stops listening for events */
     pause: function() {
+        LOG('pause');
         if ( !this._timeline.is_playing() )
             return;
         /* pause timeline */
@@ -122,6 +162,7 @@ WindowListener.prototype = {
 
     /* resumes timeline, connects up events */
     resume: function() {
+        LOG('resume');
         if ( this._timeline.is_playing() )
             return;
         /* reconnect events */
@@ -131,6 +172,11 @@ WindowListener.prototype = {
         /* resume timeline */
         this._timeline.start();
     },
+    
+    /* see whether timeline is playing */
+    is_playing: function() {
+        return this._timeline.is_playing();
+    },
 
     /* called when configuration is changed.
      * ignorePopups, ignoreMaximised, onAllWorkspaces, onDesktop (TRUE FOR NOW),
@@ -138,14 +184,25 @@ WindowListener.prototype = {
      */
     // TODO: move to signal interface instead?
     changeOptions: function(propName, propVal) {
-        if ( this.options.hasOwnProperty(propName) && this.options[propName] != propVal ) {
-            this.options[propName] = propVal;
-        }
+        if ( !this.options.hasOwnProperty(propName) || this.options[propName] == propVal ) 
+            return;
+
+        LOG('changeOptions: %s = %s', propName, propVal);
+        this.options[propName] = propVal;
         /* TRIGGER SOMETHING */
         // UPTO TODO
+        // this._updateSignals?
+    },
+
+    // TODO: is there a better way to do this?
+    _updateSignals: function() {
+        LOG('updateSignals');
+        this._disconnectSignals();
+        this._connectSignals();
     },
 
     _connectSignals: function() {
+        LOG('connectSignals');
         this._listeningPerWindow = false; /* whether we have to listen to individual windows for signals */
         let ws = this.XPenguinsWindow.get_workspace();
 
@@ -229,6 +286,7 @@ WindowListener.prototype = {
     }, // _connectSignals
 
     _disconnectSignals: function() {
+        LOG('disconnectSignals');
         /* disconnect all signals */
         this.disconnect_tracked_signals(this);
         if ( this._listeningPerWindow ) {
@@ -268,6 +326,9 @@ WindowListener.prototype = {
         }
     },
 
+    /* Note: if metaWin.get_compositor_private() is NULL, it means the window
+     * is already destroyed - don't have to worry about disconnecting signals (?)
+     */
     _onWindowRemoved: function(workspace, metaWin) {
         /* disconnect all the signals */
         LOG('_onWindowRemoved for %s', metaWin.get_title());
@@ -282,6 +343,7 @@ WindowListener.prototype = {
      * and add them to the current one
      */
     _onWorkspaceChanged: function(shellwm, from, to, direction) {
+        LOG('_onWorkspaceChanged');
         // TODO: what happens if you're in god mode?
         /* If you've changed workspaces, you need to change window-added/removed listeners. */
         if ( this.options.onAllWorkspaces ) {
@@ -315,7 +377,7 @@ WindowListener.prototype = {
      *********************/
     _dirtyToonWindows: function(msg) {
         // hmm, in debugging mode I'd also like to track why.
-        LOG('_dirtyToonWindows' + msg);
+        LOG('_dirtyToonWindows %s', msg);
     },
 
     /*********************
@@ -325,6 +387,7 @@ WindowListener.prototype = {
      * signals are stored by the owner, storing both the target & the id to clean up later
      */
     connect_and_track: function(owner, subject, name, cb) {
+        LOG('connect_and_track for %s', owner.toString());
         if ( !owner.hasOwnProperty('_XPenguins_bound_signals') ) {
             owner._XPenguins_bound_signals = [];
         }
@@ -332,15 +395,17 @@ WindowListener.prototype = {
     },
 
     disconnect_tracked_signals: function(owner) {
+        LOG('disconnect_tracked_signals for %s', owner.toString());
+        if ( !owner ) return;
         if ( !owner._XPenguins_bound_signals ) return;
         let i = owner._XPenguins_bound_signals.length;
         owner._XPenguins_bound_signals.map(
                 function(sig) {
                     sig[0].disconnect(sig[1]);
-                    LOG('disconnecting signal ID %d from object %s',
+                    LOG(' .. disconnecting signal ID %d from object %s',
                          i, sig[0].toString());
         });
         delete owner._XPenguins_bound_signals;
     },
 
-}
+};

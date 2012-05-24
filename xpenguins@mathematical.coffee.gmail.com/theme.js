@@ -284,7 +284,7 @@ Theme.Theme.prototype = {
         /* de-allocate all the ToonData textures */
         let i=this.ToonData.length;
         while ( i-- ) {
-            for ( let type on this.ToonData[i] ) {
+            for ( let type in this.ToonData[i] ) {
                 this.ToonData[type].destroy();
             }
         }

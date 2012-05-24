@@ -149,8 +149,8 @@ Toon.Toon.prototype = {
 
         // UGLY way to pass in the theme/toon data/stage info/parameters.
         /* needs: 
-         * XPenguinsStageWidth
-         * XPenguinsStageHeight
+         * XPenguinsWindowWidth
+         * XPenguinsWindowHeight
          * ToonData
          * toon_windows
          * etc.
@@ -174,7 +174,7 @@ Toon.Toon.prototype = {
     /* GNOME 3.2 laziness: */
     show: function() {
         this.actor.show();
-    }
+    },
     set_position: function() {
         this.actor.set_position(arguments);
     },
@@ -193,7 +193,7 @@ Toon.Toon.prototype = {
         this.actor.set_source( this.data.texture );
         this.direction = XPUtil.RandInt(2);
         this.set_type('faller', this.direction, Toon.UNASSOCIATED);
-        this.actor.set_position( XPUtil.RandInt(this.GLOBAL.XPenguinsStageWidth - this.data.width), 1 - this.data.height );
+        this.actor.set_position( XPUtil.RandInt(this.GLOBAL.XPenguinsWindowWidth - this.data.width), 1 - this.data.height );
         this.set_association(Toon.UNASSOCIATED);
         this.set_velocity( this.direction*2-1, this.data.speed );
         this.terminating = false;
@@ -289,13 +289,13 @@ Toon.Toon.prototype = {
                 if ( this.x <= 0 ) 
                     return 1;
             } else if ( direction == Toon.RIGHT ) {
-                if ( this.x + this.data.width >= this.GLOBAL.XPenguinsStageWidth )
+                if ( this.x + this.data.width >= this.GLOBAL.XPenguinsWindowWidth )
                     return 1;
             } else if ( direction == Toon.UP ) {
                 if ( this.y <= 0 ) 
                     return 1;
             } else if ( direction == Toon.DOWN ) {
-                if ( this.y + this.data.height >= this.GLOBAL.XPenguinsStageHeight )
+                if ( this.y + this.data.height >= this.GLOBAL.XPenguinsWindowHeight )
                     return 1;
             } // switch(direction)
         } // if edge_block
@@ -328,9 +328,9 @@ Toon.Toon.prototype = {
     OffsetBlocked: function( xoffset, yoffset ) {
         if ( this.GLOBAL.edge_block ) {
             if (    (this.x + xoffset <= 0)
-                 || (this.x + this.data.width + xoffset >= this.GLOBAL.XPenguinsStageWidth)
+                 || (this.x + this.data.width + xoffset >= this.GLOBAL.XPenguinsWindowWidth)
                  || ((this.y + yoffset <= 0) && this.GLOBAL.edge_block != Toon.SIDEBOTTOMBLOCK)
-                 || (this.y + this.data.height + yoffset >= this.GLOBAL.XPenguinsStageHeight) ) {
+                 || (this.y + this.data.height + yoffset >= this.GLOBAL.XPenguinsWindowHeight) ) {
                      return true;
             }
         }
@@ -502,8 +502,8 @@ Toon.Toon.prototype = {
             if ( newx < 0 ) {
                 newx = 0;
                 result = Toon.PARTIALMOVE;
-            } else if ( newx + this.data.width > this.GLOBAL.XPenguinsStageWidth ) {
-                newx = this.GLOBAL.XPenguinsStageWidth - data.width;
+            } else if ( newx + this.data.width > this.GLOBAL.XPenguinsWindowWidth ) {
+                newx = this.GLOBAL.XPenguinsWindowWidth - data.width;
                 result = Toon.PARTIALMOVE;
             }
         }
@@ -517,8 +517,8 @@ Toon.Toon.prototype = {
                 if ( newy < 0 && this.GLOBAL.edge_block != Toon.SIDEBOTTOMBLOCK ) {
                     newy = 0;
                     result = Toon.PARTIALMOVE;
-                } else if ( newy + this.data.height > this.GLOBAL.XPenguinsStageHeight ) {
-                    newy = this.GLOBAL.XPenguinsStageHeight - data.height;
+                } else if ( newy + this.data.height > this.GLOBAL.XPenguinsWindowHeight ) {
+                    newy = this.GLOBAL.XPenguinsWindowHeight - data.height;
                     result = Toon.PARTIALMOVE;
                 }
                 if ( newx == this.x && newy == this.y && !stationary ) {

@@ -1,3 +1,5 @@
+const Lang = imports.lang;
+
 const Clutter = imports.gi.Clutter;
 
 const Extension = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
@@ -34,6 +36,7 @@ function XPenguinsLoop() {
  * PAUSE : pause until resize/move has finished, then recalc at the end.
  * END   : run while resize/move is in progress, but only recalculate at the end. (So toons could walk off-window).
  */
+const XPenguins = XPenguins || {};
 XPenguins.RECALC = {
     ALWAYS: 1 << 0,
     PAUSE : 1 << 1,
@@ -59,7 +62,7 @@ XPenguinsLoop.prototype = {
         global.log(msg);
         print(msg);
         log(msg);
-    }
+    },
 
     /* options:
      * DEBUG
@@ -83,7 +86,7 @@ XPenguinsLoop.prototype = {
             it just wakes up every 5 seconds to recheck the load.
         */
         load_check_interval : 5000, /* ms between load average checks */
-        load_cycles, /* number of frames between load average checks */
+        load_cycles: 0, /* number of frames between load average checks */
         load1 : -1.0, /* Start killing penguins if load reaches this amount */
         load2 : -1.0, /* All gone by this amount (but can come back!) */
 
@@ -155,7 +158,7 @@ XPenguinsLoop.prototype = {
 
     is_playing: function() {
         return this._timeline.is_playing();
-    }
+    },
 
         // TODO: if xpenguins_active then do something.
     set_themes: function( themeList ) {
@@ -169,10 +172,10 @@ XPenguinsLoop.prototype = {
         /* copy over custom options */
         for ( opt in i_options ) {
             // warn of unknown options
-            if ( opt in options ) {
-                this.warn('Warning: unknown option %s, ignoring'.format(opt));
-            } else {
+            if ( options.hasOwnProperty(opt) ) {
                 options[opt] = i_options[opt];
+            } else {
+                this.warn('Warning: unknown option %s, ignoring'.format(opt));
             }
         }
         this.options = options;
@@ -425,8 +428,8 @@ XPenguinsLoop.prototype = {
             opt.workspace = global.screen.get_active_workspace();
         }
         this.global = {
-            XPenguinsWindow = this.XPenguinsWindow,
-            XPenguinsWindowWidth: this.XPenguinsWindow.get_width(),
+            XPenguinsWindow: this.XPenguinsWindow,
+            XPenguinsWindowWidth: this.XPenguinsWindow.get_width(), // TODO: bind these instead in case of change.
             XPenguinsWindowHeight: this.XPenguinsWindow.get_height(),
             ToonData: this._theme.ToonData,
             //options: opt, // <-- do I really want to lug the *whole* structure around?!
@@ -450,8 +453,8 @@ XPenguinsLoop.prototype = {
         for ( i=0; i<genus_numbers.length; ++i ) {
             while ( genus_numbers[i] ) {
                 /* Initialise toons */
-                this._penguins.push( new Toon.Toon( global,
-                                                    {genus:i} ); // will call .init() automatically
+                // will call .init() automatically since genus is provided.
+                this._penguins.push(new Toon.Toon(global, {genus:i}));
                 genus_numbers[i]--;
             }
         }
@@ -856,7 +859,7 @@ XPenguinsLoop.prototype = {
     },
 
     /* disconnects the events that are listened for */
-    this._disconnectSignals: function() {
+    _disconnectSignals: function() {
         let i;
         if ( this._signals ) {
             i=this._signals.length;
@@ -907,7 +910,7 @@ XPenguinsLoop.prototype = {
                 }
 
                 /* Reconnect per-window events for new workspace */
-                let winList = to.list_windows();
+                winList = to.list_windows();
                 i = winList.length;
                 while ( i-- ) {
                     this._connectWindowSignals( winList[i].get_compositor_private() );
@@ -1017,7 +1020,7 @@ XPenguinsLoop.prototype = {
         this.log('SMITE at %i, %i'.format(x,y));
 
         /* xpenguins_frame() bit in here */
-        let toon == act.toon_object;
+        let toon = act.toon_object;
         let gdata = this._theme.ToonData[toon.genus];
         /* squash if it's not already dead/dying.
          * Gosh, that's a lot of ways for the toons to die, isn't it? 
@@ -1070,7 +1073,7 @@ XPenguinsLoop.prototype = {
             //  ToonRelocateAssociated
             //}
         }
-    }
+    },
 
     _onInterrupt: function() {
         this.log(_('Interrupt received: Exiting.'));

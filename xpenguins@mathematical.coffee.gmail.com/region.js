@@ -45,7 +45,9 @@ Region.prototype = {
         this.extents = this.extents.union(rect);
     },
 
-    union: add_rectangle,
+    union: function() {
+        this.add_rectangle(arguments);
+    },
 
     /* determines whether the specified rect overlaps with the region.
      *
