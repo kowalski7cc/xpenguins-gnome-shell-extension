@@ -31,7 +31,13 @@
 
 const Clutter = imports.gi.Clutter;
 
-const Extension = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+// temp until two distinct versions:
+var Extension;
+try {
+    Extension = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+} catch(err) {
+    Extension = imports.misc.extensionUtils.getCurrentExtension().imports;
+}
 const XPUtil = Extension.util; 
 
 /* Use the Toon namespace */

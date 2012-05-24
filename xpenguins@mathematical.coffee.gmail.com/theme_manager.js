@@ -3,7 +3,18 @@ const Gio = imports.gi.Gio;
 
 const fileUtils = imports.misc.fileUtils;
 
-const Extension = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+// temp until two distinct versions:
+var Extension, extensionPath;
+try {
+    // gnome 3.2
+    Extension = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+    extensionPath = imports.ui.extensionSystem.extensionMeta['xpenguins@mathematical.coffee.gmail.com'].path;
+} catch(err) {
+    // gnome 3.4
+    Extension = imports.misc.extensionUtils.getCurrentExtension();
+    extensionPath = Extension.path;
+    Extension = Extension.imports;
+}
 const XPUtil = Extension.util;
 
 /***********************
@@ -18,7 +29,7 @@ const ThemeManager = {
      */
     theme_directory: 'themes',
     // TODO:
-    system_directory: '.', // metadata.path
+    system_directory: extensionPath,
     user_directory: '.xpenguins',
     config_file: 'config',
 

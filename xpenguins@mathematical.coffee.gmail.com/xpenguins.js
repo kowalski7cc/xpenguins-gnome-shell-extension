@@ -2,7 +2,13 @@ const Lang = imports.lang;
 
 const Clutter = imports.gi.Clutter;
 
-const Extension = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+// temp until two distinct versions:
+var Extension;
+try {
+    Extension = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+} catch(err) {
+    Extension = imports.misc.extensionUtils.getCurrentExtension().imports;
+}
 const XPUtil = Extension.util; 
 const Toon   = Extension.toon.Toon;
 const Theme  = Extension.theme.Theme;
@@ -36,13 +42,21 @@ function XPenguinsLoop() {
  * PAUSE : pause until resize/move has finished, then recalc at the end.
  * END   : run while resize/move is in progress, but only recalculate at the end. (So toons could walk off-window).
  */
+/*
 const XPenguins = XPenguins || {};
 XPenguins.RECALC = {
     ALWAYS: 1 << 0,
     PAUSE : 1 << 1,
     END   : 1 << 2
 };
-
+*/
+const XPenguins = {
+    RECALC: {
+        ALWAYS: 1 << 0,
+        PAUSE : 1 << 1,
+        END   : 1 << 2
+    }
+};
 XPenguinsLoop.prototype = {
     log: function(msg) {
         if ( this.options.DEBUG ) {

@@ -1,10 +1,27 @@
 const Lang = imports.lang;
 const Mainloop = imports.mainloop;
 /* Preliminary testing results.
- * NOTE: focus-app is NOT BEING CONNECTED W/ CURRENT DEFAULTS!
- * Notify::focus-app is not enough - need more like notify::focus-*window*.
- *  --> check StatusTitleBar.
+ * notify::focus-app not tested yet (only if onDesktop is FALSE)
+ *  --> check StatusTitleBar for a focus-*window* type event?
  *
+ * Workspace-switched: 'pause' used to disconnect signals but for now
+ * it *isn't* because then it can't listen for switch-workspace back
+ * to reconnect them!
+ * So: EITHER
+ * 1) do not disconnect signals when paused, OR
+ * 2) when you pause make sure you connect a signal that resumes.
+ *
+ * FIXME: map, destroy, max, unmax, min (ones that are tracked by GLOBAL)
+ *    should filter to the right workspace?
+ *
+ * UPTO:
+ * - test switching workspaces w/ default options
+ * - test switching workspaces w/ onAllWorkspaces
+ * - test ignorePopups
+ * - test !onDesktop: stacking order.
+ *
+ * NEXT:
+ * - run in another window: test that window's signals.
  */
 
 /*
@@ -93,10 +110,12 @@ WindowListener.prototype = {
         this._timeline = {
             _playing: false,
             start: function() { this._playing = true; },
-            end: function() { this._playing = false; },
+            stop: function() { this._playing = false; },
             pause: function() { this._playing = false; },
             is_playing: function() { return this._playing }
         };
+
+        this._resumeSignal = {}; /* when you pause you have to listen for an event to unpause; use this._resumeID to store this. */
         this._listeningPerWindow = false; /* whether we have to listen to individual windows for signals */
     },
 
@@ -157,7 +176,8 @@ WindowListener.prototype = {
         /* recalculate toon windows on resume */
         this._dirtyToonWindows('pause');
         /* temporarily disconnect events */
-        this._disconnectSignals();
+        // Nope - still need to listen to workspace-switched to unpause!
+        this._disconnectSignals(); 
     },
 
     /* resumes timeline, connects up events */
@@ -231,7 +251,7 @@ WindowListener.prototype = {
         }
 
         /* maximize, unmaximize, minimize */
-        if ( this.options.recalcMode == XPenguins.RECALC.ALWAYS ) {
+        if ( this.options.recalcMode != XPenguins.RECALC.ALWAYS ) {
             /* TODO: ignoreMaximised: do not connect 'maximize' signal up? */
             this.connect_and_track(this, global.window_manager, 'maximize', Lang.bind(this, function() { this._dirtyToonWindows('maximize') }));
             this.connect_and_track(this, global.window_manager, 'unmaximize', Lang.bind(this, function() { this._dirtyToonWindows('unmaximize') }));
@@ -295,6 +315,9 @@ WindowListener.prototype = {
             this._listeningPerWindow = false;
         }
 
+        /* Should I do this? Or just in the 'terminate' signal? */
+        /* Just have to make sure you connect it up *after* calling pause. */
+        this.disconnect_tracked_signals(this._resumeSignal);
     },
 
     /***********
@@ -364,7 +387,16 @@ WindowListener.prototype = {
             /* hide the toons & pause if we've switched to another workspace */
             if ( to != this.XPenguinsWindow.get_workspace() ) {
                 //this.hideToons();
-                this.pause(); // TODO: also pause signals??
+                this.pause(); 
+
+                // BIG TODO: on workspace-switch back, set this.resume() hook.
+                // Either that or don't pause signals.
+                this.connect_and_track(this._resumeSignal, global.window_manager,
+                        'switch-workspace', Lang.bind(this, function() { 
+                            // could just *not* disconnect _onWorkspaceChanged?
+                            this.disconnect_tracked_signals(this._resumeSignal);
+                            this.resume();
+                        }));
             } else {
                 //this.showToons();
                 this.resume();

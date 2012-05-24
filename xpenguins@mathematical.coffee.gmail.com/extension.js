@@ -7,9 +7,16 @@ const PanelMenu = imports.ui.panelMenu;
 const PopupMenu = imports.ui.popupMenu;
 
 /* my files */
-const Extension = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+// temp until two distinct versions:
+var Extension;
+try {
+    Extension = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+} catch(err) {
+    Extension = imports.misc.extensionUtils.getCurrentExtension().imports;
+}
 const XPenguins = Extension.xpenguins; 
 const WindowListener = Extension.windowListener;
+const ThemeManager = Extension.theme_manager.ThemeManager;
 
 const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
@@ -68,27 +75,22 @@ XPenguinsMenu.prototype = {
     
         /* items */ 
         this._optionsMenu = null;
-        this._nPenguinsItem = null;
-        //this._verboseItem = null;
-        //this._ignoreMaximisedItem = null;
-        //this._onAllWorkspacesItem = null;
         this._items = {};
         this._toggles = { 
                          ignorePopups   : _('Ignore popups'),
                          ignoreMaximised: _('Ignore maximised windows'),
                          onAllWorkspaces: _('Always on visible workspace'), // <-- this is the only one
+                         onDesktop      : _('Run on desktop'), // not fully implemented
                          blood          : _('Show blood'),
                          angels         : _('Show angels'),
                          squish         : _('God Mode'),
                          DEBUG          : _('Verbose')
-        }
+        };
 
         /* variables */  
         // this._DEBUG & this._PENGUIN_MAX: just store as UI elements?
         //this._DEBUG = true;
         this._PENGUIN_MAX = 256;
-        //this._nPenguins = 20;
-        //this._ignoreMaximised = true;
 
 
         /* connect events */
@@ -126,15 +128,13 @@ XPenguinsMenu.prototype = {
     
 
     _createMenu: function() {
-        let item;
-
         /* clear the menu */
     	this.menu.removeAll();
 
         /* toggle to start xpenguins */
-        item = new PopupMenu.PopupSwitchMenuItem( _('Start'), false );
-        item.connect('toggled', Lang.bind( this, this._startXPenguins ));
-        this.menu.addMenuItem(item);
+        this._items.start = new PopupMenu.PopupSwitchMenuItem( _('Start'), false );
+        this._items.start.connect('toggled', Lang.bind( this, this._startXPenguins ));
+        this.menu.addMenuItem(this._items.start);
 
         /* Options menu:
          * - theme chooser  --> ComboMenuItem (not 3.2 ?)
@@ -152,38 +152,27 @@ XPenguinsMenu.prototype = {
         this._optionsMenu = new PopupMenu.PopupSubMenuMenuItem(_('Options'));
         this.menu.addMenuItem(this._optionsMenu);
 
-        /* DEBUG/VERBOSE toggle. */
-        this._verboseItem = new PopupMenu.PopupSwitchMenuItem( _('Verbose'), true);
-        this._verboseItem.connect('toggled', Lang.bind( this, function() {
-            // TODO
-        }));
-        this._optionsMenu.menu.addMenuItem(this._verboseItem);
+        /* theme combo box */
+        this._items.theme = new PopupMenu.PopupComboBoxMenuItem();
+        this._populateThemeComboBox();
+        // TODO (future): show theme icon next to theme name (see IMStatusIcon)
+        this._optionsMenu.menu.addMenuItem(this._items.theme);
 
-        /* Number of penguins */
-        item = new PopupMenu.PopupMenuItem(_('Max penguins'), { reactive: false });
-        this._nPenguinsLabel = new St.Label({ text: '-1' });
-        item.addActor(this._nPenguinsLabel, { align: St.Align.END });
-        this._optionsMenu.menu.addMenuItem(item);
+        /* Number of penguins */ 
+        let dummy = new PopupMenu.PopupMenuItem(_('Max penguins'), { reactive: false });
+        this._items.nPenguinsLabel = new St.Label({ text: '-1' });
+        dummy.addActor(this._items.nPenguinsLabel, { align: St.Align.END });
+        this._optionsMenu.menu.addMenuItem(dummy);
 
-        this._nPenguinsItem = new PopupMenu.PopupSliderMenuItem(20/this._PENGUIN_MAX);
-        this._nPenguinsItem.connect('value-changed', Lang.bind(this, this._nPenguinsSliderChanged));
-        this._nPenguinsItem.connect('drag-end', Lang.bind(this, this.stub));
-        this._optionsMenu.menu.addMenuItem(this._nPenguinsItem);
+        this._items.nPenguins = new PopupMenu.PopupSliderMenuItem(20/this._PENGUIN_MAX);
+        this._items.nPenguins.connect('value-changed', Lang.bind(this, this._nPenguinsSliderChanged));
+        this._items.nPenguins.connect('drag-end', Lang.bind(this, this.stub)); // TODO: SEND TO LOOP
+        this._optionsMenu.menu.addMenuItem(this._items.nPenguins);
 
-        /* always on visible workspace toggle 
-        this._onAllWorkspacesItem = new PopupMenu.PopupSwitchMenuItem(_('Always on visible workspace'), false);
-        this._onAllWorkspacesItem.connect('toggled', Lang.bind(this, this.stub));
-        this._optionsMenu.menu.addMenuItem(this._onAllWorkspacesItem);
-        */
-
-        /* Ignore maximised toggle 
-        this._ignoreMaximisedItem = new PopupMenu.PopupSwitchMenuItem(_('Ignore maximised windows'), true));
-        this._ignoreMaximisedItem.connect('toggled', Lang.bind(this, this.stub));
-        this._optionsMenu.menu.addMenuItem(this._ignoreMaximisedItem);
-        */
-
-        /* ignore maximised, always on visible workspace, angels, blood, god mode */
-        let defaults = XPenguins.XPenguinsLoop.prototype.defaultOptions();
+        /* ignore maximised, always on visible workspace, angels, blood, god mode, verbose toggles */
+        // ERROR HERE.
+        // XPenguins is undefined.
+        let defaults = XPenguins.XPenguinsLoop.prototype.defaultOptions(); 
         for ( let propName in this._toggles ) {
             this._items[propName] = new PopupMenu.PopupSwitchMenuItem(this._toggles[propName], defaults[propName]);
             this._items[propName].connect('toggled', Lang.bind(this, function() { this.confChanged(propName); })); // TODO: how to curry better?
@@ -195,8 +184,33 @@ XPenguinsMenu.prototype = {
 
     },
 
+    _populateThemeComboBox: function() {
+        this._items.theme._menu.removeAll();
+        let themeList = ThemeManager.list_themes();
+        let dummy;
+        if ( themeList.length == 0 ) {
+           dummy = new PopupMenu.PopupMenuItem(_('No themes found, click to reload!'), {reactive: false});
+           this._items.theme.addMenuItem(dummy);
+           // TODO: ativate item or item-changed ???
+           this._items.theme.connect('active-item-changed', 
+                                     Lang.bind(this, this._populateThemeComboBox));
+        } else {
+            for ( let i=0; i<themeList.length; ++i ) {
+                dummy = new PopupMenu.PopupMenuItem(_(themeList[i]));
+                this._items.theme.addMenuItem(dummy);
+            }
+            this._items.theme.connect('active-item-changed', 
+                                      Lang.bind(this, this.stub)); // TODO
+            this._items.theme.setActiveItem(themeList.indexOf('Penguins'));
+        }
+    },
+
     stub: function() {
         /* handles configuration changes */
+    },
+
+    _onChangeTheme: function(menuItem, id) {
+        // id is the position of the theme.
     },
 
     _startXPenguins: function(item, state) {
@@ -210,7 +224,7 @@ XPenguinsMenu.prototype = {
     },
 
     _nPenguinsSliderChanged: function(slider, value) {
-        this._nPenguinsLabel.set_text( Math.ceil( value*this._PENGUIN_MAX ).toString() );
+        this._items.nPenguinsLabel.set_text( Math.ceil( value*this._PENGUIN_MAX ).toString() );
     },
 };
 

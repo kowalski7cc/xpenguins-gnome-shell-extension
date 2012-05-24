@@ -3,7 +3,7 @@
  "uuid": "xpenguins@mathematical.coffee.gmail.com",
  "settings-schema": "org.gnome.shell.extensions.xpenguins",
  "name": "xpenguins",
- "description": "An example extension to show how it works. Shows Hello, world when clicking on the top panel.",
+ "description": "A port of XPenguins to gnome-shell (NOTE: normal xpenguins works anyway, just make sure Nautilus is managing the desktop window).",
  "shell-version": [ 
      "3.2" ,
      "3.2.2.1",

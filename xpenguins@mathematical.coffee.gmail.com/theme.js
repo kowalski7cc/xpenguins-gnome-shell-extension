@@ -14,7 +14,15 @@
  *   (walker, faller, tumbler, floater, ...)
  *********************/
 /* Imports */
-const Extension = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+// temp until two distinct versions:
+var Extension;
+try {
+    Extension = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+} catch(err) {
+    Extension = imports.misc.extensionUtils.getCurrentExtension().imports;
+}
+const XPenguins = Extension.xpenguins; 
+const WindowListener = Extension.windowListener;
 const XPUtil = Extension.util; 
 const Toon   = Extension.toon.Toon;
 const ThemeManager = Extension.theme_manager.ThemeManager;
