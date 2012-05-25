@@ -7,6 +7,7 @@ const PanelMenu = imports.ui.panelMenu;
 const PopupMenu = imports.ui.popupMenu;
 
 /* my files */
+log('ASDF');
 // temp until two distinct versions:
 var Extension;
 try {
@@ -17,26 +18,9 @@ try {
 const XPenguins = Extension.xpenguins; 
 const WindowListener = Extension.windowListener;
 const ThemeManager = Extension.theme_manager.ThemeManager;
-
 const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
-
-/* GNOME 3.2:
-const ES = imports.ui.extensionSystem
-ES.userExtensionsDir.get_path() : --> .local/share/gnome-shell/extensions
-
-OR 
-init(metadata): metadata.path
-*/
-
-/* GNOME 3.4:
-const EU = imports.misc.extensionUtils
-EU.userExtensionsDir.get_path() : --> .local/share/gnome-shell/extensions
-
-EU.getCurrentExtension() --> nifty! throw an Error & parse the output
- --> object w/ '.path' & .dir
- */
-
+log('ASDF2');
 /* make a status button to click with options */
 let _indicator;
 
@@ -44,8 +28,10 @@ function init(metadata) {
 }
 
 function enable() {
+    log('ENABLE');
     _indicator = new XPenguinsMenu();
     Main.panel.addToStatusArea('xpenguins-menu', _indicator);
+    log('ENABLED');
 }
 
 function disable() {
@@ -70,6 +56,7 @@ XPenguinsMenu.prototype = {
     __proto__: PanelMenu.SystemStatusButton.prototype,
 
     _init: function() {
+        log('_init');
         /* Initialise */
         PanelMenu.SystemStatusButton.prototype._init.call(this, 'emblem-favorite');
     
@@ -96,14 +83,17 @@ XPenguinsMenu.prototype = {
         /* connect events */
 
         /* Create menus */
+        log('_createMenu');
         this._createMenu();
 
         /* create an Xpenguin Loop object which stores the XPenguins program */
         let opts = this.getConf(); 
         // opts.nPenguins = parseInt(this._nPenguinsLabel.text); <-- by default don't do it??
+        log('XPenguinsLoop');
         this.XPenguinsLoop = new XPenguins.XPenguinsLoop( this.getConf() );
         // TODO: load default theme ('Penguins', set n toons from that).
 
+        log('windowListener');
         this.windowListener = new WindowListener.WindowListener();
     },
 
@@ -129,8 +119,11 @@ XPenguinsMenu.prototype = {
 
     _createMenu: function() {
         /* clear the menu */
+        log('removing');
     	this.menu.removeAll();
+        log('removed');
 
+        log('startstop');
         /* toggle to start xpenguins */
         this._items.start = new PopupMenu.PopupSwitchMenuItem( _('Start'), false );
         this._items.start.connect('toggled', Lang.bind( this, this._startXPenguins ));
@@ -148,12 +141,15 @@ XPenguinsMenu.prototype = {
          * - choose window to run in
          */
 
+        log('optionsMenu');
         // NOTE: I don't think I need the 'Options' submenu here?
         this._optionsMenu = new PopupMenu.PopupSubMenuMenuItem(_('Options'));
         this.menu.addMenuItem(this._optionsMenu);
 
         /* theme combo box */
-        this._items.theme = new PopupMenu.PopupComboBoxMenuItem();
+        log('combo box');
+        this._items.theme = new PopupMenu.PopupComboBoxMenuItem({});
+        log('populating combo box');
         this._populateThemeComboBox();
         // TODO (future): show theme icon next to theme name (see IMStatusIcon)
         this._optionsMenu.menu.addMenuItem(this._items.theme);
@@ -185,6 +181,7 @@ XPenguinsMenu.prototype = {
     },
 
     _populateThemeComboBox: function() {
+        log('_populateThemeComboBox');
         this._items.theme._menu.removeAll();
         let themeList = ThemeManager.list_themes();
         let dummy;
@@ -192,15 +189,19 @@ XPenguinsMenu.prototype = {
            dummy = new PopupMenu.PopupMenuItem(_('No themes found, click to reload!'), {reactive: false});
            this._items.theme.addMenuItem(dummy);
            // TODO: ativate item or item-changed ???
-           this._items.theme.connect('active-item-changed', 
-                                     Lang.bind(this, this._populateThemeComboBox));
+           this._items.theme._menu.connect('open-state-changed', 
+                                     Lang.bind(this, function(act, open) {
+                                         if ( open )
+                                             this._populateThemeComboBox();
+                                     }));
+           this._items.theme.setActiveItem(0);
         } else {
             for ( let i=0; i<themeList.length; ++i ) {
                 dummy = new PopupMenu.PopupMenuItem(_(themeList[i]));
                 this._items.theme.addMenuItem(dummy);
             }
             this._items.theme.connect('active-item-changed', 
-                                      Lang.bind(this, this.stub)); // TODO
+                                      Lang.bind(this, this._onChangeTheme)); // TODO
             this._items.theme.setActiveItem(themeList.indexOf('Penguins'));
         }
     },
@@ -210,6 +211,7 @@ XPenguinsMenu.prototype = {
     },
 
     _onChangeTheme: function(menuItem, id) {
+        // TODO:
         // id is the position of the theme.
     },
 

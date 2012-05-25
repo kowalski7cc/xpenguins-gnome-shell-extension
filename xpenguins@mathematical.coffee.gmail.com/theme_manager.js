@@ -1,3 +1,4 @@
+const Lang = imports.lang;
 const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
 
@@ -55,6 +56,24 @@ const ThemeManager = {
             let themes_dir = Gio.file_new_for_path(paths[i]);
             if  ( !themes_dir.query_exists(null) ) 
                 continue;
+
+            /* Could not get fileUtils.listDirAsync to work.
+             * I think I need to make it emit a signal when it's done,
+             * & listen to that signal on the side of anything that calls this function.
+             * In any case, here is a synchronous version for the meantime.
+             */
+            // UPTO TODO
+            let fileEnum = themes_dir.enumerate_children('standard::*', Gio.FileQueryInfoFlags.NONE, null);
+            while ((let info = fileEnum.next_file(null)) != null) {
+                 let configFile = GLib.build_filenamev([themes_dir.get_path(),
+                                                        info.get_name(),
+                                                        this.config_file]);
+                 if ( GLib.file_test(configFile, GLib.FileTest.EXISTS) ) {
+                     themesList.push(info.get_name());
+                 }
+            }
+            fileEnum.close(null);
+/*
             // Note: could do Lang.bind but need two of them!
             let config_file = this.config_file;
             fileUtils.listDirAsync(themes_dir, Lang.bind(this,
@@ -70,7 +89,8 @@ const ThemeManager = {
                                   return GLib.file_test(configFile, GLib.FileTest.EXISTS);
                               })).map(function(dirInfo) { return dirInfo.get_name(); }));
                     }));
-        }
+                    */
+        } // loop through system & local xpenguins dir.
 
       /* We convert all underscores in the directory name 
        * to spaces, but actual spaces in the directory

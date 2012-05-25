@@ -115,7 +115,7 @@ Toon.Toon = new Lang.Class({
 *
 */
 Toon.Toon = function() {
-    this._init.apply(this,params);
+    this._init.apply(this,arguments);
 }
 
 Toon.Toon.prototype = {
