@@ -1,8 +1,8 @@
-const Lang = imports.lang;
+const Lang     = imports.lang;
 const Mainloop = imports.mainloop;
-const St = imports.gi.St;
+const St    = imports.gi.St;
 
-const Main = imports.ui.main;
+const Main      = imports.ui.main;
 const PanelMenu = imports.ui.panelMenu;
 const PopupMenu = imports.ui.popupMenu;
 
@@ -83,7 +83,6 @@ XPenguinsMenu.prototype = {
         /* connect events */
 
         /* Create menus */
-        log('_createMenu');
         this._createMenu();
 
         /* create an Xpenguin Loop object which stores the XPenguins program */
@@ -106,31 +105,32 @@ XPenguinsMenu.prototype = {
     },
 
     // BIG TODO: onAllWorkspaces only applies for on the desktop toons.
-    confChanged: function(whatChanged) {
+    changeOption: function(whatChanged, propVal) {
+        log(('changeOption[ext]:' + whatChanged + ' -> ' + propVal));
+        this.windowListener.changeOption(whatChanged, propVal);
         if ( !this.XPenguinsLoop.is_playing() ) {
-            this.XPenguinsLoop.options[whatChanged] = this._items[whatChanged].state;
+            this.XPenguinsLoop.options[whatChanged] = propVal;
         } else {
             /* TODO: send to XPenguins.loop: signal or direct call? */
             // this.XPenguinsLoop.changeOption(whatChanged, this._items[whatChange].state);
-            this.windowListener.changeOption(whatChanged, this._items[whatChange].state);
         }
     },
     
 
     _createMenu: function() {
-        /* clear the menu */
-        log('removing');
-    	this.menu.removeAll();
-        log('removed');
+        log('_createMenu');
+        let dummy;
 
-        log('startstop');
+        /* clear the menu */
+    	this.menu.removeAll();
+
         /* toggle to start xpenguins */
         this._items.start = new PopupMenu.PopupSwitchMenuItem( _('Start'), false );
         this._items.start.connect('toggled', Lang.bind( this, this._startXPenguins ));
         this.menu.addMenuItem(this._items.start);
 
         /* Options menu:
-         * - theme chooser  --> ComboMenuItem (not 3.2 ?)
+         * + theme chooser
          * + npenguins (??)              --> + 'choose default set by theme'!
          * + ignore maximised windows
          * + always on visible workspace
@@ -139,6 +139,7 @@ XPenguinsMenu.prototype = {
          * + blood
          * + verbose toggle
          * - choose window to run in
+         * - RECALC mode
          */
 
         log('optionsMenu');
@@ -147,15 +148,17 @@ XPenguinsMenu.prototype = {
         this.menu.addMenuItem(this._optionsMenu);
 
         /* theme combo box */
-        log('combo box');
+        // FIXME: multiple themes --> check box?.
+        log('theme combo box');
+        dummy = new PopupMenu.PopupMenuItem(_('Theme'), {reactive: false});
+        this._optionsMenu.menu.addMenuItem(dummy);
         this._items.theme = new PopupMenu.PopupComboBoxMenuItem({});
-        log('populating combo box');
         this._populateThemeComboBox();
         // TODO (future): show theme icon next to theme name (see IMStatusIcon)
         this._optionsMenu.menu.addMenuItem(this._items.theme);
 
         /* Number of penguins */ 
-        let dummy = new PopupMenu.PopupMenuItem(_('Max penguins'), { reactive: false });
+        dummy = new PopupMenu.PopupMenuItem(_('Max penguins'), { reactive: false });
         this._items.nPenguinsLabel = new St.Label({ text: '-1' });
         dummy.addActor(this._items.nPenguinsLabel, { align: St.Align.END });
         this._optionsMenu.menu.addMenuItem(dummy);
@@ -166,18 +169,32 @@ XPenguinsMenu.prototype = {
         this._optionsMenu.menu.addMenuItem(this._items.nPenguins);
 
         /* ignore maximised, always on visible workspace, angels, blood, god mode, verbose toggles */
-        // ERROR HERE.
-        // XPenguins is undefined.
         let defaults = XPenguins.XPenguinsLoop.prototype.defaultOptions(); 
-        for ( let propName in this._toggles ) {
+        for (let propName in this._toggles) {
             this._items[propName] = new PopupMenu.PopupSwitchMenuItem(this._toggles[propName], defaults[propName]);
-            this._items[propName].connect('toggled', Lang.bind(this, function() { this.confChanged(propName); })); // TODO: how to curry better?
+            let p = propName; // according to gnome-shell mailing list this
+                              // the only way to get the callback to work properly
+            this._items[propName].connect('toggled', Lang.bind(this, function() { this.changeOption(p, this._items[p].state); }));
             this._optionsMenu.menu.addMenuItem(this._items[propName]); 
         }
 
         /* TODO: "Resize behaviour": {calculate on resize, calculate on resize-end, pause during resize} */
 
-
+        /* RecalcMode combo box */
+        log('recalc combo box');
+        dummy = new PopupMenu.PopupMenuItem(_('Recalc mode'), {reactive: false});
+        this._optionsMenu.menu.addMenuItem(dummy);
+        this._items.recalc = new PopupMenu.PopupComboBoxMenuItem({});
+        this._optionsMenu.menu.addMenuItem(this._items.recalc);
+        for (let mode in XPenguins.RECALC) {
+            dummy = new PopupMenu.PopupMenuItem(mode);
+            this._items.recalc.addMenuItem(dummy, XPenguins.RECALC[mode]);
+            this._items.recalc.connect('active-item-changed', 
+                                      Lang.bind(this, this.stub)); // TODO
+        }
+        this._items.recalc.setActiveItem(XPenguins.RECALC.ALWAYS);
+        this._items.recalc.connect('active-item-changed', 
+                                  Lang.bind(this, function(item, id) { this.changeOption('recalcMode', id); }));
     },
 
     _populateThemeComboBox: function() {
@@ -188,7 +205,6 @@ XPenguinsMenu.prototype = {
         if ( themeList.length == 0 ) {
            dummy = new PopupMenu.PopupMenuItem(_('No themes found, click to reload!'), {reactive: false});
            this._items.theme.addMenuItem(dummy);
-           // TODO: ativate item or item-changed ???
            this._items.theme._menu.connect('open-state-changed', 
                                      Lang.bind(this, function(act, open) {
                                          if ( open )
@@ -201,7 +217,7 @@ XPenguinsMenu.prototype = {
                 this._items.theme.addMenuItem(dummy);
             }
             this._items.theme.connect('active-item-changed', 
-                                      Lang.bind(this, this._onChangeTheme)); // TODO
+                                      Lang.bind(this, this._onChangeTheme)); 
             this._items.theme.setActiveItem(themeList.indexOf('Penguins'));
         }
     },

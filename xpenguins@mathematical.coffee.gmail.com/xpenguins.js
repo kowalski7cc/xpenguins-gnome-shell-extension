@@ -42,22 +42,14 @@ function XPenguinsLoop() {
  * PAUSE : pause until resize/move has finished, then recalc at the end.
  * END   : run while resize/move is in progress, but only recalculate at the end. (So toons could walk off-window).
  */
-/*
-const XPenguins = XPenguins || {};
-XPenguins.RECALC = {
-    ALWAYS: 1 << 0,
-    PAUSE : 1 << 1,
-    END   : 1 << 2
+const RECALC = {
+    ALWAYS: 0,
+    PAUSE : 1,
+    END   : 2
 };
-*/
-const XPenguins = {
-    RECALC: {
-        ALWAYS: 1 << 0,
-        PAUSE : 1 << 1,
-        END   : 1 << 2
-    }
-};
+
 XPenguinsLoop.prototype = {
+    // UPTO: incorporate windowListener with XPenguinsLoop. Just create an instance??
     log: function(msg) {
         if ( this.options.DEBUG ) {
             global.log(msg);
@@ -137,7 +129,7 @@ XPenguinsLoop.prototype = {
         onAllWorkspaces: false, // uhh... this works best with XPenguinsLoop.
         onDesktop: true, /* whether it's running on the desktop or in a window */
      
-        recalcMode: XPenguins.RECALC.ALWAYS, 
+        recalcMode: RECALC.ALWAYS, 
 
 
 
@@ -171,7 +163,7 @@ XPenguinsLoop.prototype = {
     },
 
     is_playing: function() {
-        return this._timeline.is_playing();
+        return (this._timeline && this._timeline.is_playing());
     },
 
         // TODO: if xpenguins_active then do something.
@@ -200,6 +192,7 @@ XPenguinsLoop.prototype = {
         this._signals = [];
         this._workspaces = [];
         this._currentWorkspace = null;
+
     },
 
     /* when you send the stop signal to xpenguins (through the toggle) */
@@ -331,8 +324,8 @@ XPenguinsLoop.prototype = {
         /* The number of penguins that are active or not terminating.
          * When 0, we can call xpenguins_exit()
          */
-        this._toon_number = 0;
         this._timeline = null;
+        this._toon_number = 0;
         this._cycle = 0;
         this._exiting = false;
         this._stage = null;
@@ -372,7 +365,7 @@ XPenguinsLoop.prototype = {
          * in GNOME 3.4, use timeline.set_repeat_count(...);
          * Clutter.threads_add_timeout
          */
-        let timeline = new Clutter.Timeline();
+        this._timeline = new Clutter.Timeline();
         this._timeline.set_loop(true);
 
         /* Load theme into this._theme */
@@ -576,7 +569,7 @@ XPenguinsLoop.prototype = {
          *    if !ignorePopups:   everything from 'map'
          *
          * 1) look at this.options.recalcMode.
-         *    if XPenguins.RECALC.ALWAYS : listen to position-changed PER WINDOW, (UPDATE: allocation-changed + minimize more efficient?).
+         *    if RECALC.ALWAYS : listen to position-changed PER WINDOW, (UPDATE: allocation-changed + minimize more efficient?).
          *                                 window-added on CURRENT WORKSPACE,
          *                                 workspace-changed to:
          *                                  if onAllWorkspaces: disconnect old windows/reconnect new/listen to window-added.
@@ -643,7 +636,7 @@ XPenguinsLoop.prototype = {
             /* Listen to 'mapped': every window here counts */
         }
         /** window resize/move **/
-        if ( this.options.recalcMode == XPenguins.RECALC.ALWAYS ) {
+        if ( this.options.recalcMode == RECALC.ALWAYS ) {
             /* recalc every frame of the resize, i.e. every time position-{changed,moved} is fired even if
              * it is during a grab operation.
              * Requires listening to position-changed & size-changed *for each window*.
@@ -737,7 +730,7 @@ XPenguinsLoop.prototype = {
              * If PAUSE, pause during grab operation. If END, run during grab operation.
              * Only requires listening to grab-op-begin and grab-op-end.
              */
-            if ( this.options.recalcMode == XPenguins.RECALC.PAUSE ) {
+            if ( this.options.recalcMode == RECALC.PAUSE ) {
                 this._signals.push(global.screen.connect('grab-op-begin', Lang.bind(this, this._grabOpStarted)));
             }
             this._signals.push(global.screen.connect('grab-op-end', Lang.bind(this, this._grabOpEnded)));
@@ -865,7 +858,7 @@ XPenguinsLoop.prototype = {
     },
     _grabOpEnded: function() {
         if ( !this._timeline.is_playing() ) {
-            /* unpause if paused (i.e. options.recalcMode == XPenguins.RECALC.PAUSE */
+            /* unpause if paused (i.e. options.recalcMode == RECALC.PAUSE */
             this.resume(); // already dirties toon windows
         } else {
             this._dirtyToonWindows();
@@ -908,7 +901,7 @@ XPenguinsLoop.prototype = {
         if ( this.options.onAllWorkspaces ) {
             /* update the toon region */
             this._dirtyToonWindows();
-            if ( this.options.recalcMode == XPenguins.RECALC.ALWAYS ) {
+            if ( this.options.recalcMode == RECALC.ALWAYS ) {
                 /* disconnect old, reconnect new */
                 if ( from._XPenguinsWindowAddedID ) {
                     from.disconnect( from._XPenguinsWindowAddedID );

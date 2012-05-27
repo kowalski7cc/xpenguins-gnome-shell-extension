@@ -1,5 +1,5 @@
 const Meta = imports.gi.Meta;
-const Cairo = imports.gi.cairo;
+//#const Cairo = imports.gi.cairo;
 
 /* Notes to self.
  * Draw many actors in the global.stage?
@@ -35,12 +35,12 @@ function Region() {
 
 Region.prototype = {
     _init: function() {
-        this.rectList = [];
+        this.rectangles = [];
         this.extents = new Meta.Rectangle();
     },
 
     add_rectangle: function(rect) {
-        this.rectList.push(rect);
+        this.rectangles.push(rect);
         /* update extents */
         this.extents = this.extents.union(rect);
     },
@@ -49,6 +49,16 @@ Region.prototype = {
         this.add_rectangle(arguments);
     },
 
+    clear: function() {
+        this.rectangles = [];
+        this.extents.x=0; this.extents.y=0;
+        this.extents.width=0; this.extents.height=0;
+    },
+/* // only do this if you intend for a [i] method?
+    get length(): { 
+        return this.rectangles.length;
+    },
+*/
     /* determines whether the specified rect overlaps with the region.
      *
      * x, y: x & y coordinates of the upper-left corner of the rectangle
@@ -65,13 +75,13 @@ Region.prototype = {
         
         let rect = new Meta.Rectangle({x:x, y:y, width:width, height:height});
         /* quick check */
-        if ( this.rectList.length == 0 || !this.extents.overlap(rect) ) {
+        if ( this.rectangles.length == 0 || !this.extents.overlap(rect) ) {
             return false;
         }
 
-        let i = this.rectList.length;
+        let i = this.rectangles.length;
         while ( i-- ) {
-            if ( this.rectList[i].overlap(rect) ) {
+            if ( this.rectangles[i].overlap(rect) ) {
                 return true;
             }
         }

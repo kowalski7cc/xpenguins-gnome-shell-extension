@@ -64,12 +64,13 @@ const ThemeManager = {
              */
             // UPTO TODO
             let fileEnum = themes_dir.enumerate_children('standard::*', Gio.FileQueryInfoFlags.NONE, null);
-            while ((let info = fileEnum.next_file(null)) != null) {
+            let info;
+            while ((info = fileEnum.next_file(null)) != null) {
                  let configFile = GLib.build_filenamev([themes_dir.get_path(),
                                                         info.get_name(),
                                                         this.config_file]);
                  if ( GLib.file_test(configFile, GLib.FileTest.EXISTS) ) {
-                     themesList.push(info.get_name());
+                     themeList.push(info.get_name());
                  }
             }
             fileEnum.close(null);
