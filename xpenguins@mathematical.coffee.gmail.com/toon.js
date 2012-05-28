@@ -199,7 +199,7 @@ Toon.Toon.prototype = {
         this.actor.set_source( this.data.texture );
         this.direction = XPUtil.RandInt(2);
         this.set_type('faller', this.direction, Toon.UNASSOCIATED);
-        this.actor.set_position( XPUtil.RandInt(this.GLOBAL.XPenguinsWindowWidth - this.data.width), 1 - this.data.height );
+        this.actor.set_position( XPUtil.RandInt(this.GLOBAL.XPenguinsWindow.get_width() - this.data.width), 1 - this.data.height );
         this.set_association(Toon.UNASSOCIATED);
         this.set_velocity( this.direction*2-1, this.data.speed );
         this.terminating = false;
@@ -295,13 +295,13 @@ Toon.Toon.prototype = {
                 if ( this.x <= 0 ) 
                     return 1;
             } else if ( direction == Toon.RIGHT ) {
-                if ( this.x + this.data.width >= this.GLOBAL.XPenguinsWindowWidth )
+                if ( this.x + this.data.width >= this.GLOBAL.XPenguinsWindow.get_width() )
                     return 1;
             } else if ( direction == Toon.UP ) {
                 if ( this.y <= 0 ) 
                     return 1;
             } else if ( direction == Toon.DOWN ) {
-                if ( this.y + this.data.height >= this.GLOBAL.XPenguinsWindowHeight )
+                if ( this.y + this.data.height >= this.GLOBAL.XPenguinsWindow.get_height() )
                     return 1;
             } // switch(direction)
         } // if edge_block
@@ -334,9 +334,9 @@ Toon.Toon.prototype = {
     OffsetBlocked: function( xoffset, yoffset ) {
         if ( this.GLOBAL.edge_block ) {
             if (    (this.x + xoffset <= 0)
-                 || (this.x + this.data.width + xoffset >= this.GLOBAL.XPenguinsWindowWidth)
+                 || (this.x + this.data.width + xoffset >= this.GLOBAL.XPenguinsWindow.get_width())
                  || ((this.y + yoffset <= 0) && this.GLOBAL.edge_block != Toon.SIDEBOTTOMBLOCK)
-                 || (this.y + this.data.height + yoffset >= this.GLOBAL.XPenguinsWindowHeight) ) {
+                 || (this.y + this.data.height + yoffset >= this.GLOBAL.XPenguinsWindow.get_height()) ) {
                      return true;
             }
         }
@@ -508,8 +508,8 @@ Toon.Toon.prototype = {
             if ( newx < 0 ) {
                 newx = 0;
                 result = Toon.PARTIALMOVE;
-            } else if ( newx + this.data.width > this.GLOBAL.XPenguinsWindowWidth ) {
-                newx = this.GLOBAL.XPenguinsWindowWidth - data.width;
+            } else if ( newx + this.data.width > this.GLOBAL.XPenguinsWindow.get_width() ) {
+                newx = this.GLOBAL.XPenguinsWindow.get_width() - data.width;
                 result = Toon.PARTIALMOVE;
             }
         }
@@ -523,8 +523,8 @@ Toon.Toon.prototype = {
                 if ( newy < 0 && this.GLOBAL.edge_block != Toon.SIDEBOTTOMBLOCK ) {
                     newy = 0;
                     result = Toon.PARTIALMOVE;
-                } else if ( newy + this.data.height > this.GLOBAL.XPenguinsWindowHeight ) {
-                    newy = this.GLOBAL.XPenguinsWindowHeight - data.height;
+                } else if ( newy + this.data.height > this.GLOBAL.XPenguinsWindow.get_height() ) {
+                    newy = this.GLOBAL.XPenguinsWindow.get_height() - data.height;
                     result = Toon.PARTIALMOVE;
                 }
                 if ( newx == this.x && newy == this.y && !stationary ) {

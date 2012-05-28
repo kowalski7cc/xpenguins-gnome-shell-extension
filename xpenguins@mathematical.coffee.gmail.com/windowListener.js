@@ -31,6 +31,7 @@ const Region = Extension.region;
  * - test !onDesktop: stacking order.             [yep]
  * - test w/ different RECALC modes.              [yep]
  * --> change recalc mode on the fly.             [yep]
+ * - test GOD MODE
  * FIXME: 'focus-app' fires *twice* per window. Raise is better.
  *
  * NEXT:
@@ -152,7 +153,6 @@ WindowListener.prototype = {
 
     clean_up: function() {
         LOG('clean_up');
-        let i;
         /* stop timeline if it's running */
         if ( this._timeline.is_playing() ) {
             LOG('stopping timeline');
@@ -274,7 +274,6 @@ WindowListener.prototype = {
         }
     },
 
-    // TODO: is there a better way to do this?
     _updateSignals: function() {
         LOG('updateSignals');
         this._disconnectSignals();
