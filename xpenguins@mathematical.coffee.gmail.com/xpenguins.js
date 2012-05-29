@@ -24,6 +24,7 @@ const WindowListener = Extension.windowListener.WindowListener.prototype; // thi
  * - test w/ gnome-panel
  * - test w/ autohiding stuff
  * - test w/ frippery bottom panel/dock/etc
+ * ** dual-mon - how to avoid toons going into bad area of stage?
  *
  * NOTES:
  * - if Nautilus manages the desktop there is a desktop window.
@@ -36,6 +37,7 @@ const WindowListener = Extension.windowListener.WindowListener.prototype; // thi
  *   Shows *on top*.
  */
 
+const PENGUIN_MAX=255;
 /************************
  * X penguins main loop *
  ************************/
@@ -85,7 +87,6 @@ XPenguinsLoop.prototype = {
     defaultOptions: function() {
         return {
         DEBUG: true,
-        PENGUIN_MAX: 256,
 
         /* Load average checking: kill penguins if load is too high 
         --nice loadaverage1 loadaverage2
@@ -134,7 +135,6 @@ XPenguinsLoop.prototype = {
         //workspace: 0, // -1: always on visible. Otherwise, index of workspace.
         onAllWorkspaces: false, // uhh... this works best with XPenguinsLoop.
         onDesktop: true, /* whether it's running on the desktop or in a window */
-        windowPreview: true /* debugging */
      
         recalcMode: RECALC.ALWAYS, 
 
@@ -174,8 +174,17 @@ XPenguinsLoop.prototype = {
     },
 
         // TODO: if xpenguins_active then do something.
-    set_themes: function( themeList ) {
-        this.options.themes = themeList;
+    set_themes: function( themeList, setnPenguins ) {
+        if ( themeList ) 
+            this.options.themes = themeList;
+
+        /* Load theme into this._theme */
+        if ( this.options.themes.length > 0 ) {
+            this._theme = new Theme.Theme( this.options.themes );
+            if ( setnPenguins || this.options.nPenguins < 0 ) {
+                this.options.nPenguins = this._theme.total;
+            }
+        }
     },
 
     _init: function(i_options) {
@@ -246,17 +255,12 @@ XPenguinsLoop.prototype = {
         }
     },
 
-    _initWindowPreview: Lang.bind(this, WindowListener._initDrawing),
-
     /******************
      * START STOP ETC *
      * ****************/
     /* when you send the stop signal to xpenguins (through the toggle) */
     stop: function() {
         this._onInterrupt();
-        if ( this.options.windowPreview ) {
-            this.drawingArea.hide();
-        }
     },
 
     /* when you really want to kill xpenguins 
@@ -296,11 +300,6 @@ XPenguinsLoop.prototype = {
         if ( this._sleepID ) {
             Mainloop.source_remove(this._sleepID);
         } 
-
-        if ( this.drawingArea ) {
-            global.stage.remove_actor(this.drawingArea);
-            this.drawingArea.destroy();
-        }
 
         /* remove god mode */
         if ( this.options.squish || this._godModeID ) {
@@ -353,7 +352,6 @@ XPenguinsLoop.prototype = {
 
         this.dirty = true;
         this._listeningPerWindow = false; /* whether we have to listen to individual windows for signals */
-        this.drawingArea = null;
 
 
         /* Laziness (can do with(this.options) { ... } too) */
@@ -395,7 +393,7 @@ XPenguinsLoop.prototype = {
         this._timeline.set_loop(true);
 
         /* Load theme into this._theme */
-        this._theme = new Theme.Theme( opt.themes );
+        this.set_theme( opt.themes );
 
         /* theme-specific options */
         if ( !opt.sleep_msec ) {
@@ -403,11 +401,6 @@ XPenguinsLoop.prototype = {
         }
         this._timeline.set_duration(opt.sleep_msec); // ??
         // BIGTODO: I ONLY WANT *ONE FRAME* PER TIMELINE?
-        /* if the user hasn't specified nPenguins, take default from theme */
-        if ( opt.nPenguins < 0 ) {
-        // TODO: initially set the slider to the default from the theme
-            opt.nPenguins = this._theme.total;
-        }
 
         /* Set up the window we're drawing on.
          * Note: would like to treat it all the same whether it's on the
@@ -445,19 +438,16 @@ XPenguinsLoop.prototype = {
         /* set up toons */
         this._initToons();
 
-        /* set up window preview area */
-        if ( this.options.windowPreview ) {
-            this._initWindowPreview();
-            this.drawingArea.show();
-        }
-
         /* Connect signals */
         this._connectSignals();
 
         this._updateToonWindows();
     },
 
-    changeOption: Lang.bind(this, WindowListener.changeOption);
+    changeOption: function() {
+        WindowListener.changeOption.apply(this, arguments);
+        this._dirtyToonWindows('changeOption');
+    },
 
     /***** Signals ****/
     // Could do XPenguinsLoop.[functionname] = Lang.bind(this, WindowListener.WindowListener.prototype.[functionname])
@@ -528,10 +518,10 @@ XPenguinsLoop.prototype = {
 
     _updateToonWindows: function() {
         this.log(('[XP] _updateToonWindows. dirty: ' + this.dirty));
-        if ( this.dirty ) {
+        //if ( this.dirty ) { // remove check to save time: do it when you call the function.
             WindowListener._updateToonWindows.apply(this);
             this.dirty = false;
-        }
+        //}
     },
 
     /**************** GOD MODE **************/
@@ -628,8 +618,6 @@ XPenguinsLoop.prototype = {
         //ToonRelocateAssociated(penguin, penguin_number);
     },
 
-    drawWindowPreview: Lang.bind(this, WindowListener.draw),
- 
    /* for testing: shows a *single* walking toon under no constraints */ 
     _simple_frame: function(timeline, elapsed_time) {
         let i=0;
@@ -646,9 +634,6 @@ XPenguinsLoop.prototype = {
         }
         toon.Draw();
 
-        if ( this.options.windowPreview ) {
-            this.drawWindowPreview();
-        }
     }, 
 
     /* _frame is called every frame of the iteration.
@@ -664,19 +649,26 @@ XPenguinsLoop.prototype = {
      * main.c
      */
     _frame: function(timeline, elapsed_time) {
-        // UPTO BIGTODO: where do we check if events were received?
-        if ( this.options.windowPreview ) {
-            this.drawWindowPreview();
-        }
-        /* NOTE:
-         * nPenguins is the full complement of penguins;
-         * whereas penguin_number can change if the load gets too high
-         */
         /* xpenguins_frame() */
         let sstatus = null;
         let last_active = -1; 
         let o = this.options;
-        
+
+        /* Check if events were received & we need to update toon_windows */
+        if ( this.dirty ) {
+            // TODO: somehow eliminate so many loops?
+            let i=this._toon_number;
+            /* calculate for squashed toons */
+            while ( i-- ) {
+                this._penguins[i].CalculateAssociations();
+            }
+            this._updateToonWindows();
+            i = this._toon_number;
+            while ( i-- ) {
+                this._penguins[i].RelocateAssociated();
+            }
+        }
+
         /* Loop through all the toons *
          * NOTE: this.nPenguins is set always and the max. number of penguins to display.
          *       this._toon_number is the number of penguins *currently* active or not terminating,
@@ -694,28 +686,8 @@ XPenguinsLoop.prototype = {
                 }
             }
             /*
-            // TODO: else if ( in god mode & you squished a penguin )
-            else if (toon_button_x >= 0
-                 && type != PENGUIN_EXPLOSION && type != PENGUIN_ZAPPED
-                 && type != PENGUIN_SQUASHED && type != PENGUIN_ANGEL
-                 && type != PENGUIN_SPLATTED && type != PENGUIN_EXIT
-                 && !penguin[i].terminating
-                 && toon_button_x > penguin[i].x_map
-                 && toon_button_y > penguin[i].y_map
-                 && toon_button_x < penguin[i].x_map + penguin[i].width_map
-                 && toon_button_y < penguin[i].y_map + penguin[i].height_map) {
-                  // Toon has been hit by a button press 
-                if (xpenguins_blood && gdata[PENGUIN_ZAPPED].exists) {
-                    ToonSetType(penguin+i, PENGUIN_ZAPPED,
-                        penguin[i].direction, TOON_DOWN);
-                } else if (gdata[PENGUIN_EXPLOSION].exists) {
-                    ToonSetType(penguin+i, PENGUIN_EXPLOSION,
-                        penguin[i].direction, TOON_HERE);
-                } else {
-                    penguin[i].active = 0;
-                }
-                ToonSetAssociation(penguin+i, TOON_UNASSOCIATED);
-                last_active = i;
+            else if ( gets squished ) { // (rest in _onSmite)
+                last_active = i; // <-- TODO
             }
             */
             else {

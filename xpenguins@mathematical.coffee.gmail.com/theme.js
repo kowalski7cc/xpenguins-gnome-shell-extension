@@ -84,6 +84,7 @@ Theme.Theme.prototype = {
         }
 
         /* Read config file, ignoring comments ('#') and whitespace */
+        // TODO: lowercase?
         let words = Shell.get_file_contents_utf8_sync(file_name);
         words = words.replace(/#.+/g,'');
         words = words.replace(/\s+/g,' ');
@@ -107,7 +108,7 @@ Theme.Theme.prototype = {
         for ( let i=0; i<words.length; ++i ) {
             // BIG TODO: this.name.length could be < this.ngenera,
             //           because not every genus has a name (e.g. turtles)
-            let word=words[i];
+            let word = words[i].toLowerCase();
             /* define a new genus of toon (walker, skateboarder, ...) */
             // note: the 'toon' word is optional in one-genus themes.
             // If we've already seen the 'toon' word before this must be a
@@ -278,7 +279,7 @@ Theme.Theme.prototype = {
     },  // append_theme
 
     get total() {
-        return Math.min(global.PENGUIN_MAX, this.number.reduce(function(x,y) x+y));
+        return Math.min(XPenguins.PENGUIN_MAX, this.number.reduce(function(x,y) x+y));
     },
 
     grow: function() {

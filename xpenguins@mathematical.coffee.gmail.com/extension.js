@@ -1,5 +1,6 @@
 const Lang     = imports.lang;
 const Mainloop = imports.mainloop;
+const Gio = imports.gi.Gio;
 const St    = imports.gi.St;
 
 const Main      = imports.ui.main;
@@ -7,7 +8,6 @@ const PanelMenu = imports.ui.panelMenu;
 const PopupMenu = imports.ui.popupMenu;
 
 /* my files */
-log('ASDF');
 // temp until two distinct versions:
 var Extension;
 try {
@@ -18,9 +18,12 @@ try {
 const XPenguins = Extension.xpenguins; 
 const WindowListener = Extension.windowListener;
 const ThemeManager = Extension.theme_manager.ThemeManager;
+
 const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
-log('ASDF2');
+
+
+
 /* make a status button to click with options */
 let _indicator;
 
@@ -58,6 +61,7 @@ XPenguinsMenu.prototype = {
     _init: function() {
         log('_init');
         /* Initialise */
+        // TODO: change icon to something else like tux. (applications-games ?)
         PanelMenu.SystemStatusButton.prototype._init.call(this, 'emblem-favorite');
     
         /* items */ 
@@ -74,26 +78,27 @@ XPenguinsMenu.prototype = {
                          DEBUG          : _('Verbose')
         };
 
-        /* variables */  
-        // this._DEBUG & this._PENGUIN_MAX: just store as UI elements?
-        //this._DEBUG = true;
-        this._PENGUIN_MAX = 256;
+        /* create an Xpenguin Loop object which stores the XPenguins program */
+        let opts = this.getConf(); 
+        log('XPenguinsLoop');
+        this.XPenguinsLoop = new XPenguins.XPenguinsLoop( this.getConf() );
 
+        /* debugging windowListener */
+        log('windowListener');
+        this.windowListener = new WindowListener.WindowListener();
 
         /* connect events */
 
         /* Create menus */
         this._createMenu();
 
-        /* create an Xpenguin Loop object which stores the XPenguins program */
-        let opts = this.getConf(); 
-        // opts.nPenguins = parseInt(this._nPenguinsLabel.text); <-- by default don't do it??
-        log('XPenguinsLoop');
-        this.XPenguinsLoop = new XPenguins.XPenguinsLoop( this.getConf() );
-        // TODO: load default theme ('Penguins', set n toons from that).
+    },
 
-        log('windowListener');
-        this.windowListener = new WindowListener.WindowListener();
+    get DEBUG(): {
+        if ( this._items && this._items.DEBUG ) {
+            return this._items.DEBUG.state;
+        }
+        return false;
     },
 
     getConf: function() { 
@@ -108,11 +113,15 @@ XPenguinsMenu.prototype = {
     changeOption: function(whatChanged, propVal) {
         log(('changeOption[ext]:' + whatChanged + ' -> ' + propVal));
         this.windowListener.changeOption(whatChanged, propVal);
-        if ( !this.XPenguinsLoop.is_playing() ) {
-            this.XPenguinsLoop.options[whatChanged] = propVal;
-        } else {
-            /* TODO: send to XPenguins.loop: signal or direct call? */
-            // this.XPenguinsLoop.changeOption(whatChanged, this._items[whatChange].state);
+        this.XPenguinsLoop.changeOption(whatChanged, propVal);
+
+        /* start/stop the windowListener */
+        if ( whatChanged == 'DEBUG' && this.XPenguinsLoop.is_playing() ) {
+            if ( propVal ) {
+                this.windowListener.start();
+            } else {
+                this.windowListener.stop();
+            }
         }
     },
     
@@ -131,7 +140,8 @@ XPenguinsMenu.prototype = {
 
         /* Options menu:
          * + theme chooser
-         * + npenguins (??)              --> + 'choose default set by theme'!
+         * advanced theme chooser (checkboxes + info button + select multiple)
+         * + npenguins (??)              --> + TODO 'choose default set by theme'!
          * + ignore maximised windows
          * + always on visible workspace
          * + god mode
@@ -153,7 +163,6 @@ XPenguinsMenu.prototype = {
         dummy = new PopupMenu.PopupMenuItem(_('Theme'), {reactive: false});
         this._optionsMenu.menu.addMenuItem(dummy);
         this._items.theme = new PopupMenu.PopupComboBoxMenuItem({});
-        this._populateThemeComboBox();
         // TODO (future): show theme icon next to theme name (see IMStatusIcon)
         this._optionsMenu.menu.addMenuItem(this._items.theme);
 
@@ -163,7 +172,8 @@ XPenguinsMenu.prototype = {
         dummy.addActor(this._items.nPenguinsLabel, { align: St.Align.END });
         this._optionsMenu.menu.addMenuItem(dummy);
 
-        this._items.nPenguins = new PopupMenu.PopupSliderMenuItem(20/this._PENGUIN_MAX);
+        // set to default from theme that was just loaded.
+        this._items.nPenguins = new PopupMenu.PopupSliderMenuItem(0);
         this._items.nPenguins.connect('value-changed', Lang.bind(this, this._nPenguinsSliderChanged));
         this._items.nPenguins.connect('drag-end', Lang.bind(this, this.stub)); // TODO: SEND TO LOOP
         this._optionsMenu.menu.addMenuItem(this._items.nPenguins);
@@ -195,6 +205,12 @@ XPenguinsMenu.prototype = {
         this._items.recalc.setActiveItem(XPenguins.RECALC.ALWAYS);
         this._items.recalc.connect('active-item-changed', 
                                   Lang.bind(this, function(item, id) { this.changeOption('recalcMode', id); }));
+
+        /* populate the combo box which sets the theme */
+        this._populateThemeComboBox();
+        /* set the slider equal to default penguins */
+        this.items.nPenguins.setValue(this.XPenguinsLoop.options.nPenguins/XPenguins.PENGUIN_MAX);
+        this._items.nPenguinsLabel.set_text( this.XPenguinsLoop.options.nPenguins.toString() );
     },
 
     _populateThemeComboBox: function() {
@@ -212,13 +228,23 @@ XPenguinsMenu.prototype = {
                                      }));
            this._items.theme.setActiveItem(0);
         } else {
+            /*
+             * look up icon..
+             * //UPTO: theme_manager.get_icon(_path)
+             * dummy = new ThemeMenuItem(text, themeList[i]=='Penguins', icon_path);
+             */
             for ( let i=0; i<themeList.length; ++i ) {
                 dummy = new PopupMenu.PopupMenuItem(_(themeList[i]));
+                /* replace space with undescore for directory name */
+                dummy.theme_name = themeList[i].replace(/ /g,'_');
                 this._items.theme.addMenuItem(dummy);
             }
             this._items.theme.connect('active-item-changed', 
                                       Lang.bind(this, this._onChangeTheme)); 
-            this._items.theme.setActiveItem(themeList.indexOf('Penguins'));
+            /* set active theme */
+            dummy = themeList.indexOf('Penguins') || 0;
+            this._items.theme.setActiveItem(dummy);
+            this._onChangeTheme(this._items.theme, dummy);
         }
     },
 
@@ -226,23 +252,73 @@ XPenguinsMenu.prototype = {
         /* handles configuration changes */
     },
 
-    _onChangeTheme: function(menuItem, id) {
-        // TODO:
+    _onChangeTheme: function(combo, id) {
+        // TODO: better way to get the label text ???
         // id is the position of the theme.
+        // update the nPenguins slider.
+        log(('changing theme to '+ combo._items[id].theme_name));
+        /* set total penguins to default for the theme(s) */
+        this.XPenguinsLoop.set_themes( combo._items[id].theme_name, true );
     },
 
     _startXPenguins: function(item, state) {
-        if ( state == this.windowListener.is_playing() ) return;
+        if ( state == this.XPenguinsLoop.is_playing() ) return;
+
         // temporary
         if ( state ) {
-            this.windowListener.start();
+            this.XPenguinsLoop.start();
+            if ( this.DEBUG ) 
+                this.windowListener.start();
         } else {
-            this.windowListener.stop();
+            this.XPenguinsLoop.stop();
+            if ( this.DEBUG ) 
+                this.windowListener.stop();
         }
     },
 
     _nPenguinsSliderChanged: function(slider, value) {
-        this._items.nPenguinsLabel.set_text( Math.ceil( value*this._PENGUIN_MAX ).toString() );
+        this._items.nPenguinsLabel.set_text( Math.ceil( value*XPenguins.PENGUIN_MAX ).toString() );
     },
 };
 
+function ThemeMenuItem() {
+    this._init.apply(this, arguments);
+};
+
+ThemeMenuItem.prototype = {
+    __proto__: PopupMenu.PopupBaseMenuItem.prototype,
+
+    _init: function(text, state, icon_path, params) {
+        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
+
+        this.box = new St.BoxLayout({vertical: false});
+        this.addActor(box, {span: -1});
+
+        /* Info button */
+        /* Could just set style-class with background-image... */
+        this.button = new St.Button();
+        let icon = new St.Icon({ icon_name: 'help-about',
+                                 style_class:'system-status-icon'
+        });
+        this.button.set_child(icon);
+        this.box.addActor(button);
+
+        /* Icon (default no icon) */
+        let path = icon_path && Gio.file_new_for_path(icon_path) || null;
+        this.icon = new St.Icon({ 
+                                  gicon: new Gio.FileIcon({file: path}),
+                                  icon_type: St.IconType.FULLCOLOUR,
+                                  style_class: 'system-status-icon'
+        });
+        this.box.addActor(icon);
+       
+        /* toggle. TODO: should it really be embedded into a PopupBaseMenuItem? */ 
+        this.toggle = new PopupMenu.PopupSwitchMenuItem(text, state);
+        this.box.addActor(this.toggle, {span: -1});
+        // COULD DO
+        // this.toggle = new St.Button();
+        // this.toggle.set_toggle_mode(true);
+        // Then on toggle, change pic to square vs filled square?
+        // Hmm, then could just .addActor everything, I think.
+    },
+};

@@ -369,7 +369,6 @@ WindowListener.prototype = {
 
              Note - we do not listen to signals emitted by windows that do not trigger 'window-added'.
          ***/
-        // FIXME: is it a problem that I potentially have *two* hooks on window-added? (if ignorePopups is false)?
         // CHECK: should we listen to 'mapped' and add signals there, or is window-added,removed enough?
         if ( this._listeningPerWindow ) {
             this.connect_and_track(this, ws, 'window-added', Lang.bind(this, this._onWindowAdded));
@@ -610,7 +609,9 @@ WindowListener.prototype = {
     },
 
     draw: function() {
-        this.drawingArea.remove_all_children();
+        // in GNOME 3.4 this works. GNOME 3.2 (gir 1.0) this isn't a function?
+        // (remove_all_children : function of Clutter.Actor)
+        this.drawingArea.remove_all();
 
         // Background..
         let bg = new Clutter.Rectangle({ width: this.drawingArea.width,

@@ -107,29 +107,97 @@ const ThemeManager = {
 
     // xpenguins_theme_info(char *name)
     theme_info: function(iname) {
+
     },
 
-    /* Return the full path of the specified theme.
+    // TODO: graphical popup window.
+    /* xpenguins_theme_info (xpenguins_theme.c)
+     * DescribeThemes (main.c)
+     */
+    describe: function(themes) {
+        let th = themes.length;
+        while ( th-- ) {
+            let theme = themes[th];
+            let loc = this.get_theme_path(theme, 'about');
+            if ( !loc || !GLib.file_test(loc, GLib.FileTest.EXISTS) ) {
+                // TODO: make popup & continue
+                log('Theme %s not found'.format(theme));
+                continue;
+            }
+
+            /* parse the theme. 
+             * xpenguins_theme_info */
+
+            /* Read about file, ignoring comments ('#'), double spaces */
+            let lines = Shell.get_file_contents_utf8_sync(file_name);
+            lines = lines.replace(/#.+/g,'');
+            lines = lines.replace(/ {2,}/g,' ');
+            lines = lines.split(/[\r\n]+/);
+
+            let info = {};
+
+            /* get first word & then rest of line. */
+            let i = lines.length;
+            while ( i-- ) {
+                let line = lines[i].trim();
+                let j = line.indexOf(' ');
+                let word = line.slice(0,j).toLowerCase();
+                let rest = line.slice(j+1);
+
+                if ( word.match(/^(artists?|maintainer|date|copyright|license|commment)$/) ) {
+                    info[word] = rest;
+                } else if ( word == 'icon' ) {
+                    if ( rest[0] != '/' ) { /* make full path */
+                        rest = loc.replace(/\babout$/, rest);
+                    }
+                    info[word] = rest;
+                } else {
+                    /* silently skip? */
+                    log('unrecognised word ' + word + ', silently skipping');
+                }
+            }
+
+            /* print (popup box? append all?) */
+            log(('Theme: '      + themes[th].replace(/_/g, ' ')));
+            log(('Date: '       + info.date));
+            log(('Artist(s): '  + info.artist));
+            log(('Copyright: '  + info.copyright));
+            log(('License: '    + info.licence));
+            log(('Maintainer: ' + info.maintainer));
+            log(('Location: '   + loc));
+            log(('Icon: '       + info.icon));
+            log(('Comment: '    + info.comment));
+        } // theme loop
+    },
+
+    /* Return the full path or directory of the specified theme.
      * Spaces in theme name are converted to underscores
      * xpenguins_theme_directory
+     * It returns the *directory* name if the theme is "valid", i.e. contains a file 'config'.
      */
-    get_theme_path: function(iname) {
+    get_theme_dir: function(iname) {
         /* Convert spaces to underscores */
         let name = iname.replace(/ /g,'_');
 
         /* first look in $HOME/.xpenguins/themes for config,
          * then in [xpenguins_dir]/themes 
          */
-        let paths = [ GLib.build_filenamev([ GLib.get_home_dir(), this.user_directory, this.theme_directory, name, this.config_file ]),
-                      GLib.build_filenamev([ this.system_directory, this.theme_directory, name, this.config_file ]) ];
-        for ( let i=0; i<paths.length; ++i ) {
-            if ( GLib.file_test(paths[i], GLib.FileTest.EXISTS) ) {
-                return paths[i];
+        let dirs = [ GLib.build_filenamev([ GLib.get_home_dir(), this.user_directory, this.theme_directory, name ]),
+                      GLib.build_filenamev([ this.system_directory, this.theme_directory, name ]) ];
+        for ( let i=0; i<dirs.length; ++i ) {
+            if ( GLib.file_test(GLib.build_filenamev([dirs[i], this.config_file]), 
+                                GLib.FileTest.EXISTS) ) {
+                return dirs[i];
             }
         }
 
         /* Theme not found */
         return null;
+    },
+
+    get_theme_path: function(iname, fName) {
+        let dir = this.get_theme_dir(iname);
+        return GLib.build_filenamev(dir, fName || this.config_file);
     }
 }; // ThemeManager
 
