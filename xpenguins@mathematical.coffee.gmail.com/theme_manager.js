@@ -1,22 +1,23 @@
 const Lang = imports.lang;
 const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
+const Shell = imports.gi.Shell;
 
 const fileUtils = imports.misc.fileUtils;
 
 // temp until two distinct versions:
-var Extension, extensionPath;
+var Me, extensionPath;
 try {
     // gnome 3.2
-    Extension = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+    Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
     extensionPath = imports.ui.extensionSystem.extensionMeta['xpenguins@mathematical.coffee.gmail.com'].path;
 } catch(err) {
     // gnome 3.4
-    Extension = imports.misc.extensionUtils.getCurrentExtension();
-    extensionPath = Extension.path;
-    Extension = Extension.imports;
+    Me = imports.misc.extensionUtils.getCurrentExtension();
+    extensionPath = Me.path;
+    Me = Me.imports;
 }
-const XPUtil = Extension.util;
+const XPUtil = Me.util;
 
 /***********************
  * ThemeManager object *
@@ -114,10 +115,13 @@ const ThemeManager = {
     /* xpenguins_theme_info (xpenguins_theme.c)
      * DescribeThemes (main.c)
      */
-    describe: function(themes) {
+    describe_themes: function(themes, noisy) {
         let th = themes.length;
+        let infos = {};
+        let LOG = function() { global.log(arguments); log(arguments); };
         while ( th-- ) {
-            let theme = themes[th];
+            let theme = themes[th].replace(/ /g, '_');
+            log(('Parsing theme ' + theme));
             let loc = this.get_theme_path(theme, 'about');
             if ( !loc || !GLib.file_test(loc, GLib.FileTest.EXISTS) ) {
                 // TODO: make popup & continue
@@ -129,28 +133,27 @@ const ThemeManager = {
              * xpenguins_theme_info */
 
             /* Read about file, ignoring comments ('#'), double spaces */
-            let lines = Shell.get_file_contents_utf8_sync(file_name);
+            let lines = Shell.get_file_contents_utf8_sync(loc);
             lines = lines.replace(/#.+/g,'');
             lines = lines.replace(/ {2,}/g,' ');
             lines = lines.split(/[\r\n]+/);
 
-            let info = {};
-
             /* get first word & then rest of line. */
             let i = lines.length;
             while ( i-- ) {
+                infos[theme] = {};
                 let line = lines[i].trim();
                 let j = line.indexOf(' ');
                 let word = line.slice(0,j).toLowerCase();
                 let rest = line.slice(j+1);
 
                 if ( word.match(/^(artists?|maintainer|date|copyright|license|commment)$/) ) {
-                    info[word] = rest;
+                    infos[theme][word] = rest;
                 } else if ( word == 'icon' ) {
                     if ( rest[0] != '/' ) { /* make full path */
                         rest = loc.replace(/\babout$/, rest);
                     }
-                    info[word] = rest;
+                    infos[theme][word] = rest;
                 } else {
                     /* silently skip? */
                     log('unrecognised word ' + word + ', silently skipping');
@@ -158,16 +161,24 @@ const ThemeManager = {
             }
 
             /* print (popup box? append all?) */
-            log(('Theme: '      + themes[th].replace(/_/g, ' ')));
-            log(('Date: '       + info.date));
-            log(('Artist(s): '  + info.artist));
-            log(('Copyright: '  + info.copyright));
-            log(('License: '    + info.licence));
-            log(('Maintainer: ' + info.maintainer));
-            log(('Location: '   + loc));
-            log(('Icon: '       + info.icon));
-            log(('Comment: '    + info.comment));
+            infos[theme].name = theme.replace(/_/g, ' ');
+            infos[theme].sanitised_name = theme;
+            infos[theme].location = loc;
+
+            if ( noisy ) {
+                LOG(('Theme: '      + infos[theme].name));
+                LOG(('Date: '       + infos[theme].date));
+                LOG(('Artist(s): '  + infos[theme].artist));
+                LOG(('Copyright: '  + infos[theme].copyright));
+                LOG(('License: '    + infos[theme].licence));
+                LOG(('Maintainer: ' + infos[theme].maintainer));
+                LOG(('Location: '   + infos[theme].location));
+                LOG(('Icon: '       + infos[theme].icon));
+                LOG(('Comment: '    + infos[theme].comment));
+            }
         } // theme loop
+
+        return infos;
     },
 
     /* Return the full path or directory of the specified theme.
@@ -197,7 +208,7 @@ const ThemeManager = {
 
     get_theme_path: function(iname, fName) {
         let dir = this.get_theme_dir(iname);
-        return GLib.build_filenamev(dir, fName || this.config_file);
+        return GLib.build_filenamev([dir, fName || this.config_file]);
     }
 }; // ThemeManager
 

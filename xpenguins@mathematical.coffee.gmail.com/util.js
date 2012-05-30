@@ -38,3 +38,13 @@ function RandInt(max) {
     return Math.floor( Math.random()*max );
 }
 
+/* Utility logging function */
+function LOG() {
+    let msg = arguments[0];
+    if ( arguments.length > 1 ) {
+        [].shift.call(arguments);
+        msg = ''.format.apply(msg, arguments);
+    }
+    log(msg);
+    //print(msg);
+};

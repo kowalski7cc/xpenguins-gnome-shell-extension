@@ -6,13 +6,14 @@ const Meta = imports.gi.Meta;
 const Shell = imports.gi.Shell;
 
 // temp until two distinct versions:
-var Extension;
+var Me;
 try {
-    Extension = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+    Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
 } catch(err) {
-    Extension = imports.misc.extensionUtils.getCurrentExtension().imports;
+    Me = imports.misc.extensionUtils.getCurrentExtension().imports;
 }
-const Region = Extension.region;
+const Region = Me.region;
+const XPUtil = Me.util;
 /* Preliminary testing results.
  * notify::focus-app not tested yet (only if onDesktop is FALSE)
  *  --> check StatusTitleBar for a focus-*window* type event?
@@ -59,17 +60,6 @@ const XPenguins = {
     }
 };
 
-function LOG() {
-    let msg = arguments[0];
-    if ( arguments.length > 1 ) {
-        [].shift.call(arguments);
-        msg = ''.format.apply(msg, arguments);
-    }
-    global.log(msg);
-    log(msg);
-    //print(msg);
-};
-
 function WindowListener() {
     this._init.apply(this, arguments);
 };
@@ -111,7 +101,7 @@ WindowListener.prototype = {
             if ( this.options.hasOwnProperty(opt) ) {
                 this.options[opt] = i_options[opt];
             } else {
-                LOG('  option %s not supported yet', opt);
+                XPUtil.LOG('  option %s not supported yet', opt);
             }
         }
 
@@ -138,7 +128,7 @@ WindowListener.prototype = {
      * stuff that has to get reset whenever the timeline restarts.
      */
     init: function() {
-        LOG('init');
+        XPUtil.LOG('init');
         this._connectSignals();
         this._initDrawing();
         this.drawingArea.show();
@@ -152,10 +142,10 @@ WindowListener.prototype = {
     },
 
     clean_up: function() {
-        LOG('clean_up');
+        XPUtil.LOG('clean_up');
         /* stop timeline if it's running */
         if ( this._timeline.is_playing() ) {
-            LOG('stopping timeline');
+            XPUtil.LOG('stopping timeline');
             this._timeline.stop();
         }
 
@@ -171,7 +161,7 @@ WindowListener.prototype = {
      * init() should have been called by now.
      */
     start: function() {
-        LOG('start');
+        XPUtil.LOG('start');
         if ( this._timeline.is_playing() ) 
             return;
         this.init();
@@ -187,7 +177,7 @@ WindowListener.prototype = {
     },
 
     stop: function () {
-        LOG('stop');
+        XPUtil.LOG('stop');
         this.drawingArea.hide();
         this.exit();
     },
@@ -195,7 +185,7 @@ WindowListener.prototype = {
      * *except* for owner.connect(eventName) which sends the resume signal.
      */
     pause: function(owner, eventName) {
-        LOG('pause');
+        XPUtil.LOG('pause');
         if ( !this._timeline.is_playing() )
             return;
         /* pause timeline */
@@ -221,7 +211,7 @@ WindowListener.prototype = {
 
     /* resumes timeline, connects up events */
     resume: function() {
-        LOG('resume');
+        XPUtil.LOG('resume');
         if ( this._timeline.is_playing() )
             return;
         /* reconnect events */
@@ -246,7 +236,7 @@ WindowListener.prototype = {
         if ( !this.options.hasOwnProperty(propName) || this.options[propName] == propVal ) 
             return;
 
-        LOG('changeOption[WL]: %s = %s', propName, propVal);
+        XPUtil.LOG('changeOption[WL]: %s = %s', propName, propVal);
         this.options[propName] = propVal;
 
         // ARGH compatibility issues....
@@ -275,13 +265,13 @@ WindowListener.prototype = {
     },
 
     _updateSignals: function() {
-        LOG('updateSignals');
+        XPUtil.LOG('updateSignals');
         this._disconnectSignals();
         this._connectSignals();
     },
 
     _connectSignals: function() {
-        LOG('connectSignals');
+        XPUtil.LOG('connectSignals');
         this._listeningPerWindow = false; /* whether we have to listen to individual windows for signals */
         let ws = this.XPenguinsWindow.get_workspace();
 
@@ -308,7 +298,7 @@ WindowListener.prototype = {
             if ( this.options.recalcMode == XPenguins.RECALC.PAUSE ) {
                 this.connect_and_track(this, global.display, 'grab-op-begin', 
                         Lang.bind(this, function() { 
-                            LOG('grab-op-begin');
+                            XPUtil.LOG('grab-op-begin');
                             this.pause(global.display, 'grab-op-end');
                         }));
             } else {
@@ -384,7 +374,7 @@ WindowListener.prototype = {
     }, // _connectSignals
 
     _disconnectSignals: function() {
-        LOG('disconnectSignals');
+        XPUtil.LOG('disconnectSignals');
         /* disconnect all signals */
         this.disconnect_tracked_signals(this);
 
@@ -403,7 +393,7 @@ WindowListener.prototype = {
 
     /* Note: for now, per-window signals are *all* stored in the relevant actor. */
     _onWindowAdded: function(workspace, metaWin) {
-        LOG('_onWindowAdded for %s', metaWin.get_title());
+        XPUtil.LOG('_onWindowAdded for %s', metaWin.get_title());
         let winActor = metaWin.get_compositor_private();
         if ( !winActor ) {
             // Newly-created windows are added to a workspace before
@@ -432,7 +422,7 @@ WindowListener.prototype = {
      */
     _onWindowRemoved: function(workspace, metaWin) {
         /* disconnect all the signals */
-        LOG('_onWindowRemoved for %s', metaWin.get_title());
+        XPUtil.LOG('_onWindowRemoved for %s', metaWin.get_title());
         this.disconnect_tracked_signals(metaWin.get_compositor_private());
     },
 
@@ -445,7 +435,7 @@ WindowListener.prototype = {
      */
     _onWorkspaceChanged: function(shellwm, fromI, toI, direction) {
         // from & to are indices.
-        LOG('_onWorkspaceChanged: from %d to %d', fromI, toI);
+        XPUtil.LOG('_onWorkspaceChanged: from %d to %d', fromI, toI);
         // TODO: what happens if you're in god mode?
         /* If you've changed workspaces, you need to change window-added/removed listeners. */
         if ( this.options.onAllWorkspaces ) {
@@ -496,7 +486,7 @@ WindowListener.prototype = {
      *********************/
     _dirtyToonWindows: function(msg) {
         // hmm, in debugging mode I'd also like to track why.
-        LOG('_dirtyToonWindows %s', msg);
+        XPUtil.LOG('_dirtyToonWindows %s', msg);
         /* do the following in the timeline for XPenguins */
         this._updateToonWindows();
         this.draw(); 
@@ -504,7 +494,7 @@ WindowListener.prototype = {
 
     // BIG TODO: how to handle global vs local coords? (toons in local rel. to window?)
     _updateToonWindows: function() {
-        LOG('updateToonWindows');
+        XPUtil.LOG('updateToonWindows');
         this.toon_windows.clear();
         /* Add windows to region. If we use list_windows() we wont' get popups,
          * if we use get_window_actors() we will. */
@@ -564,7 +554,7 @@ WindowListener.prototype = {
      * signals are stored by the owner, storing both the target & the id to clean up later
      */
     connect_and_track: function(owner, subject, name, cb) {
-        LOG('connect_and_track for %s', owner.toString());
+        XPUtil.LOG('connect_and_track for %s', owner.toString());
         if ( !owner.hasOwnProperty('_XPenguins_bound_signals') ) {
             owner._XPenguins_bound_signals = [];
         }
@@ -572,14 +562,14 @@ WindowListener.prototype = {
     },
 
     disconnect_tracked_signals: function(owner) {
-        LOG('disconnect_tracked_signals for %s', owner.toString());
+        XPUtil.LOG('disconnect_tracked_signals for %s', owner.toString());
         if ( !owner ) return;
         if ( !owner._XPenguins_bound_signals ) return;
         let i = owner._XPenguins_bound_signals.length;
         owner._XPenguins_bound_signals.map(
                 function(sig) {
                     sig[0].disconnect(sig[1]);
-                    //LOG(' .. disconnecting signal ID %d from object %s',
+                    //XPUtil.LOG(' .. disconnecting signal ID %d from object %s',
                     //     i, sig[0].toString());
         });
         delete owner._XPenguins_bound_signals;
@@ -597,7 +587,7 @@ WindowListener.prototype = {
                                          height: this.XPenguinsWindow.get_height(),
                                          x: 5, y:5 });
         this.drawingArea.set_scale(SCALE, SCALE);
-        LOG('drawingArea: size %d, %d position %d, %d', 
+        XPUtil.LOG('drawingArea: size %d, %d position %d, %d', 
                 this.drawingArea.width, this.drawingArea.height,
                 this.drawingArea.x, this.drawingArea.y);
         
@@ -622,7 +612,7 @@ WindowListener.prototype = {
                                        });
         this.drawingArea.add_actor(bg);
 
-        LOG('draw: %d windows', this.toon_windows.rectangles.length);
+        XPUtil.LOG('draw: %d windows', this.toon_windows.rectangles.length);
         // windows
         for ( let i=0; i<this.toon_windows.rectangles.length; ++i ) {
             let rect = new Clutter.Rectangle({ width: this.toon_windows.rectangles[i].width,

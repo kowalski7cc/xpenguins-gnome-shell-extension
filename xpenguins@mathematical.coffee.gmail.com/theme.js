@@ -14,18 +14,20 @@
  *   (walker, faller, tumbler, floater, ...)
  *********************/
 /* Imports */
+const Shell = imports.gi.Shell;
+
 // temp until two distinct versions:
-var Extension;
+var Me;
 try {
-    Extension = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+    Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
 } catch(err) {
-    Extension = imports.misc.extensionUtils.getCurrentExtension().imports;
+    Me = imports.misc.extensionUtils.getCurrentExtension().imports;
 }
-const XPenguins = Extension.xpenguins; 
-const WindowListener = Extension.windowListener;
-const XPUtil = Extension.util; 
-const Toon   = Extension.toon.Toon;
-const ThemeManager = Extension.theme_manager.ThemeManager;
+const XPenguins = Me.xpenguins; 
+const WindowListener = Me.windowListener;
+const XPUtil = Me.util; 
+const Toon   = Me.toon.Toon;
+const ThemeManager = Me.theme_manager.ThemeManager;
 
 const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
@@ -43,8 +45,10 @@ Theme.Theme = function() {
     this._init.apply(this, arguments);
 };
 
+const LOG = XPUtil.LOG;
 Theme.Theme.prototype = {
     _init: function(themeList) {
+        LOG('creating theme');
         /* members */
         /* Theme: can have one or more genera
          * Genus: class of toons (Penguins has 2: walker & skateboarder).
@@ -65,10 +69,13 @@ Theme.Theme.prototype = {
         this.ngenera = 0; // number of different genera
         this.delay = 60;
 
+        LOG(('number of themes: ' + themeList.length));
         /* Initialise */
         for ( let i=0; i<themeList.length; ++i ) {
+            LOG(' ... appending theme %s', themeList[i]);
             this.append_theme(themeList[i]);
         }
+        LOG(' ...done.');
     }, // _init
 
     /* Append the theme named "name" to this theme.

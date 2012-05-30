@@ -32,13 +32,13 @@
 const Clutter = imports.gi.Clutter;
 
 // temp until two distinct versions:
-var Extension;
+var Me;
 try {
-    Extension = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+    Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
 } catch(err) {
-    Extension = imports.misc.extensionUtils.getCurrentExtension().imports;
+    Me = imports.misc.extensionUtils.getCurrentExtension().imports;
 }
-const XPUtil = Extension.util; 
+const XPUtil = Me.util; 
 
 /* Use the Toon namespace */
 const Toon = Toon || {};

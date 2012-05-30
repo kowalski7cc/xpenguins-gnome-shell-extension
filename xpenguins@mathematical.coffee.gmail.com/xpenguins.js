@@ -8,17 +8,17 @@ const Lang = imports.lang;
 const Clutter = imports.gi.Clutter;
 
 // temp until two distinct versions:
-var Extension;
+var Me;
 try {
-    Extension = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+    Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
 } catch(err) {
-    Extension = imports.misc.extensionUtils.getCurrentExtension().imports;
+    Me = imports.misc.extensionUtils.getCurrentExtension().imports;
 }
-const XPUtil = Extension.util; 
-const Toon   = Extension.toon.Toon;
-const Theme  = Extension.theme.Theme;
-const Region = Extension.region;
-const WindowListener = Extension.windowListener.WindowListener.prototype; // this is how we'll keep it in sync for now.
+const XPUtil = Me.util; 
+const Toon   = Me.toon.Toon;
+const Theme  = Me.theme.Theme;
+const Region = Me.region;
+const WindowListener = Me.windowListener.WindowListener.prototype; // this is how we'll keep it in sync for now.
 /* Far away todos:
  * - treat the top activities bar as solid?
  * - test w/ gnome-panel
@@ -57,18 +57,16 @@ const RECALC = {
 };
 
 XPenguinsLoop.prototype = {
-    // UPTO: incorporate windowListener with XPenguinsLoop. Just create an instance??
     log: function(msg) {
         if ( this.options.DEBUG ) {
-            global.log(msg);
-            print(msg);
-            log(msg);
+            XPUtil.LOG.apply(this,arguments);
+
             // make popup
             let label = new St.Label({ text: msg }); // style-class
             global.stage.add_actor(label);
             let monitor = Main.layoutManager.primaryMonitor;
             label.set_position(Math.floor (monitor.width / 2 - label.width / 2), Math.floor(monitor.height / 2 - label.height / 2));
-            Mainloop.timeout_add(1000, function () { label.destroy(); });
+            Mainloop.timeout_add(1000, function () { label.destroy(); return false; });
         }
     },
 
@@ -175,15 +173,12 @@ XPenguinsLoop.prototype = {
 
         // TODO: if xpenguins_active then do something.
     set_themes: function( themeList, setnPenguins ) {
-        if ( themeList ) 
-            this.options.themes = themeList;
+        this.options.themes = themeList;
 
         /* Load theme into this._theme */
-        if ( this.options.themes.length > 0 ) {
-            this._theme = new Theme.Theme( this.options.themes );
-            if ( setnPenguins || this.options.nPenguins < 0 ) {
-                this.options.nPenguins = this._theme.total;
-            }
+        this._theme = new Theme.Theme( this.options.themes );
+        if ( setnPenguins || this.options.nPenguins < 0 ) {
+            this.options.nPenguins = this._theme.total;
         }
     },
 
@@ -605,17 +600,6 @@ XPenguinsLoop.prototype = {
         //ToonConfigure(Toon.EXITGRACEFULLY);
         this._exiting = true;
         this.set_number(0);
-    },
-
-    /* if ToonWindowsMoved() then this occurs.
-     * In xpenguins_frame.
-     */
-    _onToonWindowsMoved: function() {
-        /* check for squashed toons */
-        // UPTO TODO:
-        //ToonCalculateAssociations(penguin, penguin_number);
-        //ToonLocateWindows();
-        //ToonRelocateAssociated(penguin, penguin_number);
     },
 
    /* for testing: shows a *single* walking toon under no constraints */ 
