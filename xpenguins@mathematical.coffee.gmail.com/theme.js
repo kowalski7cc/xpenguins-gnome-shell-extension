@@ -254,10 +254,8 @@ Theme.Theme.prototype = {
         for ( let i=first_genus; i < this.ngenera; ++i ) {
             for ( let j in this.ToonData[i] ) {
                 let current = this.ToonData[i][j];
-                //if ( !current.exists ) 
-                //    continue;
-                // sscanf first two %d from current->image[0] to width and height
-                let imwidth, imheight;
+                let imwidth = current.texture.width, 
+                    imheight = current.texture.height;
                 if ( (current.nframes = imwidth/current.width) < 1 ) {
                     if ( imwidth < current.width ) {
                         throw new Error(_('Width of xpm image too small for even a single frame'));

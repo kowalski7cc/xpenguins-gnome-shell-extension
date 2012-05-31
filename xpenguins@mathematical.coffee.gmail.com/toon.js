@@ -184,8 +184,8 @@ Toon.Toon.prototype = {
     show: function() {
         this.actor.show();
     },
-    set_position: function() {
-        this.actor.set_position(arguments);
+    set_position: function(x, y) {
+        this.actor.set_position(x, y);
     },
     move_by: function(dx, dy) {
         this.actor.move_by(dx, dy);
@@ -616,7 +616,7 @@ Toon.Toon.prototype = {
         if ( move_ahead ) {
             this.actor.set_position(newx, newy);
             // see if we've scrolled to the end of the filmstrip
-            if ( (++this.frame) >= this.nframes ) {
+            if ( (++this.frame) >= this.data.nframes ) {
                 this.frame = 0;
                 ++(this.cycle);
                 // NOCYCLE is associated with a ToonData.
@@ -625,7 +625,7 @@ Toon.Toon.prototype = {
                 }
             }
         } else if ( this.data.conf & Toon.NOCYCLE ) {
-            if ( (++this.frame) >= this.nframes ) {
+            if ( (++this.frame) >= this.data.nframes ) {
                 this.frame = 0;
                 this.cycle = 0;
                 this.active = 0;

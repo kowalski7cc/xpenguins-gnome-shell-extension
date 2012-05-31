@@ -163,7 +163,7 @@ XPenguinsLoop.prototype = {
         max_relocate_right: 16,
 
         // possibly unnecessary/can't be implemented/depreciate
-        sleep_msec : 0, // <-- delay in milliseconds between each frame.
+        sleep_msec : 1000, // <-- delay in milliseconds between each frame.
         /* Toons  regard  all  windows  as  rectangular.  */
         /* Possible slight speedup but if you use a window manager with shaped windows */
         /*  your toons might look like they're walking on thin air. */
@@ -235,13 +235,27 @@ XPenguinsLoop.prototype = {
             genus_numbers[--leftover] += 1;
         }
         //this.log(('this.options.nPenguins: ' + this.options.nPenguins + ' splitup:' + JSON.stringify(genus_numbers)));
-        for ( i=0; i<genus_numbers.length; ++i ) {
+        for ( let i=0; i<genus_numbers.length; ++i ) {
             while ( genus_numbers[i]-- ) {
                 /* Initialise toons */
                 // will call .init() automatically since genus is provided.
                 this._toons.push(new Toon.Toon(GLOBAL, {genus:i}));
             }
         }
+        //@@
+        this.testToon = new Toon.Toon(GLOBAL, {genus:0});
+        this.testToon.set_position(100, 100);
+        this.XPenguinsWindow.add_actor( this.testToon.actor );
+        //@@
+        /*
+        for ( let i=0; i<this._theme.ToonData.length; ++i ) {
+            for ( let type in this._theme.ToonData[i] ) {
+                this.log('genus %d, type %s: nframes %d'.format(i, type,
+                            this._theme.ToonData[i][type].nframes));
+                this.log(JSON.stringify(this._theme.ToonData[i][type]));
+            }
+        }
+        */
 
         /* set the stage */
         // TODO: other windows. Want the stage + the window actor?
@@ -690,6 +704,20 @@ XPenguinsLoop.prototype = {
          * this.nPenguins    <-> npenguins
          * this._toon_number <-> penguin_number
          */
+        // TEST TOON
+        let direction = (this.testToon.direction >= this.testToon.data.ndirections ? 0 : this.testToon.direction);
+        let anchor_x = this.testToon.data.width*this.testToon.frame;
+        let anchor_y = this.testToon.data.height*direction;
+        this.log('test toon anchor point: %d,%d; frame %d/%d', anchor_x, anchor_y, this.testToon.frame, this.testToon.data.nframes);
+        this.testToon.actor.set_anchor_point(anchor_x, anchor_y);
+        this.testToon.actor.set_clip(anchor_x, anchor_y, this.testToon.data.width, this.testToon.data.height);
+        // see if we've scrolled to the end of the filmstrip
+        if ( (++this.testToon.frame) >= this.testToon.data.nframes ) {
+            this.testToon.frame = 0;
+            ++(this.testToon.cycle);
+        }
+        // END TEST TOON
+
         for ( let i=0; i<this._toon_number; ++i ) {
             let toon = this._toons[i]; 
             this.log('toon %d: genus: %d, type: %s, position: %d, %d',
