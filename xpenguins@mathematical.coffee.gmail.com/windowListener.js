@@ -161,8 +161,8 @@ WindowListener.prototype = {
      * init() should have been called by now.
      */
     start: function() {
-        XPUtil.LOG('start');
-        if ( this._timeline.is_playing() ) 
+        XPUtil.LOG('[WL] start');
+        if ( this._timeline && this._timeline.is_playing() ) 
             return;
         this.init();
         this._timeline.start();
@@ -170,8 +170,8 @@ WindowListener.prototype = {
 
     /* why not 'stop' ? */
     exit: function() {
-        if ( !this._timeline.is_playing() ) 
-            return;
+        //if ( !this._timeline.is_playing() ) 
+        //    return;
 
         this.clean_up(); // <- disconnect, stop timeline, ...
     },
@@ -562,8 +562,8 @@ WindowListener.prototype = {
     },
 
     disconnect_tracked_signals: function(owner) {
-        XPUtil.LOG('disconnect_tracked_signals for %s', owner.toString());
         if ( !owner ) return;
+        XPUtil.LOG('disconnect_tracked_signals for %s', owner.toString());
         if ( !owner._XPenguins_bound_signals ) return;
         let i = owner._XPenguins_bound_signals.length;
         owner._XPenguins_bound_signals.map(

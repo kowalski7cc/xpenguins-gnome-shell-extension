@@ -1,4 +1,7 @@
-/* 
+/* UPTO: Mainloop.timeout_add seriously lags computer,
+ * once we get stuck in action%d don't seem to be able to leave.
+ * clip region doesn't work: even though I do set_anchor.
+ *
  * xpenguins_core.c:
  * + __xpenguins_init_penguin
  * + __xpenguins_make_climber
@@ -122,7 +125,7 @@ Toon.Toon.prototype = {
     _init: function(globalvars, props, params) {
         /* __xpenguins_init_penguin( Toon *p ) */
         // For GNOME 3.2, will have to store this.actor.
-        this.actor = new Clutter.Clone(params);
+        this.actor = new Clutter.Clone(params||{});
         // mark it as mine
         this.actor.toon_object = this;
 
@@ -171,7 +174,7 @@ Toon.Toon.prototype = {
             }
         }
         this.actor.set_position(0,0); 
-        if ( this.genus ) {
+        if ( this.genus != null ) {
             this.init();
         }
             // TODO: CLONE NEEDS SIZE SET
@@ -184,19 +187,20 @@ Toon.Toon.prototype = {
     set_position: function() {
         this.actor.set_position(arguments);
     },
-    move_by: function() {
-        this.actor.move_by(arguments);
+    move_by: function(dx, dy) {
+        this.actor.move_by(dx, dy);
     },
     get x() {
         return this.actor.x;
     },
     get y() {
-        return this.actor.x;
+        return this.actor.y;
     },
 
     /* Only call this *after* setting the toon's genus */
     init: function() {
-        this.actor.set_source( this.data.texture );
+        log(('TOON.INIT: genus: ' + this.genus + ' type: ' + this.type));
+
         this.direction = XPUtil.RandInt(2);
         this.set_type('faller', this.direction, Toon.UNASSOCIATED);
         this.actor.set_position( XPUtil.RandInt(this.GLOBAL.XPenguinsWindow.get_width() - this.data.width), 1 - this.data.height );
@@ -209,7 +213,8 @@ Toon.Toon.prototype = {
 
     // TODO: get data() vs storing .data (performance)
     get data() { 
-        if ( this.genus && this.type ) {
+        // GOTCHA: this.genus can be 0.
+        if ( this.genus != null && this.type ) {
             return this.GLOBAL.ToonData[this.genus][this.type];
         } else {
             return null;
@@ -359,8 +364,9 @@ Toon.Toon.prototype = {
     /* Turn a penguin into a climber */
     // __xpenguins_make_climber
     make_climber: function() {
+        log('  toon changing from %s to climber'.format(this.type));
         this.set_type('climber', this.direction, (this.direction ? Toon.DOWNRIGHT : Toon.DOWNLEFT));
-        this.SetAssocation( this.direction );
+        this.set_association( this.direction );
         this.set_velocity( 0, -this.data.speed ); // this.data is now CLIMBER
     },
 
@@ -370,6 +376,7 @@ Toon.Toon.prototype = {
      */
     // __xpenguins_make_walker
     make_walker: function(shiftforward) {
+        log('  toon changing from %s to walker'.format(this.type));
         let gravity = (shiftforward ? 
                         (this.direction ? Toon.DOWNRIGHT : Toon.DOWNLEFT) :
                         Toon.DOWN);
@@ -390,6 +397,7 @@ Toon.Toon.prototype = {
      * __xpenguins_make_faller
      */
     make_faller: function() {
+        log('  toon changing from %s to faller'.format(this.type));
         this.set_type('faller', this.direction, Toon.UP);
         this.set_velocity( this.direction*2-1, this.data.speed );
         this.set_association(Toon.UNASSOCIATED);
@@ -426,7 +434,7 @@ Toon.Toon.prototype = {
                 x = this.x + this.data.width;
                 y = this.y;
                 width = 1;
-                height = this.dat.height;
+                height = this.data.height;
             } else {
                 throw new Error(_('Error: illegal direction %d'.format(this.associate)));
                 return;
@@ -484,6 +492,13 @@ Toon.Toon.prototype = {
     },
 
     /***** CORE FUNCTIONS *****/
+    /* A baby version of Advance that disregards ToonWindows and just keeps the 
+     * toon in the direction they're currently in (need to debug).
+     */
+    SimpleAdvance: function(mode) {
+        // UPTO
+    },
+
     /* Attempt to move a toon based on its velocity.
      * 'mode' can be: 
      * - Toon.MOVE (move unless blocked),
@@ -496,20 +511,21 @@ Toon.Toon.prototype = {
      * ToonAdvance
      */
     Advance: function(mode) {
+    //    log('Advance');
         let move_ahead = ( mode == Toon.STILL ? false : true );
 
         let newx = this.x + this.u;
         let newy = this.y + this.v;
         let stationary = ( this.u == 0 && this.v == 0 );
 
-        let result;
+        let result = Toon.OK;
 
         if ( this.GLOBAL.edge_block ) {
             if ( newx < 0 ) {
                 newx = 0;
                 result = Toon.PARTIALMOVE;
             } else if ( newx + this.data.width > this.GLOBAL.XPenguinsWindow.get_width() ) {
-                newx = this.GLOBAL.XPenguinsWindow.get_width() - data.width;
+                newx = this.GLOBAL.XPenguinsWindow.get_width() - this.data.width;
                 result = Toon.PARTIALMOVE;
             }
         }
@@ -524,7 +540,7 @@ Toon.Toon.prototype = {
                     newy = 0;
                     result = Toon.PARTIALMOVE;
                 } else if ( newy + this.data.height > this.GLOBAL.XPenguinsWindow.get_height() ) {
-                    newy = this.GLOBAL.XPenguinsWindow.get_height() - data.height;
+                    newy = this.GLOBAL.XPenguinsWindow.get_height() - this.data.height;
                     result = Toon.PARTIALMOVE;
                 }
                 if ( newx == this.x && newy == this.y && !stationary ) {
@@ -535,6 +551,7 @@ Toon.Toon.prototype = {
             /* Is new toon location fully/partially filled with windows? */
             if ( this.GLOBAL.toon_windows.overlaps(newx, newy, this.data.width, this.data.height) && mode == Toon.MOVE &&
                  result != Toon.BLOCKED && !stationary ) {
+                log('Advance:  windows in the way of toon');
                 let tryx, tryy, step=1, u=newx-this.x, v=newy-this.y;
                 result = Toon.BLOCKED;
                 move_ahead=false;
@@ -571,14 +588,15 @@ Toon.Toon.prototype = {
                     }
                 }
 
-                xy = this.xy;
+                /*
+                 * Compresses the above into one step.
+                
+                xy = this.xy; // <-- ???
                 MAJ = ( Math.abs(uv[1]) < Math.abs(uv[0]) ? 0 : 1 );
                 MIN = 1-MAJ;
                 if ( newxy[MAJ] > xy[MAJ] ) {
                     step = -1;
                 }
-                /*
-                 * Compresses the above into one step.
                 let tryMAX, tryMIN, tryxy=[], step;
                 for ( tryMAX = newxy[MAJ]+step; tryMAX != xy[MAJ]; tryMAX += step ) {
                     tryMIN = xy[MIN] + (tryMAX-xy[MAJ])*uv[MIN]/uv[MAX];
@@ -613,6 +631,7 @@ Toon.Toon.prototype = {
                 this.active = 0;
             }
         }
+        log('toon.Advance: moving from (%d,%d) to (%d,%d)'.format(this.x, this.y, newx, newy));
         return result;
     }, // advance
 
@@ -623,11 +642,21 @@ Toon.Toon.prototype = {
             // NOTE: do I set this.direction to direction?
             let direction = (this.direction >= this.data.ndirections ? 0 : this.direction);
 
-            /* set_clip computed from upper left corner of actor */
-            this.set_clip( this.data.width*this.frame, 
+            /* set_clip computed from upper left corner of actor.
+             * The set_anchor_point is required for the clip region's top-left corner to always be regarded
+             * as (0,0).
+             */
+            // @@ TESTING
+            //@ UPTO: It works with the fixed clip & not worrying about anchor_point.
+            /*
+            this.actor.set_anchor_point(this.data.width*this.frame,
+                                        this.data.height*this.direction);
+            this.actor.set_clip( this.data.width*this.frame,  // always measured from top-left
                            this.data.height*this.direction,
                            this.data.width,
                            this.data.height);
+            */
+            this.actor.set_clip( 0, 0, this.data.width, this.data.height );
             /* Draw on the screen.... .show() should take care of that already? */
 
             /* update properties */

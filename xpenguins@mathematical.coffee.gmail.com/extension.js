@@ -1,9 +1,12 @@
 const Lang     = imports.lang;
 const Mainloop = imports.mainloop;
 const Gio = imports.gi.Gio;
+const Gtk = imports.gi.Gtk;
+const Pango = imports.gi.Pango;
 const St    = imports.gi.St;
 
 const Main      = imports.ui.main;
+const ModalDialog = imports.ui.modalDialog;
 const PanelMenu = imports.ui.panelMenu;
 const PopupMenu = imports.ui.popupMenu;
 
@@ -22,6 +25,10 @@ const XPUtil = Me.util;
 
 const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
+
+/* FIXME: ThemeMenuItem2 looks a bit better?
+ * FIXME: ThemeMenuItem has *way* too much vertical padding
+ */
 
 
 
@@ -83,8 +90,11 @@ XPenguinsMenu.prototype = {
                          blood          : _('Show blood'),
                          angels         : _('Show angels'),
                          squish         : _('God Mode'),
-                         DEBUG          : _('Verbose')
+                         DEBUG          : _('Verbose'),
+                         windowPreview  : _('Window Preview'),
         };
+        this._ABOUT_ORDER = ['name', 'date', 'artist', 'copyright', 
+            'license', 'maintainer', 'location', 'icon', 'comment'];
 
         /* Create menus */
         this._createMenu();
@@ -121,11 +131,12 @@ XPenguinsMenu.prototype = {
     // BIG TODO: onAllWorkspaces only applies for on the desktop toons.
     changeOption: function(item, propVal, whatChanged) {
         this.log(('changeOption[ext]:' + whatChanged + ' -> ' + propVal));
-        this.windowListener.changeOption(whatChanged, propVal);
+        if ( this.windowListener ) 
+            this.windowListener.changeOption(whatChanged, propVal);
         this.XPenguinsLoop.changeOption(whatChanged, propVal);
 
         /* start/stop the windowListener */
-        if ( whatChanged == 'DEBUG' && this.XPenguinsLoop.is_playing() ) {
+        if ( whatChanged == 'windowPreview' && this.XPenguinsLoop.is_playing() ) {
             if ( propVal ) {
                 this.windowListener.start();
             } else {
@@ -189,8 +200,9 @@ XPenguinsMenu.prototype = {
 
         /* ignore maximised, always on visible workspace, angels, blood, god mode, verbose toggles */
         let defaults = XPenguins.XPenguinsLoop.prototype.defaultOptions(); 
+        defaults.windowPreview = false;
         for (let propName in this._toggles) {
-            this._items[propName] = new PopupMenu.PopupSwitchMenuItem(this._toggles[propName], defaults[propName]);
+            this._items[propName] = new PopupMenu.PopupSwitchMenuItem(this._toggles[propName], defaults[propName]||false);
             //let p = propName; // according to gnome-shell mailing list this
                               // the only way to get the callback to work properly
             this._items[propName].connect('toggled', this.changeOption, propName);
@@ -220,12 +232,19 @@ XPenguinsMenu.prototype = {
         this._themeMenu.menu.removeAll();
         this._items.themes = {};
         let themeList = ThemeManager.list_themes();
+
+        //  @@
+        //this._themeMenu2 = new PopupMenu.PopupSubMenuMenuItem(_('Theme'));
+        //this.menu.addMenuItem(this._themeMenu2);
+        // !@@
+        
         if ( themeList.length == 0 ) {
             // TODO: add new item saying 'click to reload', or just modify dropdown menu label?
             this._themeMenu.label.set_text(_('No themes found, click to reload!'));
             // FIXME: test
             this._themeMenu.connect('open', Lang.bind(this, this._populateThemeMenu));
         } else {
+            this._themeInfo = ThemeManager.describe_themes(themeList, false);
             /*
              * look up icon..
              * //UPTO: theme_manager.get_icon(_path)
@@ -234,33 +253,39 @@ XPenguinsMenu.prototype = {
             for ( let i=0; i<themeList.length; ++i ) {
                 let sanitised_name = themeList[i].replace(/ /g,'_');
                 this._items.themes[sanitised_name] = new ThemeMenuItem(_(themeList[i]), themeList[i]=='Penguins');
+                if ( this._themeInfo[sanitised_name].icon ) {
+                    this._items.themes[sanitised_name].set_icon(this._themeInfo[sanitised_name].icon);
+                }
                 this._items.themes[sanitised_name].connect('toggled', Lang.bind(this, this._onChangeTheme));
                 this._items.themes[sanitised_name].connect('button-clicked', Lang.bind(this, this._onShowHelp, sanitised_name));
                 this._themeMenu.menu.addMenuItem(this._items.themes[sanitised_name]);
+
+                //@@
+                //this._themeMenu2.menu.addMenuItem( new ThemeMenuItem2(_(themeList[i]), themeList[i]=='Penguins') );
             }
-            this._themeinfo = ThemeManager.describe_themes(themeList, false);
         }
-/*
- * FIXME: Prefer checkbox in ThemeMenuItem2 ? (add as St.Button)
-        let dummy;
-        dummy = new ThemeMenuItem('Test theme', false);
-        this.menu.addMenuItem(dummy);
-        dummy = new ThemeMenuItem2('Test theme', false);
-        this.menu.addMenuItem(dummy);
-        // set_icon.
- */
     },
 
     // UPTO
     _onShowHelp: function(button, name) {
         this.log(('showing help for ' + name));
-        if ( !this._themeinfo[name] ) {
-            this._themeinfo[name] = ThemeManager.describe_themes([name], false)[name];
+        // TODO: titles etc (Different sized text)
+        if ( !this._themeInfo[name] ) {
+            this._themeInfo[name] = ThemeManager.describe_themes([name], false)[name];
         }
-        for ( let propName in this._themeinfo[name] ) {
-            this.log('%s: %s', propName, this._themeinfo[name][propName]);
+
+        /* make a popup dialogue (that needs to be dismissed), see perhaps alt-tab or panel-docklet? */
+        let dialog = new AboutDialog(this._themeInfo[name].name); // <-- FIXME: translated?
+        for ( let i=0; i<this._ABOUT_ORDER.length; ++i ) {
+            let propName = this._ABOUT_ORDER[i];
+            if ( this._themeInfo[name][propName] ) {
+                dialog.append_text('%s%s: %s'.format(
+                                            propName.charAt(0).toUpperCase(), 
+                                            propName.slice(1), 
+                                            this._themeInfo[name][propName]));
+            }
         }
-        /* make a popup dialogue (that needs to be dismissed), see perhaps alt-tab or panel-docklet?
+        dialog.open(global.get_current_time());
     },
 
     _onChangeTheme: function() {
@@ -286,20 +311,25 @@ XPenguinsMenu.prototype = {
 
         /* Set the label to match */
         this._items.nPenguins.setValue(this.XPenguinsLoop.options.nPenguins/XPenguins.PENGUIN_MAX);
-        this._items.nPenguinsLabel.set_text( this.XPenguinsLoop.options.nPenguins.toString() );
+        this._items.nPenguinsLabel.set_text(this.XPenguinsLoop.options.nPenguins.toString());
+
+        // @@ tmp
+        this._items.nPenguins.setValue(1/XPenguins.PENGUIN_MAX);
+        this._items.nPenguinsLabel.set_text('1');
+        this.XPenguinsLoop.set_number(1);
     },
 
     _startXPenguins: function(item, state) {
-        if ( state == this.XPenguinsLoop.is_playing() ) return;
+        //@@ tempif ( state == this.XPenguinsLoop.is_playing() ) return;
+        log((state && 'STARTING ' || 'STOPPING ') + 'XPenguins');
 
-        // temporary
         if ( state ) {
             this.XPenguinsLoop.start();
-            if ( this.DEBUG ) 
+            if ( this._items.windowPreview.state ) 
                 this.windowListener.start();
         } else {
             this.XPenguinsLoop.stop();
-            if ( this.DEBUG ) 
+            if ( this._items.windowPreview.state ) 
                 this.windowListener.stop();
         }
     },
@@ -402,52 +432,69 @@ ThemeMenuItem2.prototype = {
 
 };
 
-SettingsDialog.prototype = {
-	
-	_init: function() {
-            // just need a mainBox = St.BoxLayout({vertical: true});
-            // then add to it a multi-line text and a button. that's it.
-            // this.actor = mainBox = new St.BoxLayout(...)
-            // mainBox.add(text); mainBox.add(closeButton);
-            // no need for scrollable.
-		let monitor = dock._getMonitor(),
-			padding = 10,
-			boxWidth = Math.round(monitor.width/1.5),
-			boxHeight = Math.round(monitor.height/1.5),
-		   	mainBox = this.actor = new St.BoxLayout({style_class: "panelDocklet_dialog",
-				vertical: true,
-				x:Math.round((monitor.width - boxWidth)/2) + monitor.x,
-				y:Math.round((monitor.height - boxHeight)/2) + monitor.y,
-				width: boxWidth + padding*2,
-				height: boxHeight + padding*2,
-			}),
-            closeButton = new St.Button({style_class: 'dialog_button', label:'OK', x: boxWidth/2, y: boxHeight});
-			content = new St.BoxLayout({vertical: true});
-		
-		mainBox.add(content); // TODO: add vs add_actor ?
-        this._group = new PopupMenu.PopupComboMenu(); // what's a PopupComboMenu & why that?
-        content.add(this._group.actor);
-		
-		closeButton.connect("button-release-event", Lang.bind(this, this.close));
-		mainBox.add(closeButton);
-	
-        /* add to UI */    
-		Main.uiGroup.add_actor(mainBox);
-		
-		Main.pushModal(this.actor);
+/* Popup dialog with scrollable text. 
+ * See InstallExtensionDialog in extensionSystem.js for an example.
+ * FIXME: make it look better. styles for headings, show the icon, ...
+ */
 
-        // to make stuff:
-        // this._createSwitch(...)
-	},
-	_createSeparator: function() {
-		this._group.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-	},
-	close: function() {
-		Main.popModal(this.actor);
-		this.actor.destroy();
-		this._dock._settingsMenu = false;
-	},
+function AboutDialog() {
+    this._init.apply(this, arguments);
 };
+
+AboutDialog.prototype = {
+    __proto__: ModalDialog.ModalDialog.prototype,
+
+    _init: function(title, text) {
+        ModalDialog.ModalDialog.prototype._init.call(this, {styleClass: 'modal-dialog'});
+
+        let monitor = global.screen.get_monitor_geometry(global.screen.get_primary_monitor()),
+            width   = Math.max(250, Math.round(monitor.width/4)),
+            height  = Math.max(400, Math.round(monitor.height/2.5));
+
+        /* title */
+        // fixme: define style for title.
+        this.title = new St.Label({text: title || '', style: 'font-weight: bold'});
+        this.contentLayout.add(this.title, { x_fill: false, x_align: St.Align.MIDDLE });
+
+        /* scroll box */
+        this.scrollBox = new St.ScrollView({
+            x_fill: true, 
+            y_fill: true,
+            width: width,
+            height: height 
+        });
+        // automatic horizontal scrolling, automatic vertical scrolling
+        this.scrollBox.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC);
+
+        /* text in scrollbox. FIXME: for some reason it won't display unless in a St.BoxLayout. */
+        this.text = new St.Label({text: (text || '')});
+        this.text.clutter_text.ellipsize = Pango.EllipsizeMode.NONE; // allows scrolling
+        //this.text.clutter_text.line_wrap = true;                     
+
+        this.box = new St.BoxLayout();
+        this.box.add(this.text, { expand: true });
+        this.scrollBox.add_actor(this.box, {expand: true, x_fill: true, y_fill: true});
+        this.contentLayout.add(this.scrollBox, {expand: true, x_fill: true, y_fill: true});
+
+        /* OK button */
+        this.setButtons([{ label: _('OK'),
+                           action: Lang.bind(this, function() {this.close(global.get_current_time()); })
+                        }]);
+	},
+
+    set_title: function(title) {
+        this.title.text = title;
+    },
+
+    set_text: function(text) {
+        this.text.text = text;
+    },
+
+    append_text: function(text, sep) {
+        this.text.text += (sep || '\n') + text;
+    },
+};
+
 
 // FIXME: see panel-docklet for an example of making the switch only.
 function ThemeMenuItem() {

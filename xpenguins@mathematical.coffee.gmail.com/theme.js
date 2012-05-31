@@ -301,7 +301,7 @@ Theme.Theme.prototype = {
         let i=this.ToonData.length;
         while ( i-- ) {
             for ( let type in this.ToonData[i] ) {
-                this.ToonData[type].destroy();
+                this.ToonData[i][type].destroy();
             }
         }
     }

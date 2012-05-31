@@ -122,6 +122,7 @@ const ThemeManager = {
         while ( th-- ) {
             let theme = themes[th].replace(/ /g, '_');
             log(('Parsing theme ' + theme));
+            infos[theme] = {};
             let loc = this.get_theme_path(theme, 'about');
             if ( !loc || !GLib.file_test(loc, GLib.FileTest.EXISTS) ) {
                 // TODO: make popup & continue
@@ -141,13 +142,14 @@ const ThemeManager = {
             /* get first word & then rest of line. */
             let i = lines.length;
             while ( i-- ) {
-                infos[theme] = {};
                 let line = lines[i].trim();
+                if ( line.length == 0 ) 
+                    continue;
                 let j = line.indexOf(' ');
                 let word = line.slice(0,j).toLowerCase();
                 let rest = line.slice(j+1);
 
-                if ( word.match(/^(artists?|maintainer|date|copyright|license|commment)$/) ) {
+                if ( word.match(/^(artists?|maintainer|date|copyright|license|comment)$/) ) {
                     infos[theme][word] = rest;
                 } else if ( word == 'icon' ) {
                     if ( rest[0] != '/' ) { /* make full path */
@@ -156,7 +158,7 @@ const ThemeManager = {
                     infos[theme][word] = rest;
                 } else {
                     /* silently skip? */
-                    log('unrecognised word ' + word + ', silently skipping');
+                    log(('unrecognised word ' + word + ', silently skipping'));
                 }
             }
 

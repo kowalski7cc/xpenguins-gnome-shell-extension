@@ -46,5 +46,6 @@ function LOG() {
         msg = ''.format.apply(msg, arguments);
     }
     log(msg);
+    return msg;
     //print(msg);
 };
