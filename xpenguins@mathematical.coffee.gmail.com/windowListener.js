@@ -9,7 +9,7 @@ const Shell = imports.gi.Shell;
 var Me;
 try {
     Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-} catch(err) {
+} catch (err) {
     Me = imports.misc.extensionUtils.getCurrentExtension().imports;
 }
 const Region = Me.region;
@@ -25,7 +25,7 @@ const XPUtil = Me.util;
  * 1) do not disconnect signals when paused, OR
  * 2) when you pause make sure you connect a signal that resumes.
  *
- * UPTO:
+ * TODO:
  * - test switching workspaces w/ default options [yep]
  * - test switching workspaces w/ onAllWorkspaces [yep]
  * - test ignorePopups                            [yep]
@@ -38,15 +38,15 @@ const XPUtil = Me.util;
  * NEXT:
  * - run in another window: test that window's signals.
  */
-const BLACK = new Clutter.Color({blue:0, red:0, green:0, alpha:255});
-const YELLOW = new Clutter.Color({blue:0, red:255, green:255, alpha:255});
-const RED = new Clutter.Color({blue:0, red:255, green:0, alpha:255});
-const WHITE = new Clutter.Color({blue:255, red:255, green:255, alpha:255});
-const WINDOW_COLOR = new Clutter.Color({blue:255, red:255, green:255, alpha:100});
+const BLACK = new Clutter.Color({blue: 0, red: 0, green: 0, alpha: 255});
+const YELLOW = new Clutter.Color({blue: 0, red: 255, green: 255, alpha: 255});
+const RED = new Clutter.Color({blue: 0, red: 255, green: 0, alpha: 255});
+const WHITE = new Clutter.Color({blue: 255, red: 255, green: 255, alpha: 255});
+const WINDOW_COLOR = new Clutter.Color({blue: 255, red: 255, green: 255, alpha: 100});
 // aha! border width doesn't show because of scale!!
-const BORDER_WIDTH=1; /* desired border width *after* scaling */
-const SCALE=0.2;
-const UNSCALED_BORDER_WIDTH = Math.round(BORDER_WIDTH/SCALE);
+const BORDER_WIDTH = 1; /* desired border width *after* scaling */
+const SCALE = 0.2;
+const UNSCALED_BORDER_WIDTH = Math.round(BORDER_WIDTH / SCALE);
 /*
  * An object that tests the firing/connecting of all the signals.
  * For debugging.
@@ -62,10 +62,10 @@ const XPenguins = {
 
 function WindowListener() {
     this._init.apply(this, arguments);
-};
+}
 
 WindowListener.prototype = {
-    _init: function(i_options) {
+    _init: function (i_options) {
          /*
           * Everyone:
           * RESTACKING: either notify::focus-app OR {for each win: "raised"}
@@ -73,12 +73,12 @@ WindowListener.prototype = {
           *   IGNORE POPUPS: window-added and window-removed    for dirtying toon windows
           *  !IGNORE POPUPS: mapped       and destroyed         for dirtying toon windows
           * WINDOW STATE:
-          *  RECALC.PAUSE:  grab-op-{begin,end} (will miss keyboard-resizes)
+          *  RECALC.PAUSE:  grab-op-{begin, end} (will miss keyboard-resizes)
           *                 maximize
           *                 unmaximize
           *                 minimize
           *  RECALC.ALWAYS: {for each winActor: allocation-changed}
-          * UNMINIMISE: 
+          * UNMINIMISE:
           *   IGNORE POPUPS: nothing <hope for focus-app. Otherwise, can try winActor:show or window:notify::minimized>
           *  !IGNORE POPUPS: nothing <mapped>
           *
@@ -89,7 +89,7 @@ WindowListener.prototype = {
           */
 
         /* dummy stuff for XPenguinsLoop compatibility */
-        // TODO: run in particular window (i.e. onDesktop=false)
+        // TODO: run in particular window (i.e. onDesktop = false)
         // ignoreMaximised.
         this.options = {
             ignorePopups: false,
@@ -97,8 +97,8 @@ WindowListener.prototype = {
             onDesktop: true,
             onAllWorkspaces: false
         };
-        for ( let opt in i_options ) {
-            if ( this.options.hasOwnProperty(opt) ) {
+        for (let opt in i_options) {
+            if (i_options.hasOwnProperty(opt) && this.options.hasOwnProperty(opt)) {
                 this.options[opt] = i_options[opt];
             } else {
                 XPUtil.LOG('  option %s not supported yet', opt);
@@ -107,10 +107,10 @@ WindowListener.prototype = {
 
         this._timeline = {
             _playing: false,
-            start: function() { this._playing = true; },
-            stop: function() { this._playing = false; },
-            pause: function() { this._playing = false; },
-            is_playing: function() { return this._playing }
+            start: function () { this._playing = true; },
+            stop: function () { this._playing = false; },
+            pause: function () { this._playing = false; },
+            is_playing: function () { return this._playing; }
         };
         this._resumeSignal = {}; /* when you pause you have to listen for an event to unpause; use this._resumeID to store this. */
         this._listeningPerWindow = false; /* whether we have to listen to individual windows for signals */
@@ -127,7 +127,7 @@ WindowListener.prototype = {
     /* add other initialisation code here,
      * stuff that has to get reset whenever the timeline restarts.
      */
-    init: function() {
+    init: function () {
         XPUtil.LOG('init');
         this._connectSignals();
         this._initDrawing();
@@ -137,14 +137,14 @@ WindowListener.prototype = {
         // like this._timeline.rewind
     },
 
-    destroy: function() {
+    destroy: function () {
         this.clean_up();
     },
 
-    clean_up: function() {
+    clean_up: function () {
         XPUtil.LOG('clean_up');
         /* stop timeline if it's running */
-        if ( this._timeline.is_playing() ) {
+        if (this._timeline.is_playing()) {
             XPUtil.LOG('stopping timeline');
             this._timeline.stop();
         }
@@ -152,25 +152,26 @@ WindowListener.prototype = {
         /* disconnect events */
         this._disconnectSignals();
 
-        if ( this.drawingArea ) {
+        if (this.drawingArea) {
             global.stage.remove_actor(this.drawingArea);
             this.drawingArea.destroy();
         }
     },
-/* start the main xpenguins loop: main.c 
+/* start the main xpenguins loop: main.c
      * init() should have been called by now.
      */
-    start: function() {
+    start: function () {
         XPUtil.LOG('[WL] start');
-        if ( this._timeline && this._timeline.is_playing() ) 
+        if (this._timeline && this._timeline.is_playing()) {
             return;
+        }
         this.init();
         this._timeline.start();
     },
 
     /* why not 'stop' ? */
-    exit: function() {
-        //if ( !this._timeline.is_playing() ) 
+    exit: function () {
+        //if (!this._timeline.is_playing())
         //    return;
 
         this.clean_up(); // <- disconnect, stop timeline, ...
@@ -184,36 +185,38 @@ WindowListener.prototype = {
     /* pauses the timeline & temporarily stops listening for events,
      * *except* for owner.connect(eventName) which sends the resume signal.
      */
-    pause: function(owner, eventName) {
+    pause: function (owner, eventName) {
         XPUtil.LOG('pause');
-        if ( !this._timeline.is_playing() )
+        if (!this._timeline.is_playing()) {
             return;
+        }
         /* pause timeline */
         this._timeline.pause();
         /* recalculate toon windows on resume */
         this._dirtyToonWindows('pause');
         /* temporarily disconnect events */
         // Nope - still need to listen to workspace-switched to unpause!
-        this._disconnectSignals(); 
+        this._disconnectSignals();
 
         /* connect up the signal to resume */
         // BIG TODO: could either set a signal for resume, *or* simply
         // don't disconnect signals on pause (just don't respond to them).
         // If many windows, seems a waste to do all the disconnect/reconnect every time they grab?
-        if ( owner ) {
+        if (owner) {
             this.connect_and_track(this._resumeSignal, owner, eventName,
-                        Lang.bind(this, function() { 
-                            this.disconnect_tracked_signals(this._resumeSignal);
-                            this.resume();
-                        }));
+                Lang.bind(this, function () {
+                    this.disconnect_tracked_signals(this._resumeSignal);
+                    this.resume();
+                }));
         }
     },
 
     /* resumes timeline, connects up events */
-    resume: function() {
+    resume: function () {
         XPUtil.LOG('resume');
-        if ( this._timeline.is_playing() )
+        if (this._timeline.is_playing()) {
             return;
+        }
         /* reconnect events */
         this._connectSignals();
         /* recalculate toon windows */
@@ -221,9 +224,9 @@ WindowListener.prototype = {
         /* resume timeline */
         this._timeline.start();
     },
-    
+
     /* see whether timeline is playing */
-    is_playing: function() {
+    is_playing: function () {
         return this._timeline.is_playing();
     },
 
@@ -232,154 +235,161 @@ WindowListener.prototype = {
      * ignored: blood, angels, squish, DEBUG.
      */
     // TODO: move to signal interface instead?
-    changeOption: function(propName, propVal) {
-        if ( !this.options.hasOwnProperty(propName) || this.options[propName] == propVal ) 
+    changeOption: function (propName, propVal) {
+        if (!this.options.hasOwnProperty(propName) || this.options[propName] === propVal) {
             return;
+        }
 
         XPUtil.LOG('changeOption[WL]: %s = %s', propName, propVal);
         this.options[propName] = propVal;
 
         // ARGH compatibility issues....
-        if ( propName == 'onAllWorkspaces' ) {
-            if ( this.XPenguinsWindow instanceof Meta.WindowActor ) {
+        if (propName === 'onAllWorkspaces') {
+            if (this.XPenguinsWindow instanceof Meta.WindowActor) {
                 this.XPenguinsWindow.get_workspace = this.XPenguinsWindow.meta_window.get_workspace;
             } else {
                 /* just to initially connect the window's workspace to listen
                  * to window-added & window-removed events
                  */
-                if ( this.options.onAllWorkspaces ) {
+                if (this.options.onAllWorkspaces) {
                     // always return "current" workspace.
                     this.XPenguinsWindow.get_workspace = Lang.bind(global.screen, global.screen.get_active_workspace);
                 } else {
                     // return the starting workspace.
                     let ws = global.screen.get_active_workspace();
-                    this.XPenguinsWindow.get_workspace = function() { return ws; };
+                    this.XPenguinsWindow.get_workspace = function () { return ws; };
                 }
             }
         }
 
         /* TRIGGER SOMETHING */
-        if ( this._timeline.is_playing() ) {
+        if (this._timeline.is_playing()) {
             this._updateSignals();
         }
     },
 
-    _updateSignals: function() {
+    _updateSignals: function () {
         XPUtil.LOG('updateSignals');
         this._disconnectSignals();
         this._connectSignals();
     },
 
-    _connectSignals: function() {
+    _connectSignals: function () {
         XPUtil.LOG('connectSignals');
         this._listeningPerWindow = false; /* whether we have to listen to individual windows for signals */
         let ws = this.XPenguinsWindow.get_workspace();
 
         /* new or destroyed windows */
-        if ( this.options.ignorePopups ) {
+        if (this.options.ignorePopups) {
             /* Listen to 'window-added' and '-removed': these are the only windows that count. */
-            this.connect_and_track(this, ws, 'window-added', Lang.bind(this, function() { this._dirtyToonWindows('window-added') }));
-            this.connect_and_track(this, ws, 'window-removed', Lang.bind(this, function() { this._dirtyToonWindows('window-removed') }));
+            this.connect_and_track(this, ws, 'window-added', Lang.bind(this, function () { this._dirtyToonWindows('window-added'); }));
+            this.connect_and_track(this, ws, 'window-removed', Lang.bind(this, function () { this._dirtyToonWindows('window-removed'); }));
         } else {
             /* Listen to 'mapped' and 'destroyed': every window here counts */
-            this.connect_and_track(this, global.window_manager, 'map', Lang.bind(this, function() { this._dirtyToonWindows('map')}));
-            this.connect_and_track(this, global.window_manager, 'destroy', Lang.bind(this, function() { this._dirtyToonWindows('destroy') }));
+            this.connect_and_track(this, global.window_manager, 'map', Lang.bind(this, function () { this._dirtyToonWindows('map'); }));
+            this.connect_and_track(this, global.window_manager, 'destroy', Lang.bind(this, function () { this._dirtyToonWindows('destroy'); }));
         }
 
 
         /* resizing/moving */
-        if ( this.options.recalcMode == XPenguins.RECALC.ALWAYS ) {
+        if (this.options.recalcMode === XPenguins.RECALC.ALWAYS) {
             // done in _onWindowAdded.
             this._listeningPerWindow = true;
         } else {
             /* if RECALC.PAUSE, pause on grab-op-begin with resume hook on grabOpEnd.
              * Otherwise, just recalc on grab-op-end.
              */
-            if ( this.options.recalcMode == XPenguins.RECALC.PAUSE ) {
-                this.connect_and_track(this, global.display, 'grab-op-begin', 
-                        Lang.bind(this, function() { 
-                            XPUtil.LOG('grab-op-begin');
-                            this.pause(global.display, 'grab-op-end');
-                        }));
+            if (this.options.recalcMode === XPenguins.RECALC.PAUSE) {
+                this.connect_and_track(this, global.display, 'grab-op-begin',
+                    Lang.bind(this, function () {
+                        XPUtil.LOG('grab-op-begin');
+                        this.pause(global.display, 'grab-op-end');
+                    }));
             } else {
-                this.connect_and_track(this, global.display, 'grab-op-end', 
-                        Lang.bind(this, function() {
-                            this._dirtyToonWindows('grab-op-end');
-                        }));
+                this.connect_and_track(this, global.display, 'grab-op-end',
+                    Lang.bind(this, function () {
+                        this._dirtyToonWindows('grab-op-end');
+                    }));
             }
         }
 
         /* maximize, unmaximize, minimize */
-        if ( this.options.recalcMode != XPenguins.RECALC.ALWAYS ) {
+        if (this.options.recalcMode !== XPenguins.RECALC.ALWAYS) {
             /* TODO: ignoreMaximised: do not connect 'maximize' signal up? */
-            this.connect_and_track(this, global.window_manager, 'maximize', Lang.bind(this, function() { this._dirtyToonWindows('maximize') }));
-            this.connect_and_track(this, global.window_manager, 'unmaximize', Lang.bind(this, function() { this._dirtyToonWindows('unmaximize') }));
-            this.connect_and_track(this, global.window_manager, 'minimize', Lang.bind(this, function() { this._dirtyToonWindows('minimize') }));
-        } else {
-            /* allocation-changed covers all of the above. */
-        }
+            this.connect_and_track(this, global.window_manager, 'maximize', Lang.bind(this, function () { this._dirtyToonWindows('maximize'); }));
+            this.connect_and_track(this, global.window_manager, 'unmaximize', Lang.bind(this, function () { this._dirtyToonWindows('unmaximize'); }));
+            this.connect_and_track(this, global.window_manager, 'minimize', Lang.bind(this, function () { this._dirtyToonWindows('minimize'); }));
+        }   /* allocation-changed covers all of the above. */
 
         /* unminimize. Options: notify::minimize for each window, or hope that notify::focus-app covers it.
          * TODO: check focus-app vs notify::minimize
          */
-        if ( this.options.ignorePopups ) {
+        if (this.options.ignorePopups) {
             // FIXME: focus-app does do for unminimize, but perhaps notify::minimize would prevent so many bogus recalculations.
-            this.connect_and_track(this, Shell.WindowTracker.get_default(), 'notify::focus-app', Lang.bind(this, function() { 
-                Mainloop.idle_add(Lang.bind(this, function() {
+            this.connect_and_track(this, Shell.WindowTracker.get_default(), 'notify::focus-app', Lang.bind(this, function () {
+                Mainloop.idle_add(Lang.bind(this, function () {
                     this._dirtyToonWindows('notify::focus-app');
                     return false;
-                }))}));
-        } else {
-            /* map covers this */
-        }
+                }));
+            }));
+        } /* otherwise, map covers it */
 
         /* stacking order: NOTE: this *only* matters if we are not running on the desktop! */
-        if ( !this.options.onDesktop ) {
-            if ( this.options.recalcMode == XPenguins.RECALC.ALWAYS ) {
+        if (!this.options.onDesktop) {
+            if (this.options.recalcMode === XPenguins.RECALC.ALWAYS) {
                 /* already listening to per-window events, so why not add 'raised' to the list? */
                 // DONE IN _onWindowAdded.
                 this._listeningPerWindow = true;
-            } else if ( !this.options.ignorePopups ) {
+            } else if (!this.options.ignorePopups) {
                 /* Not listening to any per-window events yet, so stick with notify::focus-app
                  * and hope for the best.
                  * Don't connect if we've already done so in this.options.ignorePopups above (for unminimize)
                  */
-                //this.connect_and_track(this, Shell.WindowTracker.get_default(), 'notify::focus-app', Lang.bind(this, function() { this._dirtyToonWindows('notify::focus-app') }));
-                this.connect_and_track(this, Shell.WindowTracker.get_default(), 'notify::focus-app', Lang.bind(this, function() { 
-                    Mainloop.idle_add(Lang.bind(this, function() {
+                //this.connect_and_track(this, Shell.WindowTracker.get_default(), 'notify::focus-app', Lang.bind(this, function () { this._dirtyToonWindows('notify::focus-app') }));
+                this.connect_and_track(this, Shell.WindowTracker.get_default(), 'notify::focus-app', Lang.bind(this, function () {
+                    Mainloop.idle_add(Lang.bind(this, function () {
                         this._dirtyToonWindows('notify::focus-app');
                         return false;
-                    }))}));
+                    }));
+                }));
             }
         }
 
         /*** if listening to any events from each window, we need to listen to window-added and window-removed
-             in order to add the appropriate listeners. 
+             in order to add the appropriate listeners.
              Then, we also need to listen to workspace-changed to reconnect these signals.
 
              Note - we do not listen to signals emitted by windows that do not trigger 'window-added'.
          ***/
-        // CHECK: should we listen to 'mapped' and add signals there, or is window-added,removed enough?
-        if ( this._listeningPerWindow ) {
+        // CHECK: should we listen to 'mapped' and add signals there, or is window-added, removed enough?
+        if (this._listeningPerWindow) {
             this.connect_and_track(this, ws, 'window-added', Lang.bind(this, this._onWindowAdded));
-            this.connect_and_track(this, ws, 'window-removed', Lang.bind(this, this._onWindowRemoved)); 
+            this.connect_and_track(this, ws, 'window-removed', Lang.bind(this, this._onWindowRemoved));
 
             this.connect_and_track(this, global.window_manager, 'switch-workspace', Lang.bind(this, this._onWorkspaceChanged));
             /* connect up existing windows */
-            ws.list_windows().map(Lang.bind(this, function(metaWin) { if ( metaWin.get_window_type() != Meta.WindowType.DESKTOP ) { this._onWindowAdded(null, metaWin); }}));
+            ws.list_windows().map(Lang.bind(this, function (metaWin) {
+                if (metaWin.get_window_type() !== Meta.WindowType.DESKTOP) {
+                    this._onWindowAdded(null, metaWin);
+                }
+            }));
         }
         // FIXME LATER: reduce cases. This RECALC business is silly - just recalc *always* !
         // FIXME LATER: events for the XPenguins Window.
 
     }, // _connectSignals
 
-    _disconnectSignals: function() {
+    _disconnectSignals: function () {
         XPUtil.LOG('disconnectSignals');
         /* disconnect all signals */
         this.disconnect_tracked_signals(this);
 
         let ws = this.XPenguinsWindow.get_workspace();
-        ws.list_windows().map(Lang.bind(this, function(metaWin) { if ( metaWin.get_window_type() != Meta.WindowType.DESKTOP ) { this._onWindowRemoved(null, metaWin); }}));
+        ws.list_windows().map(Lang.bind(this, function (metaWin) {
+            if (metaWin.get_window_type() !== Meta.WindowType.DESKTOP) {
+                this._onWindowRemoved(null, metaWin);
+            }
+        }));
         this._listeningPerWindow = false;
 
         /* Should I do this? Or just in the 'terminate' signal? */
@@ -392,35 +402,41 @@ WindowListener.prototype = {
      ***********/
 
     /* Note: for now, per-window signals are *all* stored in the relevant actor. */
-    _onWindowAdded: function(workspace, metaWin) {
+    _onWindowAdded: function (workspace, metaWin) {
         XPUtil.LOG('_onWindowAdded for %s', metaWin.get_title());
         let winActor = metaWin.get_compositor_private();
-        if ( !winActor ) {
+        if (!winActor) {
             // Newly-created windows are added to a workspace before
             // the compositor finds out about them.
-            Mainloop.idle_add(Lang.bind(this, function() { 
+            Mainloop.idle_add(Lang.bind(this, function () {
                 // TODO: check if it's on the current WS any more
-                                                this._onWindowAdded(workspace, metaWin); 
-                                                return false; 
+                if (metaWin.get_workspace() === workspace) {
+                    this._onWindowAdded(workspace, metaWin);
+                }
+                return false;
             }));
             return;
         }
-        
+
         /* Stacking order. If we're not running on the desktop & aren't already listening to focus-app, then listen to 'raised' */
-        if  ( !this.options.onDesktop && this.options.recalcMode == XPenguins.RECALC.ALWAYS && !this.options.ignorePopups ) {
-           this.connect_and_track(winActor, metaWin, 'raised', Lang.bind(this, function() { this._dirtyToonWindows('raised') }));
+        if (!this.options.onDesktop && this.options.recalcMode === XPenguins.RECALC.ALWAYS && !this.options.ignorePopups) {
+            this.connect_and_track(winActor, metaWin, 'raised', Lang.bind(this, function () {
+                this._dirtyToonWindows('raised');
+            }));
         }
 
         /* resized/moved windows */
-        if ( this.options.recalcMode == XPenguins.RECALC.ALWAYS ) {
-            this.connect_and_track(winActor, winActor, 'allocation-changed', Lang.bind(this, function() { this._dirtyToonWindows('allocation-changed') }));
+        if (this.options.recalcMode === XPenguins.RECALC.ALWAYS) {
+            this.connect_and_track(winActor, winActor, 'allocation-changed', Lang.bind(this, function () {
+                this._dirtyToonWindows('allocation-changed');
+            }));
         }
     },
 
     /* Note: if metaWin.get_compositor_private() is NULL, it means the window
      * is already destroyed - don't have to worry about disconnecting signals (?)
      */
-    _onWindowRemoved: function(workspace, metaWin) {
+    _onWindowRemoved: function (workspace, metaWin) {
         /* disconnect all the signals */
         XPUtil.LOG('_onWindowRemoved for %s', metaWin.get_title());
         this.disconnect_tracked_signals(metaWin.get_compositor_private());
@@ -433,42 +449,49 @@ WindowListener.prototype = {
      * - pause (if switched away from XPenguinWindow's workspace)
      * and add them to the current one
      */
-    _onWorkspaceChanged: function(shellwm, fromI, toI, direction) {
+    _onWorkspaceChanged: function (shellwm, fromI, toI, direction) {
         // from & to are indices.
         XPUtil.LOG('_onWorkspaceChanged: from %d to %d', fromI, toI);
         // TODO: what happens if you're in god mode?
         /* If you've changed workspaces, you need to change window-added/removed listeners. */
-        if ( this.options.onAllWorkspaces ) {
+        if (this.options.onAllWorkspaces) {
             /* update the toon region */
             //this._dirtyToonWindows('_onWorkspaceChanged');
             //Note: if you call this straight away and switch back into a workspace *with* windows, it doesn't update until the next event.
             //However, if you're running a timeline it'll be fine.
-            Mainloop.idle_add(Lang.bind(this, function() {this._dirtyToonWindows('_onWorkspaceChanged'); return false;}));
+            Mainloop.idle_add(Lang.bind(this, function () {
+                this._dirtyToonWindows('_onWorkspaceChanged');
+                return false;
+            }));
 
             /* disconnect/reconnect window-added & window-removed events we were listening to */
-            if ( this._listeningPerWindow ) {
+            if (this._listeningPerWindow) {
                 let from = global.screen.get_workspace_by_index(fromI);
                 let to = global.screen.get_workspace_by_index(toI);
                 this.disconnect_tracked_signals(from);
 
                 this.connect_and_track(this, to, 'window-added', Lang.bind(this, this._onWindowAdded));
-                this.connect_and_track(this, to, 'window-removed', Lang.bind(this, this._onWindowRemoved)); 
+                this.connect_and_track(this, to, 'window-removed', Lang.bind(this, this._onWindowRemoved));
 
                 /* connect up existing windows */
-                to.list_windows().map(Lang.bind(this, function(metaWin) { if ( metaWin.get_window_type() != Meta.WindowType.DESKTOP ) { this._onWindowAdded(null, metaWin); }}));
+                to.list_windows().map(Lang.bind(this, function (metaWin) {
+                    if (metaWin.get_window_type() !== Meta.WindowType.DESKTOP) {
+                        this._onWindowAdded(null, metaWin);
+                    }
+                }));
             }
         } else {
             /* hide the toons & pause if we've switched to another workspace */
-            if ( global.screen.get_workspace_by_index(toI) != 
-                    this.XPenguinsWindow.get_workspace() ) {
+            if (global.screen.get_workspace_by_index(toI) !==
+                    this.XPenguinsWindow.get_workspace()) {
                 //this.hideToons();
-                //this.pause(); 
+                //this.pause();
                 this.pause(global.window_manager, 'switch-workspace');
 /*
                 // BIG TODO: on workspace-switch back, set this.resume() hook.
                 // Either that or don't pause signals.
                 this.connect_and_track(this._resumeSignal, global.window_manager,
-                        'switch-workspace', Lang.bind(this, function() { 
+                        'switch-workspace', Lang.bind(this, function () {
                             // could just *not* disconnect _onWorkspaceChanged?
                             this.disconnect_tracked_signals(this._resumeSignal);
                             this.resume();
@@ -484,60 +507,58 @@ WindowListener.prototype = {
     /*********************
      *     FUNCTION      *
      *********************/
-    _dirtyToonWindows: function(msg) {
+    _dirtyToonWindows: function (msg) {
         // hmm, in debugging mode I'd also like to track why.
         XPUtil.LOG('_dirtyToonWindows %s', msg);
         /* do the following in the timeline for XPenguins */
         this._updateToonWindows();
-        this.draw(); 
+        this.draw();
     },
 
     // BIG TODO: how to handle global vs local coords? (toons in local rel. to window?)
-    _updateToonWindows: function() {
+    _updateToonWindows: function () {
         XPUtil.LOG('updateToonWindows');
         this.toon_windows.clear();
         /* Add windows to region. If we use list_windows() we wont' get popups,
          * if we use get_window_actors() we will. */
         let ws = this.XPenguinsWindow.get_workspace();
         let winList;
-        if ( this.options.ignorePopups ) {
+        if (this.options.ignorePopups) {
             winList = ws.list_windows();
             /* sort by stacking (if !onDesktop) */
-            if ( !this.options.onDesktop ) {
+            if (!this.options.onDesktop) {
                 winList = global.display.sort_windows_by_stacking(winList);
             }
         } else {
             // already sorted.
-            winList = global.get_window_actors().map(function(act) { return act.meta_window; });
+            winList = global.get_window_actors().map(function (act) { return act.meta_window; });
             /* filter out other workspaces */
-            winList = winList.filter(function(win) { return win.get_workspace() == ws; });
+            winList = winList.filter(function (win) { return win.get_workspace() === ws; });
         }
 
-        /* iterate through backwards: every window up to winList[i]==winActor has a chance
-         * of being on top of you. Once you hit winList[i]==winActor, the other windows
+        /* iterate through backwards: every window up to winList[i] == winActor has a chance
+         * of being on top of you. Once you hit winList[i] == winActor, the other windows
          * are *guaranteed* to be behind you.
          */
         /* filter out maximised & desktop & nonvisible/mapped windows windows */
-        winList = winList.filter(Lang.bind(this, function(win) {
-            return (win.get_compositor_private().mapped && 
+        winList = winList.filter(Lang.bind(this, function (win) {
+            return (win.get_compositor_private().mapped &&
                     win.get_compositor_private().visible &&
-                   !((this.options.ignoreMaximised && 
-                      win.get_maximized() == (Meta.MaximizeFlags.HORIZONTAL | 
-                                              Meta.MaximizeFlags.VERTICAL)
-                      ) ||
-                     (win.get_window_type() == Meta.WindowType.DESKTOP)
-                    ));
+                   !((this.options.ignoreMaximised &&
+                      win.get_maximized() === (Meta.MaximizeFlags.HORIZONTAL |
+                                               Meta.MaximizeFlags.VERTICAL)) ||
+                     (win.get_window_type() === Meta.WindowType.DESKTOP)));
         }));
 
-        let i=winList.length;
-        while ( i-- ) {
+        let i = winList.length;
+        while (i--) {
             /* exit once you hit the window actor (if !onDesktop) */
-            if ((!this.options.onDesktop && 
-                   winList[i] == this.XPenguinsWindow.meta_window) ) {
+            if ((!this.options.onDesktop &&
+                   winList[i] === this.XPenguinsWindow.meta_window)) {
                 break;
             }
-            // 0,0 is top-left corner
-            this.toon_windows.add_rectangle( winList[i].get_outer_rect() );
+            // 0, 0 is top-left corner
+            this.toon_windows.add_rectangle(winList[i].get_outer_rect());
         }
         // bah: toon_windows.intersect(new_rectangle) gives the rectangle bounding box. Not the shape.
         // winList[0].meta_window.get_frame_bounds(): meant to return a Cairo.region
@@ -553,52 +574,54 @@ WindowListener.prototype = {
     /* Note : my connect/disconnect tracker takes ideas from shellshape extension:
      * signals are stored by the owner, storing both the target & the id to clean up later
      */
-    connect_and_track: function(owner, subject, name, cb) {
+    connect_and_track: function (owner, subject, name, cb) {
         XPUtil.LOG('connect_and_track for %s', owner.toString());
-        if ( !owner.hasOwnProperty('_XPenguins_bound_signals') ) {
+        if (!owner.hasOwnProperty('_XPenguins_bound_signals')) {
             owner._XPenguins_bound_signals = [];
         }
-        owner._XPenguins_bound_signals.push([subject, subject.connect(name,cb)]);
+        owner._XPenguins_bound_signals.push([subject, subject.connect(name, cb)]);
     },
 
-    disconnect_tracked_signals: function(owner) {
-        if ( !owner ) return;
+    disconnect_tracked_signals: function (owner) {
+        if (!owner) { return; }
         XPUtil.LOG('disconnect_tracked_signals for %s', owner.toString());
-        if ( !owner._XPenguins_bound_signals ) return;
-        let i = owner._XPenguins_bound_signals.length;
+        if (!owner._XPenguins_bound_signals) { return; }
         owner._XPenguins_bound_signals.map(
-                function(sig) {
-                    sig[0].disconnect(sig[1]);
-                    //XPUtil.LOG(' .. disconnecting signal ID %d from object %s',
-                    //     i, sig[0].toString());
-        });
+            function (sig) {
+                sig[0].disconnect(sig[1]);
+                //XPUtil.LOG(' .. disconnecting signal ID %d from object %s',
+                //     i, sig[0].toString());
+            }
+        );
         delete owner._XPenguins_bound_signals;
     },
 
     /*********************
      *      DRAWING      *
      *********************/
-    _initDrawing: function() {
+    _initDrawing: function () {
         /* set up drawing area & add to stage */
         // BIG TODO: if XPenguinsWindow is a Meta.WindowActor, width/height are a bit off */
-        /* NOTE: on restarting gnome shell, global.stage.width,height = 640,480. */
-        this.drawingArea = new Clutter.Group({ 
-                                         width: this.XPenguinsWindow.get_width(),
-                                         height: this.XPenguinsWindow.get_height(),
-                                         x: 5, y:5 });
+        /* NOTE: on restarting gnome shell, global.stage.width, height = 640, 480. */
+        this.drawingArea = new Clutter.Group({
+            width: this.XPenguinsWindow.get_width(),
+            height: this.XPenguinsWindow.get_height(),
+            x: 5,
+            y: 5
+        });
         this.drawingArea.set_scale(SCALE, SCALE);
-        XPUtil.LOG('drawingArea: size %d, %d position %d, %d', 
+        XPUtil.LOG('drawingArea: size %d, %d position %d, %d',
                 this.drawingArea.width, this.drawingArea.height,
                 this.drawingArea.x, this.drawingArea.y);
-        
-        global.stage.add_actor(this.drawingArea); 
+
+        global.stage.add_actor(this.drawingArea);
         this.drawingArea.hide();
 
         /* set up toonwindows */
         this.toon_windows = new Region.Region();
     },
 
-    draw: function() {
+    draw: function () {
         // in GNOME 3.4 this works. GNOME 3.2 (gir 1.0) this isn't a function?
         // (remove_all_children : function of Clutter.Actor)
         this.drawingArea.remove_all();
@@ -614,7 +637,7 @@ WindowListener.prototype = {
 
         XPUtil.LOG('draw: %d windows', this.toon_windows.rectangles.length);
         // windows
-        for ( let i=0; i<this.toon_windows.rectangles.length; ++i ) {
+        for (let i = 0; i < this.toon_windows.rectangles.length; ++i) {
             let rect = new Clutter.Rectangle({ width: this.toon_windows.rectangles[i].width,
                                                height: this.toon_windows.rectangles[i].height,
                                                x: this.toon_windows.rectangles[i].x,

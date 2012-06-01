@@ -20,12 +20,12 @@ const Shell = imports.gi.Shell;
 var Me;
 try {
     Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-} catch(err) {
+} catch (err) {
     Me = imports.misc.extensionUtils.getCurrentExtension().imports;
 }
-const XPenguins = Me.xpenguins; 
+const XPenguins = Me.xpenguins;
 const WindowListener = Me.windowListener;
-const XPUtil = Me.util; 
+const XPUtil = Me.util;
 const Toon   = Me.toon.Toon;
 const ThemeManager = Me.theme_manager.ThemeManager;
 
@@ -41,14 +41,13 @@ const Theme = Theme || {};
 /* Contains all the information about the toon,
  * basically an array of ToonData structures.
  */
-Theme.Theme = function() {
+Theme.Theme = function () {
     this._init.apply(this, arguments);
 };
 
-const LOG = XPUtil.LOG;
 Theme.Theme.prototype = {
-    _init: function(themeList) {
-        LOG('creating theme');
+    _init: function (themeList) {
+        XPUtil.LOG('creating theme');
         /* members */
         /* Theme: can have one or more genera
          * Genus: class of toons (Penguins has 2: walker & skateboarder).
@@ -60,7 +59,7 @@ Theme.Theme.prototype = {
          * this.name: array of names, one per genus
          * this.number: array of numbers, one per genus
          *
-         * Note: can't have ToonData an object because over multiple themes there can be 
+         * Note: can't have ToonData an object because over multiple themes there can be
          *  duplicate genus (for example BigPenguins & Penguins both have 'normal' & 'skateboarder').
          */
         this.ToonData = []; // data, one per genus
@@ -69,237 +68,232 @@ Theme.Theme.prototype = {
         this.ngenera = 0; // number of different genera
         this.delay = 60;
 
-        LOG(('number of themes: ' + themeList.length));
+        XPUtil.LOG(('number of themes: ' + themeList.length));
         /* Initialise */
-        for ( let i=0; i<themeList.length; ++i ) {
-            LOG(' ... appending theme %s', themeList[i]);
+        for (let i = 0; i < themeList.length; ++i) {
+            XPUtil.LOG(' ... appending theme %s', themeList[i]);
             this.append_theme(themeList[i]);
         }
-        LOG(' ...done.');
+        XPUtil.LOG(' ...done.');
     }, // _init
 
     /* Append the theme named "name" to this theme.
      * To initialise the theme, set theme.ngenera to 0 before
      *  calling this function.
      */
-    append_theme: function( name ) {
+    append_theme: function (name) {
         /* find theme */
         let file_name = ThemeManager.get_theme_path(name);
-        if ( !file_name ) {
+        if (!file_name) {
             throw new Error('Theme ' + name + ' not found or config file not present');
-            return;
         }
 
         /* Read config file, ignoring comments ('#') and whitespace */
         // TODO: lowercase?
-        let words = Shell.get_file_contents_utf8_sync(file_name);
-        words = words.replace(/#.+/g,'');
-        words = words.replace(/\s+/g,' ');
-        words = words.trim().split(' ');
+        let words = Shell.get_file_contents_utf8_sync(file_name),
+            started = false, // whether we've encountered the 'toon' keyword yet
+                             // (may be omitted in single-genera files)
+            first_genus = this.ngenera,
+            genus = this.ngenera,
+            current,    // holds the current ToonData
+            def = {},   // holds default ToonData
+            dummy = {}; // any unknown ToonData
 
         /* iterate through the words to parse the config file. */
-        // note: the 'toon' keyword may be omitted if there's only one
-        // genus of toon the the config file.
-        let started=false; // whether we've encountered the 'toon' keyword yet.
+        words = words.replace(/#.+/g, '');
+        words = words.replace(/\s+/g, ' ');
+        words = words.trim().split(' ');
 
-        let first_genus = this.ngenera; // original number of genera
-        let genus = this.ngenera; 
         /* make space for the next toon */
         this.grow();
-                                 
 
-        let current;   // the current ToonData
-        let def = {};  // holds the default ToonData
-        let dummy = {};// any unknown ToonData
         try {
-        for ( let i=0; i<words.length; ++i ) {
-            // BIG TODO: this.name.length could be < this.ngenera,
-            //           because not every genus has a name (e.g. turtles)
-            let word = words[i].toLowerCase();
-            /* define a new genus of toon (walker, skateboarder, ...) */
-            // note: the 'toon' word is optional in one-genus themes.
-            // If we've already seen the 'toon' word before this must be a
-            //  multi-genus theme so make space for it & increment 'genus' index.
-            if ( word == 'toon' ) {
-                if ( started ) {
-                    this.grow();
-                    ++genus;
-                } else {
-                    // first toon in file, don't have to ++genus.
-                    started = 1;
-                }
-                /* store the genus name */
-                this.name[genus] = words[++i];
-            }
-            /* preferred frame delay in milliseconds */
-            else if (word == 'delay') {
-                this.delay = parseInt(words[++i]);
-            }
-            /* Various types of toon */
-            else if ( word == 'define' ) {
-                let type = words[++i];
-                /* Define default properties of current genus */
-                if ( type == 'default' ) {
-                    current = def;
-                } 
-                /* other types of toon */
-                else if ( type.match(/^(walker|faller|tumbler|floater|climber|runner|action[0-5]|exit|explosion|splatted|squashed|zapped|angel)$/) ) {
-                    started = 1;
-                    /* note: passed by reference. */
-                    this.ToonData[genus][type] = new Toon.ToonData(def);
-                    current = this.ToonData[genus][type];
-                } else {
-                    warn(_('Warning: unknown type "%s": ignoring'.format(type)));
-                    current = dummy;
-                }
-                /* extra configuration */
-                if ( type == 'exit' ) {
-                    current.conf |= (Toon.NOCYCLE | Toon.INVULNERABLE);
-                } else if ( type == 'explosion' ) {
-                    current.conf |= (Toon.NOCYCLE | Toon.INVULNERABLE | Toon.NOBLOCK);
-                } else if ( type == 'splatted' ) {
-                    current.conf |= (Toon.NOCYCLE | Toon.INVULNERABLE);
-                } else if ( type == 'squashed' ) {
-                    current.conf |= (Toon.NOCYCLE | Toon.INVULNERABLE | Toon.NOBLOCK);
-                } else if ( type == 'zapped' ) {
-                    current.conf |= (Toon.NOCYCLE | Toon.INVULNERABLE | Toon.NOBLOCK);
-                } else if ( type == 'angel' ) {
-                    current.conf |= (Toon.INVULNERABLE | Toon.NOBLOCK);
-                }
-            } 
-            /* Toon Properties */
-            else if ( word.match(/^(width|height|speed|acceleration|terminal_velocity|loop)$/) ) {
-                current[word] = parseInt(words[++i]);
-            } 
-            else if ( word.match(/^(frames|directions)/) ) { 
-                current['n' + word] = parseInt(words[++i]);
-            }
-            /* Pixmap */
-            else if ( word == 'pixmap' ) {
-                let pixmap = words[++i];
-                if ( current == def ) {
-                    warn(_('Warning: theme config file may not specify a default pixmap, ignoring'));
-                } else if ( current == dummy ) { // don't bother.
-                    continue;
-                } else {
-                    /* read in pixmap */
-                    if ( pixmap[0] != '/' ) {
-                        // convert to absolute path
-                        let tmp = file_name.split('/');
-                        tmp[tmp.length-1] = pixmap;
-                        pixmap = tmp.join('/'); 
+            for (let i = 0; i < words.length; ++i) {
+                // BIG TODO: this.name.length could be < this.ngenera,
+                //           because not every genus has a name (e.g. turtles)
+                let word = words[i].toLowerCase();
+                /* define a new genus of toon (walker, skateboarder, ...) */
+                // note: the 'toon' word is optional in one-genus themes.
+                // If we've already seen the 'toon' word before this must be a
+                //  multi-genus theme so make space for it & increment 'genus' index.
+                if (word === 'toon') {
+                    if (started) {
+                        this.grow();
+                        ++genus;
+                    } else {
+                        // first toon in file, don't have to ++genus.
+                        started = 1;
                     }
-
-                    /* Pixmap is already defined! */
-                    if ( current.texture ) {
-                        warn(_('Warning: resetting pixmap to %s'.format(pixmap)));
-                        /* Free old pixmap if it is not a copy */
-                        // BIGTODO: do I need to "free"/destroy it or is JS garbage collection
-                        // good enough that when there are no longer Toon.Datas using this texture
-                        // it will be destroyed?
-                        if ( !current.master ) {
-                            // BIGTODO: what if this is already the master of others?
-                            // What happens the the clones' pointers?
-                            // (C source: XpmFree(current->image))
-                            // Well, that's what the warning is for.
-                            current.texture.destroy();
+                    /* store the genus name */
+                    this.name[genus] = words[++i];
+                } else if (word === 'delay') {
+                /* preferred frame delay in milliseconds */
+                    this.delay = parseInt(words[++i], 10);
+                } else if (word === 'define') {
+                /* Various types of toon */
+                    let type = words[++i];
+                    /* Define default properties of current genus */
+                    if (type === 'default') {
+                        current = def;
+                    } else if (type.match(/^(walker|faller|tumbler|floater|climber|runner|action[0-5]|exit|explosion|splatted|squashed|zapped|angel)$/)) {
+                    /* other types of toon */
+                        started = 1;
+                        /* note: passed by reference. */
+                        this.ToonData[genus][type] = new Toon.ToonData(def);
+                        current = this.ToonData[genus][type];
+                    } else {
+                        XPUtil.warn(_('Warning: unknown type "%s": ignoring'.format(type)));
+                        current = dummy;
+                    }
+                    /* extra configuration */
+                    if (type === 'exit') {
+                        current.conf |= (Toon.NOCYCLE | Toon.INVULNERABLE);
+                    } else if (type === 'explosion') {
+                        current.conf |= (Toon.NOCYCLE | Toon.INVULNERABLE | Toon.NOBLOCK);
+                    } else if (type === 'splatted') {
+                        current.conf |= (Toon.NOCYCLE | Toon.INVULNERABLE);
+                    } else if (type === 'squashed') {
+                        current.conf |= (Toon.NOCYCLE | Toon.INVULNERABLE | Toon.NOBLOCK);
+                    } else if (type === 'zapped') {
+                        current.conf |= (Toon.NOCYCLE | Toon.INVULNERABLE | Toon.NOBLOCK);
+                    } else if (type === 'angel') {
+                        current.conf |= (Toon.INVULNERABLE | Toon.NOBLOCK);
+                    }
+                /* Toon Properties */
+                } else if (word.match(/^(width|height|speed|acceleration|terminal_velocity|loop)$/)) {
+                    current[word] = parseInt(words[++i], 10);
+                } else if (word.match(/^(frames|directions)/)) {
+                    current['n' + word] = parseInt(words[++i], 10);
+                } else if (word === 'pixmap') {
+                /* Pixmap */
+                    let pixmap = words[++i];
+                    if (current === def) {
+                        XPUtil.warn(_('Warning: theme config file may not specify a default pixmap, ignoring'));
+                    } else if (current === dummy) { // don't bother.
+                        continue;
+                    } else {
+                        /* read in pixmap */
+                        if (pixmap[0] !== '/') {
+                            // convert to absolute path
+                            let tmp = file_name.split('/');
+                            tmp[tmp.length - 1] = pixmap;
+                            pixmap = tmp.join('/');
                         }
-                    }
 
-                    /* Check if the file has been used before, but only look in
-                       the pixmaps for the current theme... */
-                    let new_pixmap = 1;
-                    for ( let igenus=first_genus; igenus <= genus && new_pixmap; ++igenus ) {
-                        let data = this.ToonData[igenus];
-                        // note: ToonData[igenus] is an *object* type: ToonData
-                        for ( let itype in data ) { 
-                            /* data already exists in theme, set master */
-                            if ( data[itype].filename && !data[itype].master
-                                 && data[itype].filename == pixmap ) {
-                                     // set .master & .texture (& hence .filename)
-                                     current.set_master( data[itype] );
-                                     new_pixmap = 0;
-                                     break;
+                        /* Pixmap is already defined! */
+                        if (current.texture) {
+                            XPUtil.warn(_('Warning: resetting pixmap to %s'.format(pixmap)));
+                            /* Free old pixmap if it is not a copy */
+                            // BIGTODO: do I need to "free"/destroy it or is JS garbage collection
+                            // good enough that when there are no longer Toon.Datas using this texture
+                            // it will be destroyed?
+                            if (!current.master) {
+                                // BIGTODO: what if this is already the master of others?
+                                // What happens the the clones' pointers?
+                                // (C source: XpmFree(current->image))
+                                // Well, that's what the XPUtil.warning is for.
+                                current.texture.destroy();
                             }
                         }
-                    }
 
-                    /* If we didn't find the pixmap before, it's new */
-                    if ( new_pixmap ) {
-                        // print('loading new pixmap ' + pixmap);
-                        // Sets this.pixmap to Cogl Texture & this.filename to pixmap
-                        current.load_texture(pixmap);
-                        // If it all worked:
-                        current.master = null;
+                        /* Check if the file has been used before, but only look in
+                           the pixmaps for the current theme... */
+                        let new_pixmap = 1;
+                        for (let igenus = first_genus; igenus <= genus && new_pixmap; ++igenus) {
+                            let data = this.ToonData[igenus];
+                            // note: ToonData[igenus] is an *object* type: ToonData
+                            for (let itype in data) {
+                                /* data already exists in theme, set master */
+                                if (data.hasOwnProperty(itype) && data[itype].filename &&
+                                        !data[itype].master && data[itype].filename === pixmap) {
+                                         // set .master & .texture (& hence .filename)
+                                    current.set_master(data[itype]);
+                                    new_pixmap = 0;
+                                    break;
+                                }
+                            }
+                        }
+
+                        /* If we didn't find the pixmap before, it's new */
+                        if (new_pixmap) {
+                            // print('loading new pixmap ' + pixmap);
+                            // Sets this.pixmap to Cogl Texture & this.filename to pixmap
+                            current.load_texture(pixmap);
+                            // If it all worked:
+                            current.master = null;
+                        }
                     }
+                } else if (word === 'number') {
+                /* Number of toons */
+                    this.number[genus] = parseInt(words[++i], 10);
+                } else {
+                /* unknown word */
+                    XPUtil.warn(_('Warning: Unrecognised word %s, ignoring'.format(word)));
                 }
-            } // end pixmap
-            /* Number of toons */
-            else if ( word == 'number' ) {
-                this.number[genus] = parseInt(words[++i]);
-            } 
-            /* unknown word */
-            else {
-                warn(_('Warning: Unrecognised word %s, ignoring'.format(word)));
-            }
-        } // while read word
+            } // while read word
         } catch (err) {
             throw new Error(_('Error reading config file: config file ended unexpectedly: Line ' + err.lineNumber + ': ' + err.message));
         } /* end config file parsing */
-        this.ngenera = genus+1;
+        this.ngenera = genus + 1;
 
         /* Now valid our widths, heights etc with the size of the image
          * for all the types of the genera we just added
          */
-        for ( let i=first_genus; i < this.ngenera; ++i ) {
-            for ( let j in this.ToonData[i] ) {
-                let current = this.ToonData[i][j];
-                let imwidth = current.texture.width, 
-                    imheight = current.texture.height;
-                if ( (current.nframes = imwidth/current.width) < 1 ) {
-                    if ( imwidth < current.width ) {
-                        throw new Error(_('Width of xpm image too small for even a single frame'));
-                    } else {
-                        warn(_('Warning: width of %s is too small to display all frames'.format(
-                                        current.filename)));
+        for (let i = first_genus; i < this.ngenera; ++i) {
+            for (let j in this.ToonData[i]) {
+                if (this.ToonData[i].hasOwnProperty(j)) {
+                    current = this.ToonData[i][j];
+                    let imwidth = current.texture.width,
+                        imheight = current.texture.height;
+                    if ((current.nframes = imwidth / current.width) < 1) {
+                        if (imwidth < current.width) {
+                            throw new Error(_('Width of xpm image too small for even a single frame'));
+                        } else {
+                            XPUtil.warn(_('Warning: width of %s is too small to display all frames'.format(
+                                current.filename
+                            )));
+                        }
                     }
-                }
-                if ( imheight < current.height*current.ndirections ) {
-                    if ( (current.ndirections = imheight/current.height) < 1 ) {
-                        throw new Error(_('Height of xpm image too small for even a single frame'));
-                    } else {
-                        warn(_('Warning: height of %s is too small to display all frames'.format(
-                                        current.filename)));
+                    if (imheight < current.height * current.ndirections) {
+                        if ((current.ndirections = imheight / current.height) < 1) {
+                            throw new Error(_('Height of xpm image too small for even a single frame'));
+                        } else {
+                            XPUtil.warn(_('Warning: height of %s is too small to display all frames'.format(
+                                current.filename
+                            )));
+                        }
                     }
                 }
             } // loop through Toon type
-            if ( !this.ToonData[i]['walker'] || !this.ToonData[i]['faller'] ) {
+            if (!this.ToonData[i].walker || !this.ToonData[i].faller) {
                 throw new Error(_('Theme must contain at least walkers and fallers'));
             }
         }
 
         // NOTE: original code sets theme.total = 0
         // and only adds the numbers of the genera we *just* added?
-        // i.e. theme.total = sum(theme.number[first_genus:theme.ngenera] ) ??
+        // i.e. theme.total = sum(theme.number[first_genus:theme.ngenera]) ??
     },  // append_theme
 
     get total() {
-        return Math.min(XPenguins.PENGUIN_MAX, this.number.reduce(function(x,y) x+y));
+        return Math.min(XPenguins.PENGUIN_MAX, this.number.reduce(function (x, y) { return x + y; }));
     },
 
-    grow: function() {
+    grow: function () {
         this.name.push('');
         this.number.push(1);
         this.ToonData.push({}); // object 'toonType': ToonData
         ++this.ngenera;
     },
 
-    destroy: function() {
+    destroy: function () {
         /* de-allocate all the ToonData textures */
-        let i=this.ToonData.length;
-        while ( i-- ) {
-            for ( let type in this.ToonData[i] ) {
-                this.ToonData[i][type].destroy();
+        let i = this.ToonData.length;
+        while (i--) {
+            for (let type in this.ToonData[i]) {
+                if (this.ToonData[i].hasOwnProperty(type)) {
+                    this.ToonData[i][type].destroy();
+                }
             }
         }
     }

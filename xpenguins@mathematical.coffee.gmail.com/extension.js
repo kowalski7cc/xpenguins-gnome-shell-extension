@@ -15,10 +15,10 @@ const PopupMenu = imports.ui.popupMenu;
 var Me;
 try {
     Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-} catch(err) {
+} catch (err) {
     Me = imports.misc.extensionUtils.getCurrentExtension().imports;
 }
-const XPenguins = Me.xpenguins; 
+const XPenguins = Me.xpenguins;
 const WindowListener = Me.windowListener;
 const ThemeManager = Me.theme_manager.ThemeManager;
 const XPUtil = Me.util;
@@ -44,12 +44,143 @@ function enable() {
 }
 
 function disable() {
-    if ( _indicator ) {
+    if (_indicator) {
         // _indicator.penguinLoop.FREE/EXITNOW
         _indicator.destroy();
     }
 }
 
+
+/* Popup dialog with scrollable text.
+ * See InstallExtensionDialog in extensionSystem.js for an example.
+ * FIXME: make it look better. styles for headings, show the icon, ...
+ */
+
+function AboutDialog() {
+    this._init.apply(this, arguments);
+}
+
+AboutDialog.prototype = {
+    __proto__: ModalDialog.ModalDialog.prototype,
+
+    _init: function (title, text) {
+        ModalDialog.ModalDialog.prototype._init.call(this, {styleClass: 'modal-dialog'});
+
+        let monitor = global.screen.get_monitor_geometry(global.screen.get_primary_monitor()),
+            width   = Math.max(250, Math.round(monitor.width / 4)),
+            height  = Math.max(400, Math.round(monitor.height / 2.5));
+
+        /* title */
+        // fixme: define style for title.
+        this.title = new St.Label({text: title || '', style: 'font-weight: bold'});
+        this.contentLayout.add(this.title, { x_fill: false, x_align: St.Align.MIDDLE });
+
+        /* scroll box */
+        this.scrollBox = new St.ScrollView({
+            x_fill: true,
+            y_fill: true,
+            width: width,
+            height: height
+        });
+        // automatic horizontal scrolling, automatic vertical scrolling
+        this.scrollBox.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC);
+
+        /* text in scrollbox. FIXME: for some reason it won't display unless in a St.BoxLayout. */
+        this.text = new St.Label({text: (text || '')});
+        this.text.clutter_text.ellipsize = Pango.EllipsizeMode.NONE; // allows scrolling
+        //this.text.clutter_text.line_wrap = true;
+
+        this.box = new St.BoxLayout();
+        this.box.add(this.text, { expand: true });
+        this.scrollBox.add_actor(this.box, {expand: true, x_fill: true, y_fill: true});
+        this.contentLayout.add(this.scrollBox, {expand: true, x_fill: true, y_fill: true});
+
+        /* OK button */
+        this.setButtons([{ label: _('OK'),
+                           action: Lang.bind(this, function () {this.close(global.get_current_time()); })
+                        }]);
+	},
+
+    set_title: function (title) {
+        this.title.text = title;
+    },
+
+    set_text: function (text) {
+        this.text.text = text;
+    },
+
+    append_text: function (text, sep) {
+        this.text.text += (sep || '\n') + text;
+    }
+};
+
+
+// FIXME: see panel-docklet for an example of making the switch only.
+function ThemeMenuItem() {
+    this._init.apply(this, arguments);
+}
+
+ThemeMenuItem.prototype = {
+    __proto__: PopupMenu.PopupBaseMenuItem.prototype,
+
+    _init: function (text, state, icon_path, params) {
+        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
+        /* FIXME: if I just use this.addActor there's heaps of space between all the items,
+         * regardless of setting this.actor's spacing or padding to 0, same with constituent items.
+         * So currently using this.box  and this.box.add.
+         */
+        this.box = new St.BoxLayout({vertical: false});
+        this.addActor(this.box, {expand: true, span: -1});
+        // FIXME: should the toggles be all the way to the right like that?? various padding-right settings seem not to have effect.
+
+        /* Info button */
+        /* Could just set style-class with background-image... */
+        this.button = new St.Button();
+        let icon = new St.Icon({
+            icon_name: 'help-contents',
+            style_class: 'popup-menu-icon',
+            // FIXME: appears not to have symbolic icon
+            icon_type: St.IconType.FULLCOLOR
+        });
+        this.button.set_child(icon);
+        this.box.add(this.button);
+
+        /* Icon (default no icon) */
+        this.icon = new St.Icon({
+            icon_name: 'image-missing', // placeholder
+            icon_type: St.IconType.FULLCOLOR,
+            style_class: 'popup-menu-icon'
+        });
+        this.box.add(this.icon);
+        this.set_icon(icon_path);
+
+        /* toggle. */
+        this.toggle = new PopupMenu.PopupSwitchMenuItem(text, state || false);
+        this.box.add(this.toggle.actor, {expand: true, align: St.Align.END});
+
+        /* Pass through events */
+        this.toggle.connect('toggled', Lang.bind(this, function () { this.emit('toggled', this.toggle.state); }));
+        this.button.connect('clicked', Lang.bind(this, function () { this.emit('button-clicked'); }));
+
+        /* debugging.
+        this.icon.set_style('border: 1px solid #ffffff');
+        this.button.set_style('border: 1px solid #ffffff');
+        this.toggle.actor.set_style('border: 1px solid #ffffff; padding-right: 0em');
+        this.box.set_style('border: 1px solid #ffff00');
+        this.actor.set_style('border: 1px solid #ff0000');
+        */
+    },
+
+    get state() { return this.toggle.state; },
+
+    /* sets the icon from a path */
+    set_icon: function (icon_path) {
+        let path = icon_path ? Gio.file_new_for_path(icon_path) : null;
+        if (path && path.query_exists(null)) {
+            this.icon.set_gicon(new Gio.FileIcon({file: path}));
+        }
+    }
+};
 
 /*
  * XPenguinsMenu Object
@@ -65,35 +196,35 @@ function XPenguinsMenu() {
 XPenguinsMenu.prototype = {
     __proto__: PanelMenu.SystemStatusButton.prototype,
 
-    log: function() {
-        if ( !this._items || !this._items.DEBUG || this._items.DEBUG.state ) {
-            XPUtil.LOG.apply(this,arguments);
+    log: function () {
+        if (!this._items || !this._items.DEBUG || this._items.DEBUG.state) {
+            XPUtil.LOG.apply(this, arguments);
         }
     },
 
-    _init: function() {
+    _init: function () {
         this.log('_init');
         /* Initialise */
         // TODO: change icon to something else like tux. (applications-games ?)
         PanelMenu.SystemStatusButton.prototype._init.call(this, 'emblem-favorite');
-    
-        /* items */ 
+
+        /* items */
         this._optionsMenu = null;
         this._themeMenu = null;
         this._items = {};
         this._themeInfo = {};
-        this._toggles = { 
-                         ignorePopups   : _('Ignore popups'),
-                         ignoreMaximised: _('Ignore maximised windows'),
-                         onAllWorkspaces: _('Always on visible workspace'), // <-- this is the only one
-                         onDesktop      : _('Run on desktop'), // not fully implemented
-                         blood          : _('Show blood'),
-                         angels         : _('Show angels'),
-                         squish         : _('God Mode'),
-                         DEBUG          : _('Verbose'),
-                         windowPreview  : _('Window Preview'),
+        this._toggles = {
+            ignorePopups   : _('Ignore popups'),
+            ignoreMaximised: _('Ignore maximised windows'),
+            onAllWorkspaces: _('Always on visible workspace'), // <-- this is the only one
+            onDesktop      : _('Run on desktop'), // not fully implemented
+            blood          : _('Show blood'),
+            angels         : _('Show angels'),
+            squish         : _('God Mode'),
+            DEBUG          : _('Verbose'),
+            windowPreview  : _('Window Preview'),
         };
-        this._ABOUT_ORDER = ['name', 'date', 'artist', 'copyright', 
+        this._ABOUT_ORDER = ['name', 'date', 'artist', 'copyright',
             'license', 'maintainer', 'location', 'icon', 'comment'];
 
         /* Create menus */
@@ -101,7 +232,7 @@ XPenguinsMenu.prototype = {
 
         /* create an Xpenguin Loop object which stores the XPenguins program */
         this.log('XPenguinsLoop');
-        this.XPenguinsLoop = new XPenguins.XPenguinsLoop( this.getConf() );
+        this.XPenguinsLoop = new XPenguins.XPenguinsLoop(this.getConf());
 
         /* debugging windowListener */
         this.log('windowListener');
@@ -112,16 +243,16 @@ XPenguinsMenu.prototype = {
     },
 
     get DEBUG() {
-        if ( this._items.DEBUG ) {
+        if (this._items.DEBUG) {
             return this._items.DEBUG.state;
         }
         return false;
     },
 
-    getConf: function() { 
+    getConf: function () {
         let opts = {};
-        for ( let propName in this._toggles ) {
-            if ( this._items[propName] ) {
+        for (let propName in this._toggles) {
+            if (this._toggles.hasOwnProperty(propName) && this._items[propName]) {
                 opts[propName] = this._items[propName].state;
             }
         }
@@ -129,33 +260,34 @@ XPenguinsMenu.prototype = {
     },
 
     // BIG TODO: onAllWorkspaces only applies for on the desktop toons.
-    changeOption: function(item, propVal, whatChanged) {
+    changeOption: function (item, propVal, whatChanged) {
         this.log(('changeOption[ext]:' + whatChanged + ' -> ' + propVal));
-        if ( this.windowListener ) 
+        if (this.windowListener) {
             this.windowListener.changeOption(whatChanged, propVal);
+        }
         this.XPenguinsLoop.changeOption(whatChanged, propVal);
 
         /* start/stop the windowListener */
-        if ( whatChanged == 'windowPreview' && this.XPenguinsLoop.is_playing() ) {
-            if ( propVal ) {
+        if (whatChanged === 'windowPreview' && this.XPenguinsLoop.is_playing()) {
+            if (propVal) {
                 this.windowListener.start();
             } else {
                 this.windowListener.stop();
             }
         }
     },
-    
 
-    _createMenu: function() {
+
+    _createMenu: function () {
         this.log('_createMenu');
         let dummy;
 
         /* clear the menu */
-    	this.menu.removeAll();
+        this.menu.removeAll();
 
         /* toggle to start xpenguins */
-        this._items.start = new PopupMenu.PopupSwitchMenuItem( _('Start'), false );
-        this._items.start.connect('toggled', Lang.bind( this, this._startXPenguins ));
+        this._items.start = new PopupMenu.PopupSwitchMenuItem(_('Start'), false);
+        this._items.start.connect('toggled', Lang.bind(this, this._startXPenguins));
         this.menu.addMenuItem(this._items.start);
 
         /* theme submenu */
@@ -186,7 +318,7 @@ XPenguinsMenu.prototype = {
         this.menu.addMenuItem(this._optionsMenu);
 
 
-        /* Number of penguins */ 
+        /* Number of penguins */
         dummy = new PopupMenu.PopupMenuItem(_('Max penguins'), { reactive: false });
         this._items.nPenguinsLabel = new St.Label({ text: '-1' });
         dummy.addActor(this._items.nPenguinsLabel, { align: St.Align.END });
@@ -199,14 +331,14 @@ XPenguinsMenu.prototype = {
         this._optionsMenu.menu.addMenuItem(this._items.nPenguins);
 
         /* ignore maximised, always on visible workspace, angels, blood, god mode, verbose toggles */
-        let defaults = XPenguins.XPenguinsLoop.prototype.defaultOptions(); 
+        let defaults = XPenguins.XPenguinsLoop.prototype.defaultOptions();
         defaults.windowPreview = false;
         for (let propName in this._toggles) {
-            this._items[propName] = new PopupMenu.PopupSwitchMenuItem(this._toggles[propName], defaults[propName]||false);
-            //let p = propName; // according to gnome-shell mailing list this
-                              // the only way to get the callback to work properly
-            this._items[propName].connect('toggled', this.changeOption, propName);
-            this._optionsMenu.menu.addMenuItem(this._items[propName]); 
+            if (this._toggles.hasOwnProperty(propName)) {
+                this._items[propName] = new PopupMenu.PopupSwitchMenuItem(this._toggles[propName], defaults[propName] || false);
+                this._items[propName].connect('toggled', this.changeOption, propName);
+                this._optionsMenu.menu.addMenuItem(this._items[propName]);
+            }
         }
 
         /* TODO: "Resize behaviour": {calculate on resize, calculate on resize-end, pause during resize} */
@@ -218,16 +350,18 @@ XPenguinsMenu.prototype = {
         this._items.recalc = new PopupMenu.PopupComboBoxMenuItem({});
         this._optionsMenu.menu.addMenuItem(this._items.recalc);
         for (let mode in XPenguins.RECALC) {
-            dummy = new PopupMenu.PopupMenuItem(mode);
-            this._items.recalc.addMenuItem(dummy, XPenguins.RECALC[mode]);
+            if (XPenguins.RECALC.hasOwnProperty(mode)) {
+                dummy = new PopupMenu.PopupMenuItem(mode);
+                this._items.recalc.addMenuItem(dummy, XPenguins.RECALC[mode]);
+            }
         }
         this._items.recalc.setActiveItem(XPenguins.RECALC.ALWAYS);
-        this._items.recalc.connect('active-item-changed', 
-                                  Lang.bind(this, function(item, id) { this.changeOption('recalcMode', id); }));
+        this._items.recalc.connect('active-item-changed',
+                                  Lang.bind(this, function (item, id) { this.changeOption('recalcMode', id); }));
 
     },
 
-    _populateThemeMenu: function() {
+    _populateThemeMenu: function () {
         this.log('_populateThemeMenu');
         this._themeMenu.menu.removeAll();
         this._items.themes = {};
@@ -237,23 +371,18 @@ XPenguinsMenu.prototype = {
         //this._themeMenu2 = new PopupMenu.PopupSubMenuMenuItem(_('Theme'));
         //this.menu.addMenuItem(this._themeMenu2);
         // !@@
-        
-        if ( themeList.length == 0 ) {
+
+        if (themeList.length === 0) {
             // TODO: add new item saying 'click to reload', or just modify dropdown menu label?
             this._themeMenu.label.set_text(_('No themes found, click to reload!'));
             // FIXME: test
             this._themeMenu.connect('open', Lang.bind(this, this._populateThemeMenu));
         } else {
             this._themeInfo = ThemeManager.describe_themes(themeList, false);
-            /*
-             * look up icon..
-             * //UPTO: theme_manager.get_icon(_path)
-             * dummy = new ThemeMenuItem(text, themeList[i]=='Penguins', icon_path);
-             */
-            for ( let i=0; i<themeList.length; ++i ) {
-                let sanitised_name = themeList[i].replace(/ /g,'_');
-                this._items.themes[sanitised_name] = new ThemeMenuItem(_(themeList[i]), themeList[i]=='Penguins');
-                if ( this._themeInfo[sanitised_name].icon ) {
+            for (let i = 0; i < themeList.length; ++i) {
+                let sanitised_name = themeList[i].replace(/ /g, '_');
+                this._items.themes[sanitised_name] = new ThemeMenuItem(_(themeList[i]), themeList[i] === 'Penguins');
+                if (this._themeInfo[sanitised_name].icon) {
                     this._items.themes[sanitised_name].set_icon(this._themeInfo[sanitised_name].icon);
                 }
                 this._items.themes[sanitised_name].connect('toggled', Lang.bind(this, this._onChangeTheme));
@@ -261,104 +390,102 @@ XPenguinsMenu.prototype = {
                 this._themeMenu.menu.addMenuItem(this._items.themes[sanitised_name]);
 
                 //@@
-                //this._themeMenu2.menu.addMenuItem( new ThemeMenuItem2(_(themeList[i]), themeList[i]=='Penguins') );
+                //this._themeMenu2.menu.addMenuItem(new ThemeMenuItem2(_(themeList[i]), themeList[i] == 'Penguins'));
             }
         }
     },
 
-    // UPTO
-    _onShowHelp: function(button, name) {
+    _onShowHelp: function (button, name) {
         this.log(('showing help for ' + name));
         // TODO: titles etc (Different sized text)
-        if ( !this._themeInfo[name] ) {
+        if (!this._themeInfo[name]) {
             this._themeInfo[name] = ThemeManager.describe_themes([name], false)[name];
         }
 
         /* make a popup dialogue (that needs to be dismissed), see perhaps alt-tab or panel-docklet? */
         let dialog = new AboutDialog(this._themeInfo[name].name); // <-- FIXME: translated?
-        for ( let i=0; i<this._ABOUT_ORDER.length; ++i ) {
+        for (let i = 0; i < this._ABOUT_ORDER.length; ++i) {
             let propName = this._ABOUT_ORDER[i];
-            if ( this._themeInfo[name][propName] ) {
+            if (this._themeInfo[name][propName]) {
                 dialog.append_text('%s%s: %s'.format(
-                                            propName.charAt(0).toUpperCase(), 
-                                            propName.slice(1), 
-                                            this._themeInfo[name][propName]));
+                    propName.charAt(0).toUpperCase(),
+                    propName.slice(1),
+                    this._themeInfo[name][propName]
+                ));
             }
         }
         dialog.open(global.get_current_time());
     },
 
-    _onChangeTheme: function() {
+    _onChangeTheme: function () {
         this.log('_onChangeTheme');
 
         let themeList = [];
         /* THIS IS ALWAYS TURNING OUT 0 */
-        for ( let name in this._items.themes ) {
-            if ( this._items.themes[name].state )
+        for (let name in this._items.themes) {
+            if (this._items.themes.hasOwnProperty(name) && this._items.themes[name].state) {
                 themeList.push(name);
+            }
         }
 
-        this.XPenguinsLoop.set_themes( themeList, true );
+        this.XPenguinsLoop.set_themes(themeList, true);
 
         // FIXME: JSON.stringify?
-        let themeListFlat = themeList.map(function(name) { 
-                                            return _(name.replace(/ /g,'_'));
-                                          }).reduce(function(x, y) {
-                                              return x+','+y;
-                                          });
+        let themeListFlat = themeList.map(function (name) {
+                return _(name.replace(/ /g, '_'));
+            }).reduce(function (x, y) {
+                return x + ',' + y;
+            });
         // FIXME: truncate to '...'
         this._themeMenu.label.set_text(_('Theme') + ' (%s)'.format(themeListFlat));
 
         /* Set the label to match */
-        this._items.nPenguins.setValue(this.XPenguinsLoop.options.nPenguins/XPenguins.PENGUIN_MAX);
+        this._items.nPenguins.setValue(this.XPenguinsLoop.options.nPenguins / XPenguins.PENGUIN_MAX);
         this._items.nPenguinsLabel.set_text(this.XPenguinsLoop.options.nPenguins.toString());
 
-        // @@ tmp
-        this._items.nPenguins.setValue(1/XPenguins.PENGUIN_MAX);
-        this._items.nPenguinsLabel.set_text('1');
-        this.XPenguinsLoop.set_number(1);
     },
 
-    _startXPenguins: function(item, state) {
-        //@@ tempif ( state == this.XPenguinsLoop.is_playing() ) return;
-        log((state && 'STARTING ' || 'STOPPING ') + 'XPenguins');
+    _startXPenguins: function (item, state) {
+        log((state ? 'STARTING ' : 'STOPPING ') + 'XPenguins');
 
-        if ( state ) {
+        if (state) {
             this.XPenguinsLoop.start();
-            if ( this._items.windowPreview.state ) 
+            if (this._items.windowPreview.state) {
                 this.windowListener.start();
+            }
         } else {
             this.XPenguinsLoop.stop();
-            if ( this._items.windowPreview.state ) 
+            if (this._items.windowPreview.state) {
                 this.windowListener.stop();
+            }
         }
     },
 
-    _nPenguinsSliderChanged: function(slider, value) {
-        this._items.nPenguinsLabel.set_text( Math.ceil( value*XPenguins.PENGUIN_MAX ).toString() );
+    _nPenguinsSliderChanged: function (slider, value) {
+        this._items.nPenguinsLabel.set_text(Math.ceil(value * XPenguins.PENGUIN_MAX).toString());
     },
 
-    _onNPenguinsChanged: function() {
+    _onNPenguinsChanged: function () {
         /* will have to set terminate sequence for the others.
          * Like load averaging.
          * TODO: test.
          */
-        if ( this.XPenguinsLoop ) {
-            this.XPenguinsLoop.set_number(parseInt(this._items.nPenguinsLabel.get_text()));
+        if (this.XPenguinsLoop) {
+            this.XPenguinsLoop.set_number(parseInt(this._items.nPenguinsLabel.get_text(), 10));
         }
-    },
+    }
 
 };
 
 function ThemeMenuItem2() {
     this._init.apply(this, arguments);
-};
+}
 
 ThemeMenuItem2.prototype = {
     __proto__: PopupMenu.PopupBaseMenuItem.prototype,
 
-    _init: function(text, state, icon_path, params) {
-        PopupMenu.PopupBaseMenuItem.prototype._init.call(this);
+    _init: function (text, state, icon_path, params) {
+        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
         /* FIXME: if I just use this.addActor there's heaps of space between all the items,
          * regardless of setting this.actor's spacing or padding to 0, same with constituent items.
          * So currently using this.box  and this.box.add.
@@ -368,24 +495,24 @@ ThemeMenuItem2.prototype = {
 
 
         /* icon */
-        this.icon = new St.Icon({ 
-                                  icon_name: 'image-missing', //placeholder
-                                  icon_type: St.IconType.FULLCOLOR,
-                                  style_class: 'popup-menu-icon'
+        this.icon = new St.Icon({
+            icon_name: 'image-missing', //placeholder
+            icon_type: St.IconType.FULLCOLOR,
+            style_class: 'popup-menu-icon'
         });
-        this.box.add(this.icon); 
+        this.box.add(this.icon);
 
-        /* label */ 
+        /* label */
         this.label = new St.Label({text: text}); // reactive: false?
         this.box.add(this.label, {expand: true, align: St.Align.START});
 
         /* info button */
         this.button = new St.Button();
-        let icon = new St.Icon({ icon_name: 'help-contents',
-                                 style_class:'popup-menu-icon',
-                                 // FIXME: appears not to have symbolic icon
-                                 icon_type: St.IconType.FULLCOLOR
-
+        let icon = new St.Icon({
+            icon_name: 'help-contents',
+            style_class: 'popup-menu-icon',
+            // FIXME: appears not to have symbolic icon
+            icon_type: St.IconType.FULLCOLOR
         });
         this.button.set_child(icon);
         this.box.add(this.button, {align: St.Align.END});
@@ -393,9 +520,10 @@ ThemeMenuItem2.prototype = {
         /* toggle */
         this.state = state || false;
         this.setShowDot(true); /* connect up toggle event to setShowDot */
-        this.connect('activate', Lang.bind(this, function() { 
+        this.connect('activate', Lang.bind(this, function () {
             this.state = !this.state;
         }));
+        this.set_icon(icon_path);
 
         /* debugging.
         this.icon.set_style('border: 1px solid #ffffff');
@@ -408,156 +536,40 @@ ThemeMenuItem2.prototype = {
 
     },
 
-    _onRepaintDot: function(area) {
+    _onRepaintDot: function (area) {
         log('_onRepaintDot');
-        let cr = area.get_context();
-        let [width, height] = area.get_surface_size();
-        let colour = area.get_theme_node().get_foreground_color();
+        let cr = area.get_context(),
+            colour = area.get_theme_node().get_foreground_color(),
+            width = area.get_surface_size(),
+            height;
+        height = width[1];
+        width = width[0];
 
-        cr.setSourceRGBA (
-                colour.red / 255,
-                colour.green / 255,
-                colour.blue / 255,
-                colour.alpha / 255);
-        
+        cr.setSourceRGBA(
+            colour.red / 255,
+            colour.green / 255,
+            colour.blue / 255,
+            colour.alpha / 255
+        );
+
         /* draw box */
         // FIXME: make this a St.Button in toggle mode instead of this??
-      
+
         cr.rectangle(0, 0, width, height);
-        if ( this.state ) {
+        if (this.state) {
             cr.fill();
         }
         cr.stroke();
     },
 
-};
-
-/* Popup dialog with scrollable text. 
- * See InstallExtensionDialog in extensionSystem.js for an example.
- * FIXME: make it look better. styles for headings, show the icon, ...
- */
-
-function AboutDialog() {
-    this._init.apply(this, arguments);
-};
-
-AboutDialog.prototype = {
-    __proto__: ModalDialog.ModalDialog.prototype,
-
-    _init: function(title, text) {
-        ModalDialog.ModalDialog.prototype._init.call(this, {styleClass: 'modal-dialog'});
-
-        let monitor = global.screen.get_monitor_geometry(global.screen.get_primary_monitor()),
-            width   = Math.max(250, Math.round(monitor.width/4)),
-            height  = Math.max(400, Math.round(monitor.height/2.5));
-
-        /* title */
-        // fixme: define style for title.
-        this.title = new St.Label({text: title || '', style: 'font-weight: bold'});
-        this.contentLayout.add(this.title, { x_fill: false, x_align: St.Align.MIDDLE });
-
-        /* scroll box */
-        this.scrollBox = new St.ScrollView({
-            x_fill: true, 
-            y_fill: true,
-            width: width,
-            height: height 
-        });
-        // automatic horizontal scrolling, automatic vertical scrolling
-        this.scrollBox.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC);
-
-        /* text in scrollbox. FIXME: for some reason it won't display unless in a St.BoxLayout. */
-        this.text = new St.Label({text: (text || '')});
-        this.text.clutter_text.ellipsize = Pango.EllipsizeMode.NONE; // allows scrolling
-        //this.text.clutter_text.line_wrap = true;                     
-
-        this.box = new St.BoxLayout();
-        this.box.add(this.text, { expand: true });
-        this.scrollBox.add_actor(this.box, {expand: true, x_fill: true, y_fill: true});
-        this.contentLayout.add(this.scrollBox, {expand: true, x_fill: true, y_fill: true});
-
-        /* OK button */
-        this.setButtons([{ label: _('OK'),
-                           action: Lang.bind(this, function() {this.close(global.get_current_time()); })
-                        }]);
-	},
-
-    set_title: function(title) {
-        this.title.text = title;
-    },
-
-    set_text: function(text) {
-        this.text.text = text;
-    },
-
-    append_text: function(text, sep) {
-        this.text.text += (sep || '\n') + text;
-    },
-};
-
-
-// FIXME: see panel-docklet for an example of making the switch only.
-function ThemeMenuItem() {
-    this._init.apply(this, arguments);
-};
-
-ThemeMenuItem.prototype = {
-    __proto__: PopupMenu.PopupBaseMenuItem.prototype,
-
-    _init: function(text, state, icon_path, params) {
-        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
-        /* FIXME: if I just use this.addActor there's heaps of space between all the items,
-         * regardless of setting this.actor's spacing or padding to 0, same with constituent items.
-         * So currently using this.box  and this.box.add.
-         */
-        this.box = new St.BoxLayout({vertical: false});
-        this.addActor(this.box, {expand: true, span: -1}); 
-        // FIXME: should the toggles be all the way to the right like that?? various padding-right settings seem not to have effect.
-        
-        /* Info button */
-        /* Could just set style-class with background-image... */
-        this.button = new St.Button();
-        let icon = new St.Icon({ icon_name: 'help-contents',
-                                 style_class:'popup-menu-icon',
-                                 // FIXME: appears not to have symbolic icon
-                                 icon_type: St.IconType.FULLCOLOR
-
-        });
-        this.button.set_child(icon);
-        this.box.add(this.button);
-
-        /* Icon (default no icon) */
-        this.icon = new St.Icon({ icon_name: 'image-missing', // placeholder
-                                  icon_type: St.IconType.FULLCOLOR,
-                                  style_class: 'popup-menu-icon'
-        });
-        this.box.add(this.icon);
-        this.set_icon(icon_path);
-
-        /* toggle. */ 
-        this.toggle = new PopupMenu.PopupSwitchMenuItem(text, state|| false);
-        this.box.add(this.toggle.actor, {expand: true, align:St.Align.END});
-
-        /* Pass through events */
-        this.toggle.connect('toggled', Lang.bind(this, function() { this.emit('toggled', this.toggle.state); }));
-        this.button.connect('clicked', Lang.bind(this, function() { this.emit('button-clicked'); }));
-
-        /* debugging.
-        this.icon.set_style('border: 1px solid #ffffff');
-        this.button.set_style('border: 1px solid #ffffff');
-        this.toggle.actor.set_style('border: 1px solid #ffffff; padding-right: 0em');
-        this.box.set_style('border: 1px solid #ffff00');
-        this.actor.set_style('border: 1px solid #ff0000');
-        */
-    },
-
     get state() { return this.toggle.state; },
 
     /* sets the icon from a path */
-    set_icon: function(icon_path) {
-        let path = icon_path && Gio.file_new_for_path(icon_path) || null;
-        if ( path && path.query_exists(null) ) {
+    set_icon: function (icon_path) {
+        let path = icon_path ? Gio.file_new_for_path(icon_path) : null;
+        if (path && path.query_exists(null)) {
             this.icon.set_gicon(new Gio.FileIcon({file: path}));
         }
     }
+
 };
