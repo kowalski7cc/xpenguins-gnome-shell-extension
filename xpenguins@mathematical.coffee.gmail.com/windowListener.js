@@ -65,6 +65,14 @@ function WindowListener() {
 }
 
 WindowListener.prototype = {
+    /* a bit silly but I want to access these externally without having to 
+     * create an instance of it first */
+    options: {
+        ignorePopups: false,
+        recalcMode: XPenguins.RECALC.ALWAYS,
+        onDesktop: true,
+        onAllWorkspaces: false
+    },
     _init: function (i_options) {
          /*
           * Everyone:
@@ -91,12 +99,6 @@ WindowListener.prototype = {
         /* dummy stuff for XPenguinsLoop compatibility */
         // TODO: run in particular window (i.e. onDesktop = false)
         // ignoreMaximised.
-        this.options = {
-            ignorePopups: false,
-            recalcMode: XPenguins.RECALC.ALWAYS,
-            onDesktop: true,
-            onAllWorkspaces: false
-        };
         for (let opt in i_options) {
             if (i_options.hasOwnProperty(opt) && this.options.hasOwnProperty(opt)) {
                 this.options[opt] = i_options[opt];
@@ -185,8 +187,8 @@ WindowListener.prototype = {
     /* pauses the timeline & temporarily stops listening for events,
      * *except* for owner.connect(eventName) which sends the resume signal.
      */
-    pause: function (owner, eventName) {
-        XPUtil.LOG('pause');
+    pause: function (owner, eventName, cb) {
+        XPUtil.LOG('[WL] pause');
         if (!this._timeline.is_playing()) {
             return;
         }
@@ -203,10 +205,12 @@ WindowListener.prototype = {
         // don't disconnect signals on pause (just don't respond to them).
         // If many windows, seems a waste to do all the disconnect/reconnect every time they grab?
         if (owner) {
-            this.connect_and_track(this._resumeSignal, owner, eventName,
+            this.connect_and_track(this._resumeSignal, owner, eventName, 
                 Lang.bind(this, function () {
-                    this.disconnect_tracked_signals(this._resumeSignal);
-                    this.resume();
+                    if (!cb || cb.apply(this, arguments)) {
+                        this.disconnect_tracked_signals(this._resumeSignal);
+                        this.resume();
+                    }
                 }));
         }
     },
@@ -263,7 +267,7 @@ WindowListener.prototype = {
         }
 
         /* TRIGGER SOMETHING */
-        if (this._timeline.is_playing()) {
+        if (this._timeline && this._timeline.is_playing()) {
             this._updateSignals();
         }
     },
@@ -484,21 +488,13 @@ WindowListener.prototype = {
             /* hide the toons & pause if we've switched to another workspace */
             if (global.screen.get_workspace_by_index(toI) !==
                     this.XPenguinsWindow.get_workspace()) {
-                //this.hideToons();
-                //this.pause();
-                this.pause(global.window_manager, 'switch-workspace');
-/*
-                // BIG TODO: on workspace-switch back, set this.resume() hook.
-                // Either that or don't pause signals.
-                this.connect_and_track(this._resumeSignal, global.window_manager,
-                        'switch-workspace', Lang.bind(this, function () {
-                            // could just *not* disconnect _onWorkspaceChanged?
-                            this.disconnect_tracked_signals(this._resumeSignal);
-                            this.resume();
-                        }));
-*/
+                this.pause(global.window_manager, 'switch-workspace',
+                    /* Note: binding done on pause end. do it here too for safety? */
+                    function (dmy, fI, tI, dir) {
+                        return (global.screen.get_workspace_by_index(tI) === 
+                            this.XPenguinsWindow.get_workspace());
+                    });
             } else {
-                //this.showToons();
                 this.resume();
             }
         }

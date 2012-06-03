@@ -168,15 +168,23 @@ Toon.Toon.prototype = {
     show: function () {
         this.actor.show();
     },
+
+    hide: function () {
+        this.actor.hide();
+    },
+
     set_position: function (x, y) {
         this.actor.set_position(x, y);
     },
+
     move_by: function (dx, dy) {
         this.actor.move_by(dx, dy);
     },
+
     get x() {
         return this.actor.x;
     },
+
     get y() {
         return this.actor.y;
     },
@@ -524,7 +532,6 @@ Toon.Toon.prototype = {
             /* Is new toon location fully/partially filled with windows? */
             if (this.GLOBAL.toon_windows.overlaps(newx, newy, this.data.width, this.data.height) && mode === Toon.MOVE &&
                     result !== Toon.BLOCKED && !stationary) {
-                log('Advance:  windows in the way of toon');
                 let tryx, tryy,
                     step = 1,
                     u = newx - this.x,
@@ -598,14 +605,14 @@ Toon.Toon.prototype = {
                 ++(this.cycle);
                 // NOCYCLE is associated with a ToonData.
                 if (this.data.conf & Toon.NOCYCLE) {
-                    this.active = 0;
+                    this.active = false;
                 }
             }
         } else if (this.data.conf & Toon.NOCYCLE) {
             if ((++this.frame) >= this.data.nframes) {
                 this.frame = 0;
                 this.cycle = 0;
-                this.active = 0;
+                this.active = false;
             }
         }
         return result;

@@ -1,25 +1,3 @@
-/*
- * [yep] _onInterrupt
- * [yep] jumping penguins
- * UPTO:
- * all the TODOs (wid, window data, ...) --> move windows & see if toons cling on.
- * * exploded penguins do not turn into angels until you remove what exploded them ('toon changing from explosion to explosion')
- * sometimes: fatal IO error 11 Resource temporarily unavailable.
- * god mode
- * speed up (seems to lag the computer, perhaps because of Mainloop)
- * on-the-fly settings changes
- * multiple themes
- * Recalc modes
- * load averaging
- * on all workspaces
- * - test w/ nautilus desktop window
- * - treat the top activities bar as solid?
- * - test w/ gnome-panel
- * - test w/ autohiding stuff
- * - test w/ frippery bottom panel/dock/etc
- * ** dual-mon - how to avoid toons going into bad area of stage?
- *
- */
 const Lang = imports.lang;
 const Mainloop = imports.mainloop;
 
@@ -156,18 +134,6 @@ XPenguinsLoop.prototype = {
             recalcMode: RECALC.ALWAYS,
 
 
-
-            // trigger an _onUpdateWindows only:
-            // ignoreMaximised
-            // ignorePopups
-            // Triggers more
-            // onAllWorkspaces: _onUpdateWindows + pause/resume
-            // ???
-            // angels, blood: what about existing toons?
-            // squish: enables god mode
-            //
-
-
             /* maximum amount a window can move and the penguin can still cling on */
             // set in main.c
             max_relocate_up:    16,
@@ -188,15 +154,28 @@ XPenguinsLoop.prototype = {
         return (this._timeline && this._timeline.is_playing());
     },
 
-        // TODO: if xpenguins_active then do something.
     set_themes: function (themeList, setnPenguins) {
         this.log('[XP] set_themes');
+        /* FIXME: 
+         * It would be neat to kill all the penguins of the theme
+         * that got removed and initialised them into the theme
+         * that got added, but I'm not sure how to manage that --
+         * all the toon.GLOBAL.ToonData handles are old.
+         * I suppose toons could emit a 'dead' signal that allows
+         * me to hot-swap the new ToonData in.
+         * But for now that's too hard. Just stop the loop & restart.
+         */
+        let playing = (this._timeline && this._timeline.is_playing());
+        if (playing) {
+            this.exit();
+        }
         this.options.themes = themeList;
-
-        /* Load theme into this._theme */
-        this._theme = new Theme.Theme(this.options.themes);
+        this._theme = new Theme.Theme(themeList);
         if (setnPenguins || this.options.nPenguins < 0) {
-            this.options.nPenguins = this._theme.total;
+            this.set_number(this._theme.total);
+        }
+        if (playing) {
+            this.start();
         }
     },
 
@@ -221,7 +200,7 @@ XPenguinsLoop.prototype = {
         this.log('[XP] _initToons');
         /* set up global vars to feed in to the toons */
         // TODO
-        let GLOBAL = {
+        this.GLOBAL = {
             XPenguinsWindow: this.XPenguinsWindow,
             ToonData: this._theme.ToonData,
             //options: opt, // <-- do I really want to lug the *whole* structure around?!
@@ -229,35 +208,33 @@ XPenguinsLoop.prototype = {
             toon_windows: this.toon_windows,
             // TODO: must change when window changes workspace!
             //workspace: this.options.workspace
-        },
+        };
         /* set the genus of each penguin, respecting the ratios in theme.number? */
         /* Xpenguins makes one of each type, & then give the requested number
          * per genus, so if your genus is at the end and you run out of penguins,
          * then you miss out on all but one.
          * Also initialise them.
          */
-            genus_numbers = this._theme.number.map(Lang.bind(this,
-                function (i) {
+         let i,
+             genus_numbers = this._theme.number.map(Lang.bind(this,
+                    function (i) {
                     return Math.floor(i / this._theme.total * this.options.nPenguins);
                 })),
-            i,
             leftover = this.options.nPenguins - genus_numbers.reduce(function (x, y) { return x + y; }); // note: guaranteed <= theme.ngenera
         while (leftover) { // genera 0 to leftover-1 get 1 extra.
             genus_numbers[--leftover] += 1;
         }
-        //this.log(('this.options.nPenguins: ' + this.options.nPenguins + ' splitup:' + JSON.stringify(genus_numbers)));
+        // FIXME: is there a better way to find the index of the min of an array?
+        this._genus = genus_numbers.indexOf(Math.min.apply(null, genus_numbers));
         for (i = 0; i < genus_numbers.length; ++i) {
             while (genus_numbers[i]--) {
                 /* Initialise toons */
                 // will call .init() automatically since genus is provided.
-                this._toons.push(new Toon.Toon(GLOBAL, {genus: i}));
+                this._toons.push(new Toon.Toon(this.GLOBAL, {genus: i}));
             }
         }
 
         /* set the stage */
-        // TODO: other windows. Want the stage + the window actor?
-        // You can set actor == stage if it's a window: add_actor works.
-        // *HOWEVER* adding a rectangel to (0, 0) of a window appears to set it a bit outside its bounds.
         i = this._theme.ToonData.length;
         /* add ToonDatas to the stage so clones can be added properly */
         while (i--) {
@@ -266,7 +243,6 @@ XPenguinsLoop.prototype = {
                     /* to fix "Attempting to add actor of type '...' to a container of type '...',
                      * but the actor already has a parent of type '...'.
                      */
-                    //this.log('adding genus %d type %s', i, type);
                     this.XPenguinsWindow.add_actor(this._theme.ToonData[i][type].texture);
                     this._theme.ToonData[i][type].texture.hide();
                 }
@@ -274,11 +250,8 @@ XPenguinsLoop.prototype = {
         }
         /* add toons to the stage */
         i = this._toons.length;
-        this.log('this._toons.length: %d; this.nPenguins: %d; this._toon_number: %d', i, this.options.nPenguins, this._toon_number);
         while (i--) {
-            //this.log('adding toon %d', i);
             this.XPenguinsWindow.add_actor(this._toons[i].actor);
-            //this._toons[i].Draw();
         }
     },
 
@@ -304,6 +277,7 @@ XPenguinsLoop.prototype = {
      * init() should have been called by now.
      */
     start: function () {
+        /* calls this.init */
         WindowListener.start.apply(this, arguments);
         //@@ Mainloop...
         this._frame();
@@ -312,10 +286,39 @@ XPenguinsLoop.prototype = {
     /* pauses the timeline & temporarily stops listening for events,
      * *except* for owner.connect(eventName) which sends the resume signal.
      */
-    pause: function () { WindowListener.pause.apply(this, arguments); },
+    pause: function () { 
+        /* pauses this._timeline/window tracker */
+        WindowListener.pause.apply(this, arguments); 
+        /* @@ mainloop pause */
+        if (this._timelineID) {
+            Mainloop.source_remove(this._timelineID);
+            this._timelineID = null;
+            this.hideToons();
+        }
+    },
 
     /* resumes timeline, connects up events */
-    resume: function () { WindowListener.resume.apply(this, arguments); },
+    resume: function () { 
+        /* resume this._timeline/window tracker */
+        WindowListener.resume.apply(this, arguments); 
+        /* @@ mainloop resume */
+        this.showToons();
+        this._frame();
+    },
+
+    /* stop xpenguins, but play the exit sequence */
+    _onInterrupt: function () {
+        this.log(_('Interrupt received: Exiting.'));
+
+        /* set the 'exit gracefully flag' */
+        //ToonConfigure(Toon.EXITGRACEFULLY);
+        this._exiting = true;
+        this.set_number(0);
+
+        //@@ temp
+        //this.exit();
+    },
+
 
     /* ToonFinishUp in toon_end.c
      */
@@ -346,6 +349,7 @@ XPenguinsLoop.prototype = {
 
         /* remove toonDatas from the stage */
         i = this._theme.ToonData.length;
+
         while (i--) {
             for (let type in this._theme.ToonData[i]) {
                 if (this._theme.ToonData[i].hasOwnProperty(type) && !this._theme.ToonData[i][type].master) {
@@ -382,7 +386,6 @@ XPenguinsLoop.prototype = {
         this._resumeSignal = {}; /* when you pause you have to listen for an event to unpause; use this._resumeID to store this. */
 
         /* variables */
-        //this._theme = null;
         this._toons = [];
         /* The number of penguins that are active or not terminating.
          * When 0, we can call xpenguins_exit()
@@ -393,6 +396,7 @@ XPenguinsLoop.prototype = {
         this._tempFRAMENUMBER = 0;
         this._exiting = false;
         this.XPenguinsWindow = null;
+        this._genus = 0;
 
         this.dirty = true;
         this._listeningPerWindow = false; /* whether we have to listen to individual windows for signals */
@@ -410,7 +414,7 @@ XPenguinsLoop.prototype = {
         }
 
         /* create timeline */
-        /* NOTE: GNOME 3.2 has Clutter-1.0, and no set_repeat_count.
+        /* FIXME: GNOME 3.2 has Clutter-1.0, and no set_repeat_count.
          * --> do timeline.set_loop(true);
          * in GNOME 3.4, use timeline.set_repeat_count(...);
          * Clutter.threads_add_timeout
@@ -492,16 +496,38 @@ XPenguinsLoop.prototype = {
         this._updateToonWindows();
     },
 
-    changeOption: function () {
-        WindowListener.changeOption.apply(this, arguments);
-        this._dirtyToonWindows('changeOption');
+    changeOption: function (propName, propVal) {
+        /* Window tracking-specific options */
+        if (WindowListener.options.hasOwnProperty(propName)) {
+            WindowListener.changeOption.call(this, propName, propVal);
+            this._dirtyToonWindows('changeOption');
+        } else {
+        /* XPENGUIN-specific options. */
+            if (!this.options.hasOwnProperty(propName) || this.options[propName] === propVal) {
+                return;
+            }
+            if (propName === 'nPenguins') {
+                this.set_number(propVal);
+            } else if (propName === 'themes') {
+                this.set_themes(propVal);
+            } else {
+                this.options[propName] = propVal;
+                /* actions to be taken if the timeline is playing */
+                if (this._timeline.is_playing()) {
+                    if (propName === 'squish') {
+                    /* enable god mode */
+                        this.toggleGodMode(propVal);
+                    }
+                    /* Otherwise, things like angels, blood: these things can just be
+                     * set and no recalculating of signals etc or extra action
+                     * need be done.
+                     */
+                }
+            } 
+        } // whether xpenguins or window-listener option
     },
 
     /***** Signals ****/
-    // Could do XPenguinsLoop.[functionname] = Lang.bind(this, WindowListener.WindowListener.prototype.[functionname])
-    // OR
-    // WindowListener.WindowListener.prototype.[functionname].apply(this, arguments)
-    // and then add extra XPenguinsLoop-specific stuff.
     /* connects up events required to maintain toon_windows as an accurate
      * snapshot of what the windows on the workspace look like
      */
@@ -572,6 +598,20 @@ XPenguinsLoop.prototype = {
     },
 
     /**************** GOD MODE **************/
+    toggleGodMode: function(onoff) {
+        if (onoff) {
+            this._godModeID = this.XPenguinsWindow.connect('button-press-event', this._onSmite);
+            /* change cursor to something suitably god-like */
+            // FIXME: ICING: change it to a bolt of lightning :D
+            global.set_cursor(Shell.Cursor.POINTING_HAND);
+        } else {
+            if (this._godModeID) {
+                this.XPenguinsWindow.disconnect(this._godModeID);
+            }
+            /* change cursor back */
+            global.unset_cursor();
+        }
+    },
     _onEnableGodMode: function () {
         // BIG TODO:
         // you can connect a window properly up to a button-press-event.
@@ -593,6 +633,15 @@ XPenguinsLoop.prototype = {
         global.set_cursor(Shell.Cursor.POINTING_HAND);
 
     },
+
+    _onDisableGodMode: function () {
+        if (this._godModeID) {
+            this.XPenguinsWindow.disconnect(this._godModeID);
+        }
+        /* change cursor back */
+        global.unset_cursor();
+    },
+
     _onSmite: function (actor, event) {
         // Event coordinates are relative to the stage
         // that received the event, and can be transformed
@@ -640,26 +689,20 @@ XPenguinsLoop.prototype = {
         }
     },
 
-    _onDisableGodMode: function () {
-        if (this._godModeID) {
-            this.XPenguinsWindow.disconnect(this._godModeID);
+    /******** TOONS ********/
+
+    hideToons: function () {
+        for (let i=0; i<this._toons.length; ++i) {
+            this._toons[i].hide();
         }
-        /* change cursor back */
-        global.unset_cursor();
     },
 
-    /* stop xpenguins, but play the exit sequence */
-    _onInterrupt: function () {
-        this.log(_('Interrupt received: Exiting.'));
-
-        /* set the 'exit gracefully flag' */
-        //ToonConfigure(Toon.EXITGRACEFULLY);
-        this._exiting = true;
-        this.set_number(0);
-
-        //@@ temp
-        //this.exit();
+    showToons: function () {
+        for (let i=0; i<this._toons.length; ++i) {
+            this._toons[i].show();
+        }
     },
+
 
     /* _frame is called every frame of the iteration.
      * It consists of two parts:
@@ -730,13 +773,12 @@ XPenguinsLoop.prototype = {
                     gdata = this._theme.ToonData[toon.genus];
                 last_active = i; // TODO: seems to be set to i always?
 
-                // TODO: this.conf
                 /* see if the toon is squashed */
-                if (!((this.conf & Toon.NOBLOCK) | (this.conf & Toon.INVULNERABLE)) &&
+                if (!((toon.data.conf & Toon.NOBLOCK) || (toon.data.conf & Toon.INVULNERABLE)) &&
                         toon.Blocked(Toon.HERE)) {
+                    this.log('EXPLODING');
                     if (o.blood && gdata.squashed) {
                         toon.set_type('squashed', toon.direction, Toon.HERE);
-                        // UPTO: it keeps setting explosion to explosion so I assume it's here.
                         // I guess because it's blocked? test w/ xpenguins
                     } else if (gdata.explosion) {
                         toon.set_type('explosion', toon.direction, Toon.HERE);
@@ -783,7 +825,7 @@ XPenguinsLoop.prototype = {
                                 toon.set_association(Toon.DOWN);
                                 toon.set_velocity(0, 0);
                             } else {
-                                /* got lucky - didn't splat: walk */
+                                /* got lucky - didn't splat (or !options.blood): walk */
                                 toon.direction = (toon.pref_direction > -1 ?
                                                    toon.pref_direction : XPUtil.RandInt(2));
                                 toon.make_walker(false);
@@ -1026,7 +1068,7 @@ XPenguinsLoop.prototype = {
             this.log('.');
         }
 
-        // TODO: timeline.get_current_repeat() could be this.cycle,
+        // TODO: timeline.get_current_repeat() could be this._cycle,
         // if only there were one frame per repeat?
 
         // small todo: code cleanup. all the this. & this._ & o
@@ -1072,6 +1114,7 @@ XPenguinsLoop.prototype = {
     }, // _frame
 
     set_number: function (n) {
+        this.log('set_number(%d)', n);
         if (!this._timeline || !this._timeline.is_playing())  {
             this.options.nPenguins = n;
             this._toon_number = n;
@@ -1080,8 +1123,19 @@ XPenguinsLoop.prototype = {
         // want to spawn more penguins
         if (n > this._toon_number) {
             n = Math.min(PENGUIN_MAX, n);
-            for (let i = this._toon_number; i < n; i++) {
-                this._toons[i].init(); // what if genus isn't set?
+            for (let i = this._toon_number; i < n; ++i) {
+                /* reuse an old toon if it exists (in the old genus), 
+                 * otherwise make a new one. Just rotate around the
+                 * genii.
+                 */
+                if (i >= this._toons.length) {
+                    this._toons[i] = new Toon.Toon(this.GLOBAL, {genus: this._genus});
+                    this._genus = (this._genus + 1) % this._theme.ngenera;
+                    // UPTO: remove the actor when the toon is deactivated?
+                    this.XPenguinsWindow.add_actor(this._toons[i].actor);
+                } else {
+                    this._toons[i].init();
+                }
                 this._toons[i].active = true;
             }
             this._toon_number = n;
@@ -1102,7 +1156,8 @@ XPenguinsLoop.prototype = {
                 }
                 // regardless, set it terminating.
                 this._toons[i].terminating = true;
-                this._toons[i].Draw();
+                // NOTE: toons are not popped from this._toons after dying,
+                // and hence can be reused. (check)
             }
         }
     },

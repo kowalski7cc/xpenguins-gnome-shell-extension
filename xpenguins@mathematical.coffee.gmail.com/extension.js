@@ -231,11 +231,9 @@ XPenguinsMenu.prototype = {
         this._createMenu();
 
         /* create an Xpenguin Loop object which stores the XPenguins program */
-        this.log('XPenguinsLoop');
         this.XPenguinsLoop = new XPenguins.XPenguinsLoop(this.getConf());
 
-        /* debugging windowListener */
-        this.log('windowListener');
+        /* @@ debugging windowListener */
         this.windowListener = new WindowListener.WindowListener();
 
         /* initialise as 'Penguins' */
@@ -291,7 +289,6 @@ XPenguinsMenu.prototype = {
         this.menu.addMenuItem(this._items.start);
 
         /* theme submenu */
-        this.log('theme submenu');
         this._themeMenu = new PopupMenu.PopupSubMenuMenuItem(_('Theme'));
         this.menu.addMenuItem(this._themeMenu);
         /* populate the combo box which sets the theme */
@@ -312,7 +309,6 @@ XPenguinsMenu.prototype = {
          * - RECALC mode
          */
 
-        this.log('optionsMenu');
         // NOTE: I don't think I need the 'Options' submenu here?
         this._optionsMenu = new PopupMenu.PopupSubMenuMenuItem(_('Options'));
         this.menu.addMenuItem(this._optionsMenu);
@@ -336,7 +332,7 @@ XPenguinsMenu.prototype = {
         for (let propName in this._toggles) {
             if (this._toggles.hasOwnProperty(propName)) {
                 this._items[propName] = new PopupMenu.PopupSwitchMenuItem(this._toggles[propName], defaults[propName] || false);
-                this._items[propName].connect('toggled', this.changeOption, propName);
+                this._items[propName].connect('toggled', Lang.bind(this, this.changeOption, propName));
                 this._optionsMenu.menu.addMenuItem(this._items[propName]);
             }
         }
@@ -344,7 +340,6 @@ XPenguinsMenu.prototype = {
         /* TODO: "Resize behaviour": {calculate on resize, calculate on resize-end, pause during resize} */
 
         /* RecalcMode combo box */
-        this.log('recalc combo box');
         dummy = new PopupMenu.PopupMenuItem(_('Recalc mode'), {reactive: false});
         this._optionsMenu.menu.addMenuItem(dummy);
         this._items.recalc = new PopupMenu.PopupComboBoxMenuItem({});
@@ -357,7 +352,9 @@ XPenguinsMenu.prototype = {
         }
         this._items.recalc.setActiveItem(XPenguins.RECALC.ALWAYS);
         this._items.recalc.connect('active-item-changed',
-                                  Lang.bind(this, function (item, id) { this.changeOption('recalcMode', id); }));
+            Lang.bind(this, function (item, id) { 
+                this.changeOption(null, 'recalcMode', id); 
+            }));
 
     },
 
@@ -396,7 +393,6 @@ XPenguinsMenu.prototype = {
     },
 
     _onShowHelp: function (button, name) {
-        this.log(('showing help for ' + name));
         // TODO: titles etc (Different sized text)
         if (!this._themeInfo[name]) {
             this._themeInfo[name] = ThemeManager.describe_themes([name], false)[name];
