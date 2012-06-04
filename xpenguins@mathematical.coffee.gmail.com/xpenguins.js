@@ -320,14 +320,16 @@ XPenguinsLoop.prototype = {
     /* pauses the timeline & temporarily stops listening for events,
      * *except* for owner.connect(eventName) which sends the resume signal.
      */
-    pause: function () { 
+    pause: function (hide, owner, eventName, cb) {
         /* pauses this._timeline/window tracker */
-        WindowListener.pause.apply(this, arguments); 
+        WindowListener.pause.call(this, hide, owner, eventName, cb); 
         /* @@ mainloop pause */
         if (this._timelineID) {
             Mainloop.source_remove(this._timelineID);
             this._timelineID = null;
-            this.hideToons();
+            if (hide) {
+                this.hideToons();
+            }
         }
     },
 
@@ -335,8 +337,10 @@ XPenguinsLoop.prototype = {
     resume: function () { 
         /* resume this._timeline/window tracker */
         WindowListener.resume.apply(this, arguments); 
+        if (this._toons[0] && !this._toons[0].visible) {
+            this.showToons();
+        }
         /* @@ mainloop resume */
-        this.showToons();
         this._frame();
     },
 

@@ -190,7 +190,7 @@ WindowListener.prototype = {
     /* pauses the timeline & temporarily stops listening for events,
      * *except* for owner.connect(eventName) which sends the resume signal.
      */
-    pause: function (owner, eventName, cb) {
+    pause: function (hide, owner, eventName, cb) {
         XPUtil.LOG('[WL] pause');
         if (!this._timeline.is_playing()) {
             return;
@@ -202,6 +202,11 @@ WindowListener.prototype = {
         /* temporarily disconnect events */
         // Nope - still need to listen to workspace-switched to unpause!
         this._disconnectSignals();
+
+        /* hide drawing area? */
+        if (hide) {
+            this.drawingArea.hide();
+        }
 
         /* connect up the signal to resume */
         // BIG TODO: could either set a signal for resume, *or* simply
@@ -314,7 +319,7 @@ WindowListener.prototype = {
                 this.connect_and_track(this, global.display, 'grab-op-begin',
                     Lang.bind(this, function () {
                         XPUtil.LOG('grab-op-begin');
-                        this.pause(global.display, 'grab-op-end');
+                        this.pause(false, global.display, 'grab-op-end');
                     }));
             } else {
                 this.connect_and_track(this, global.display, 'grab-op-end',
@@ -486,7 +491,7 @@ WindowListener.prototype = {
             /* hide the toons & pause if we've switched to another workspace */
             if (global.screen.get_workspace_by_index(toI) !==
                     this.XPenguinsWindow.get_workspace()) {
-                this.pause(global.window_manager, 'switch-workspace',
+                this.pause(true, global.window_manager, 'switch-workspace',
                     /* Note: binding done on pause end. do it here too for safety? */
                     function (dmy, fI, tI, dir) {
                         return (global.screen.get_workspace_by_index(tI) === 

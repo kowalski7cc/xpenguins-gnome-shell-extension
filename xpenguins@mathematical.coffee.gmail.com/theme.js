@@ -1,17 +1,8 @@
 /*********************
+ * Contains Theme class.
  * xpenguins_theme.c
- * xpenguins.h
- * Notes:
- * - genus == theme (penguins, simpsons, ...)
- * TODO:
- * - what to do about eror handling? at them oment thorw new Error
- * BIG TODO: is .master needed?
- *
- * GENUS
- *
- * CONFIG FILE:
- *  toon == walker, skater ('genera'), in which there are types
- *   (walker, faller, tumbler, floater, ...)
+ * BIG TODO: is .master needed? just refer to genus.texture
+ * UPTO: make redundant .master
  *********************/
 /* Imports */
 const Shell = imports.gi.Shell;
@@ -52,34 +43,26 @@ Theme.Theme.prototype = {
         /* Theme: can have one or more genera
          * Genus: class of toons (Penguins has 2: walker & skateboarder).
          * Each genus has toon types: walker, floater, tumbler, faller, ...
-         */
-
-        /*
-         * this.ToonData: array, one per genus (per theme). this.ToonData[i] = { type_of_toon: ToonData }
-         * this.name: array of names, one per genus
-         * this.number: array of numbers, one per genus
          *
-         * Note: can't have ToonData an object because over multiple themes there can be
-         *  duplicate genus (for example BigPenguins & Penguins both have 'normal' & 'skateboarder').
+         * this.ToonData: array, one per genus (per theme). this.ToonData[i] = { type_of_toon: ToonData }
+         * this.number: array of numbers, one per genus
          */
         this.ToonData = []; // data, one per genus
-        this.name = [];    // names of genus
         this.number = [];   // theme penguin numbers
-        this.ngenera = 0; // number of different genera
         this.delay = 60;
 
-        XPUtil.LOG(('number of themes: ' + themeList.length));
         /* Initialise */
         for (let i = 0; i < themeList.length; ++i) {
-            XPUtil.LOG(' ... appending theme %s', themeList[i]);
+            XPUtil.DEBUG(' ... appending theme %s', themeList[i]);
             this.append_theme(themeList[i]);
         }
-        XPUtil.LOG(' ...done.');
     }, // _init
 
+    get ngenera() {
+        return this.number.length;
+    },
+
     /* Append the theme named "name" to this theme.
-     * To initialise the theme, set theme.ngenera to 0 before
-     *  calling this function.
      */
     append_theme: function (name) {
         /* find theme */
@@ -89,7 +72,6 @@ Theme.Theme.prototype = {
         }
 
         /* Read config file, ignoring comments ('#') and whitespace */
-        // TODO: lowercase?
         let words = Shell.get_file_contents_utf8_sync(file_name),
             started = false, // whether we've encountered the 'toon' keyword yet
                              // (may be omitted in single-genera files)
@@ -109,13 +91,12 @@ Theme.Theme.prototype = {
 
         try {
             for (let i = 0; i < words.length; ++i) {
-                // BIG TODO: this.name.length could be < this.ngenera,
-                //           because not every genus has a name (e.g. turtles)
                 let word = words[i].toLowerCase();
-                /* define a new genus of toon (walker, skateboarder, ...) */
-                // note: the 'toon' word is optional in one-genus themes.
-                // If we've already seen the 'toon' word before this must be a
-                //  multi-genus theme so make space for it & increment 'genus' index.
+                /* define a new genus of toon (walker, skateboarder, ...) 
+                 * note: the 'toon' word is optional in one-genus themes.
+                 * If we've already seen the 'toon' word before this must be a
+                 *  multi-genus theme so make space for it & increment 'genus' index.
+                 */
                 if (word === 'toon') {
                     if (started) {
                         this.grow();
@@ -125,7 +106,7 @@ Theme.Theme.prototype = {
                         started = 1;
                     }
                     /* store the genus name */
-                    this.name[genus] = words[++i];
+                    //this.name[genus] = words[++i];
                 } else if (word === 'delay') {
                 /* preferred frame delay in milliseconds */
                     this.delay = parseInt(words[++i], 10);
@@ -184,14 +165,7 @@ Theme.Theme.prototype = {
                         if (current.texture) {
                             XPUtil.warn(_('Warning: resetting pixmap to %s'.format(pixmap)));
                             /* Free old pixmap if it is not a copy */
-                            // BIGTODO: do I need to "free"/destroy it or is JS garbage collection
-                            // good enough that when there are no longer Toon.Datas using this texture
-                            // it will be destroyed?
                             if (!current.master) {
-                                // BIGTODO: what if this is already the master of others?
-                                // What happens the the clones' pointers?
-                                // (C source: XpmFree(current->image))
-                                // Well, that's what the XPUtil.warning is for.
                                 current.texture.destroy();
                             }
                         }
@@ -201,12 +175,12 @@ Theme.Theme.prototype = {
                         let new_pixmap = 1;
                         for (let igenus = first_genus; igenus <= genus && new_pixmap; ++igenus) {
                             let data = this.ToonData[igenus];
-                            // note: ToonData[igenus] is an *object* type: ToonData
                             for (let itype in data) {
                                 /* data already exists in theme, set master */
                                 if (data.hasOwnProperty(itype) && data[itype].filename &&
                                         !data[itype].master && data[itype].filename === pixmap) {
                                          // set .master & .texture (& hence .filename)
+                                    //UPTO
                                     current.set_master(data[itype]);
                                     new_pixmap = 0;
                                     break;
@@ -216,10 +190,7 @@ Theme.Theme.prototype = {
 
                         /* If we didn't find the pixmap before, it's new */
                         if (new_pixmap) {
-                            // print('loading new pixmap ' + pixmap);
-                            // Sets this.pixmap to Cogl Texture & this.filename to pixmap
                             current.load_texture(pixmap);
-                            // If it all worked:
                             current.master = null;
                         }
                     }
@@ -234,7 +205,6 @@ Theme.Theme.prototype = {
         } catch (err) {
             throw new Error(_('Error reading config file: config file ended unexpectedly: Line ' + err.lineNumber + ': ' + err.message));
         } /* end config file parsing */
-        this.ngenera = genus + 1;
 
         /* Now valid our widths, heights etc with the size of the image
          * for all the types of the genera we just added
@@ -269,10 +239,6 @@ Theme.Theme.prototype = {
                 throw new Error(_('Theme must contain at least walkers and fallers'));
             }
         }
-
-        // NOTE: original code sets theme.total = 0
-        // and only adds the numbers of the genera we *just* added?
-        // i.e. theme.total = sum(theme.number[first_genus:theme.ngenera]) ??
     },  // append_theme
 
     get total() {
@@ -280,10 +246,8 @@ Theme.Theme.prototype = {
     },
 
     grow: function () {
-        this.name.push('');
         this.number.push(1);
         this.ToonData.push({}); // object 'toonType': ToonData
-        ++this.ngenera;
     },
 
     destroy: function () {

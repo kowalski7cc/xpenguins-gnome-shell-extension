@@ -1,9 +1,19 @@
 --------------------------
            UPTO
 --------------------------
-* OPTIONS:::
-* - RECALC mode [not in GNOME 3.2]
-* all the TODOs
+* test theme.ngenera with 1) loading all at once 2) appending.
+* remove_theme.
+* rewrite on-the-fly theme changing to use append_theme and remove_theme?
+* all the TODOs, remove log/replace with XPUtil, tidy, ...
+  - toon.js
+  - extension.js
+  - theme.js
+  - [DONE] util.js
+  - [DONE] theme_manager.js
+  - windowListener.js
+  - xpenguins.js
+  - region.js
+* error handling: what to do on throw new Error
 * load averaging + options/sliders.
 * sometimes: fatal IO error 11 Resource temporarily unavailable.
 * speed up (seems to lag the computer, perhaps because of Mainloop)
@@ -47,6 +57,7 @@ SEPARATE BRANCH
 --------------------------
 FUTURE
 --------------------------
+* translations from xpenguins, '' -> _('')
 * toggle n toons per theme: don't need a checkbox, just a theme & a slider.
 * "Efficient" toggle:
   - in God Mode, don't change cursor on mouseover: use Clutter.set_motion_events_enabled(false) for optimisations
@@ -62,6 +73,7 @@ DONE
 --------------------------
 * [yep] god mode
 * OPTIONS:::
+* - [yep] RECALC mode [not in GNOME 3.2]
 * - [yep] ignoreMaximised: improve to ignore underneath
 * - [yep] onAllWorkspaces
 * - [yep] blood

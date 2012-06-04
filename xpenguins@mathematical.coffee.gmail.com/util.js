@@ -1,3 +1,5 @@
+/* various utility functions */
+
 /* Get the 1-min averaged system load on linux systems - it's the
  * first number in the /proc/loadavg pseudofile. Return -1 if not
  * found. */
@@ -46,12 +48,18 @@ function LOG() {
     let msg = arguments[0];
     if (arguments.length > 1) {
         [].shift.call(arguments);
-        msg = ''.format.apply(msg, arguments);
+        msg = ''.format.apply(null, arguments);
     }
     log(msg);
+    return msg;
+}
+
+function DEBUG() {
+    //LOG.apply(null, arguments);
 }
 
 /* utility warning function */
-function warn(msg) {
-    log(msg);
+function warn() {
+    let msg = LOG.apply(null, arguments);
+    global.log(msg);
 }

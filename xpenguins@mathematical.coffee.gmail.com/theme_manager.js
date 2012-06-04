@@ -1,3 +1,6 @@
+/* Containts ThemeManager static methods:
+ * for listing/describing themes.
+ */
 const Lang = imports.lang;
 const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
@@ -24,19 +27,17 @@ const XPUtil = Me.util;
  ***********************/
 //ThemeManager.ThemeManager = {
 const ThemeManager = {
-    /*
-     * Look for themes in
+    /* Look for themes in
      * $HOME/.xpenguins/themes
      * [xpenguins_directory]/themes
      */
     theme_directory: 'themes',
-    // TODO:
     system_directory: extensionPath,
     user_directory: '.xpenguins',
     config_file: 'config',
 
     /* xpenguins_list_themes */
-    /* Return a NULL-terminated list of names of apparently valid themes -
+    /* Return a list of names of apparently valid themes -
      * basically the directory names from either the user or the system
      * theme directories that contain a file called "config" are
      * returned. Underscores in the directory names are converted into
@@ -46,9 +47,6 @@ const ThemeManager = {
      * underscores are ugly.
      */
     list_themes: function () {
-        /* first look in $HOME/.xpenguins/themes for config,
-         * then in [xpenguins_dir]/themes
-         */
         let themes_dir, info, fileEnum, i,
             themeList = [],
             paths = [ GLib.build_filenamev([ GLib.get_home_dir(), this.user_directory, this.theme_directory ]),
@@ -59,11 +57,6 @@ const ThemeManager = {
                 continue;
             }
 
-            /* Could not get fileUtils.listDirAsync to work.
-             * I think I need to make it emit a signal when it's done,
-             * & listen to that signal on the side of anything that calls this function.
-             * In any case, here is a synchronous version for the meantime.
-             */
             fileEnum = themes_dir.enumerate_children('standard::*', Gio.FileQueryInfoFlags.NONE, null);
             while ((info = fileEnum.next_file(null)) !== null) {
                 let configFile = GLib.build_filenamev([themes_dir.get_path(),
@@ -74,23 +67,6 @@ const ThemeManager = {
                 }
             }
             fileEnum.close(null);
-/*
-            // Note: could do Lang.bind but need two of them!
-            let config_file = this.config_file;
-            fileUtils.listDirAsync(themes_dir, Lang.bind(this,
-                    function (dirInfos) {
-                        // look for config file, return name of dir, append to themeList
-                        themeList.push.apply(themeList,
-                            dirInfos.filter(Lang.bind(this,
-                              function (themedirinfo) {
-                                  let configFile = GLib.build_filenamev([themes_dir.get_path(),
-                                                                         themedirinfo.get_name(),
-                                                                         config_file]);
-//                                  print(configFile);
-                                  return GLib.file_test(configFile, GLib.FileTest.EXISTS);
-                              })).map(function (dirInfo) { return dirInfo.get_name(); }));
-                    }));
-                    */
         } // loop through system & local xpenguins dir.
 
       /* We convert all underscores in the directory name
@@ -105,22 +81,19 @@ const ThemeManager = {
         return themeList;
     },
 
-    // TODO: graphical popup window.
     /* xpenguins_theme_info (xpenguins_theme.c)
      * DescribeThemes (main.c)
      */
-    describe_themes: function (themes, noisy) {
+    describe_themes: function (themes) {
         let theme, loc, i,
             th = themes.length,
             infos = {};
         while (th--) {
             theme = themes[th].replace(/ /g, '_');
             loc = this.get_theme_path(theme, 'about');
-            log(('Parsing theme ' + theme));
             infos[theme] = {};
             if (!loc || !GLib.file_test(loc, GLib.FileTest.EXISTS)) {
-                // TODO: make popup & continue
-                log('Theme %s not found'.format(theme));
+                XPUtil.warn('Theme %s not found'.format(theme));
                 continue;
             }
 
@@ -153,7 +126,7 @@ const ThemeManager = {
                     infos[theme][word] = rest;
                 } else {
                     /* silently skip? */
-                    log(('unrecognised word ' + word + ', silently skipping'));
+                    XPUtil.LOG('unrecognised word %s, silently skipping', word);
                 }
             }
 
@@ -161,18 +134,6 @@ const ThemeManager = {
             infos[theme].name = theme.replace(/_/g, ' ');
             infos[theme].sanitised_name = theme;
             infos[theme].location = loc;
-
-            if (noisy) {
-                log(('Theme: '      + infos[theme].name));
-                log(('Date: '       + infos[theme].date));
-                log(('Artist(s): '  + infos[theme].artist));
-                log(('Copyright: '  + infos[theme].copyright));
-                log(('License: '    + infos[theme].licence));
-                log(('Maintainer: ' + infos[theme].maintainer));
-                log(('Location: '   + infos[theme].location));
-                log(('Icon: '       + infos[theme].icon));
-                log(('Comment: '    + infos[theme].comment));
-            }
         } // theme loop
 
         return infos;

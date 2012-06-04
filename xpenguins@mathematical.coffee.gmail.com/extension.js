@@ -314,6 +314,8 @@ XPenguinsMenu.prototype = {
         /* ignore maximised, always on visible workspace, angels, blood, god mode, verbose toggles */
         let defaults = XPenguins.XPenguinsLoop.prototype.defaultOptions();
         let blacklist = XPenguins.get_compatible_options(true);
+        // remove windowPreview code in release branches
+        blacklist.windowPreview = true;
         defaults.windowPreview = false;
         for (let propName in this._toggles) {
             if (this._toggles.hasOwnProperty(propName) && !blacklist[propName]) {
@@ -325,13 +327,13 @@ XPenguinsMenu.prototype = {
 
         /* RecalcMode combo box: only if global.display has grab-op- events. */
         if (!blacklist.recalcMode) {
-            dummy = new PopupMenu.PopupMenuItem(_('Recalc mode'), {reactive: false});
-            this._optionsMenu.menu.addMenuItem(dummy);
+            //dummy = new PopupMenu.PopupMenuItem(_('Recalc mode'), {reactive: false});
+            //this._optionsMenu.menu.addMenuItem(dummy);
             this._items.recalc = new PopupMenu.PopupComboBoxMenuItem({});
             this._optionsMenu.menu.addMenuItem(this._items.recalc);
             for (let mode in XPenguins.RECALC) {
                 if (XPenguins.RECALC.hasOwnProperty(mode)) {
-                    dummy = new PopupMenu.PopupMenuItem(mode);
+                    dummy = new PopupMenu.PopupMenuItem('Recalc mode: ' + mode);
                     this._items.recalc.addMenuItem(dummy, XPenguins.RECALC[mode]);
                 }
             }

@@ -1,7 +1,4 @@
 /*
- *
- *
- *
  * xpenguins_core.c:
  * + __xpenguins_init_penguin
  * + __xpenguins_make_climber
