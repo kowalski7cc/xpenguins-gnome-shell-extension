@@ -111,7 +111,7 @@ Toon.Toon.prototype = {
         // For GNOME 3.2, will have to store this.actor.
         this.actor = new Clutter.Clone(params || {});
         // mark it as mine
-        this.actor.toon_object = this;
+        //this.actor.toon_object = this;
 
         /* initialisation */
         this.u = this.v = 0; /* velocity */
@@ -127,7 +127,7 @@ Toon.Toon.prototype = {
         this.associate = Toon.UNASSOCIATED; /* toon is associated with a window */
         this.wid = null; /* window associated with */
 
-        //this.xoffset = this.yoffset = 0; /* location relative to window origin */
+        this.xoffset = this.yoffset = 0; /* location relative to window origin */
 
         this.frame = 0; /* Frame we're up to in the animation */
         this.cycle = 0; /* Number of times frame cycle has repeated */
@@ -410,8 +410,7 @@ Toon.Toon.prototype = {
             /* determine the position of a line of pixels that
              * the associated window should at least partially enclose
              */
-            let x, y, width, height,
-                w = this.GLOBAL.toon_windows;
+            let x, y, width, height;
             if (this.associate === Toon.DOWN) {
                 x = this.x;
                 y = this.y + this.data.height;
@@ -435,46 +434,46 @@ Toon.Toon.prototype = {
             } else {
                 throw new Error(_('Error: illegal direction %d'.format(this.associate)));
             } // switch(this.associate)
-            this.wid = 0;
+            this.wid = -1;
 
-            // TODO
-            for (let i = 0; i < this.GLOBAL.toon_windows.length; ++i) {
-                // TODO: solid?
-                if (w[i].solid &&
-                        w[i].x < x + width &&
+            /* work out which window the toon is sitting/climbing/walking on
+             * and when the window shifts by less than toon_relocate_max,
+             * move the toon with it (hence xoffset, yoffset)
+             */
+            let w = this.GLOBAL.toon_windows.rectangles;
+            for (let i = 0; i < w.length; ++i) {
+                if (w[i].x < x + width &&
                         w[i].x + w[i].width > x &&
                         w[i].y < y + height &&
-                        w[i].y + w[i].height < y) {
+                        w[i].y + w[i].height > y) {
                     this.wid = w[i].wid;
                     this.xoffset = this.x - w[i].x;
                     this.yoffset = this.y - w[i].y;
                     break;
                 }
             }
-            // BIG TODO: what's the xoffset/yoffset for? do I need it?
         }
     }, // CalculateAssociations
 
-    /* After calling ToonLocateWindows() we relocate
-     * all the toons that were
-     * associated with particular windows
+    /* After calling ToonLocateWindows() we relocate all toons that were
+     * associated with particular windows.
      * ToonRelocateAssociated
      */
+    // FIXME: toon_windows = OBJ { wid=>Meta.Rect } ??
+    // Avoids this loop..
     RelocateAssociated: function () {
         let i, dx, dy,
-            w = this.GLOBAL.toon_windows;
+            w = this.GLOBAL.toon_windows.rectangles;
         if (this.associate !== Toon.UNASSOCIATED &&
-                this.wid !== 0 && this.active) {
-            for (i = 0; i < this.GLOBAL.toon_windows.length; ++i) {
-                // TODO: I don't need to loop. just store the index??
-                // or does toon_windows change in between
-                if (this.wid === w[i].wid && w[i].solid) {
+                this.wid >= 0 && this.active) {
+            for (i = 0; i < this.GLOBAL.toon_windows.rectangles.length; ++i) {
+                if (this.wid === w[i].wid) {
                     dx = this.xoffset + w[i].x - this.x;
                     dy = this.yoffset + w[i].y - this.y;
-                    if (dx < this.GLOBAL.toon_max_relocate_right &&
-                            -dx < this.GLOBAL.toon_max_relocate_left &&
-                            dy < this.GLOBAL.toon_max_relocate_down &&
-                            -dy < this.GLOBAL.toon_max_relocate_up) {
+                    if (dx < this.GLOBAL.max_relocate_right &&
+                            -dx < this.GLOBAL.max_relocate_left &&
+                            dy < this.GLOBAL.max_relocate_down &&
+                            -dy < this.GLOBAL.max_relocate_up) {
                         if (!this.OffsetBlocked(dx, dy)) {
                             this.actor.move_by(dx, dy);
                         }
@@ -498,7 +497,6 @@ Toon.Toon.prototype = {
      * ToonAdvance
      */
     Advance: function (mode) {
-    //    log('Advance');
         let move_ahead = (mode === Toon.STILL ? false : true),
             newx = this.x + this.u,
             newy = this.y + this.v,

@@ -1,46 +1,86 @@
 --------------------------
            UPTO
 --------------------------
-* wid/window data/toons cling on to windows.
 * OPTIONS:::
-* - RECALC mode
-* - [yep] onAllWorkspaces
-* - [yep] blood
-* - [yep] angels
-* - [yep] ignore popups
-* - [yep] god mode
-* - windowed mode (onDesktop) --> need to think of an interface. Show overview & pick one?
-* - ignoreMaximised: improve to ignore underneath
-* - [yep] nPenguins
-* - [yep] multiple themes
-* all the TODOs (wid, window data, ...)
+* - RECALC mode [not in GNOME 3.2]
+* all the TODOs
+* load averaging + options/sliders.
 * sometimes: fatal IO error 11 Resource temporarily unavailable.
-* god mode
 * speed up (seems to lag the computer, perhaps because of Mainloop)
-* multiple themes
-* load averaging
-* - test w/ nautilus desktop window
-* - treat the top activities bar as solid?
-* - test w/ gnome-panel
-* - test w/ autohiding stuff
-* - test w/ frippery bottom panel/dock/etc
-* ** dual-mon - how to avoid toons going into bad area of stage?
-*/
+* Performance: addChrome vs add_actor ? only addChrome in god mode?
+* Performance/stability: just 'return true;' at the end of _frame to avoid having to keep re-adding
+
+SPLIT into branches:
+GNOME 3.2 
+- no RECALC mode
+- ui.extensionSystem
+- toon.actor (??)
+- no 'debug' toggle.
+- remove windowListener?
+GNOME 3.4 
+- RECALC mode
+- misc.extensionutils
+- toon == actor (??)
+- no 'debug' toggle.
+- remove windowListener?
+DEV
+- polyglot (try/catch for diff versions)
+
+windowed
+- try implement windowed mode.
+
 --------------------------
 CODE TIDYING
 --------------------------
 - XPenguinLoop properties: this.var vs this._var ?
 - redundant properties: Theme.names, .ngenera (bind to theme.genus.length?)
+- TODOs
+- BIGTODOs
+- FIXMEs
+- comments
            
+--------------------------
+SEPARATE BRANCH
+--------------------------
+* windowed mode (onDesktop) --> need to think of an interface. Show overview & pick one? {start a new branch, this is tricky}
+
 --------------------------
 FUTURE
 --------------------------
+* toggle n toons per theme: don't need a checkbox, just a theme & a slider.
+* "Efficient" toggle:
+  - in God Mode, don't change cursor on mouseover: use Clutter.set_motion_events_enabled(false) for optimisations
+  - use RECALC.PAUSE or RECALC.END
+  - if in a window, listen to window button-pressed, not per-actor button-pressed.
+  - enable load averaging
 * swap in themes on the fly
 * They appear in the overview. should they?
+* when you smite a toon or it dies, show a little speech bubble '- owwie!' for a second after.
 
 --------------------------
 DONE 
 --------------------------
+* [yep] god mode
+* OPTIONS:::
+* - [yep] ignoreMaximised: improve to ignore underneath
+* - [yep] onAllWorkspaces
+* - [yep] blood
+* - [yep] angels
+* - [yep] ignore popups
+* - [yep] god mode
+* - [yep] nPenguins
+* - [yep] multiple themes
+* [yep, solid] test w/ gnome-panel
+* [yep, solid] test w/ autohiding stuff
+* [yep] wid/window data/toons cling on to windows.
+* [yep] test w/ nautilus desktop window
 * [yep] _onInterrupt
 * [yep] jumping penguins
 * [yep] exploded penguins do not turn into angels until you remove what exploded them ('toon changing from explosion to explosion')
+
+-----------------------------
+KNOWN ISSUES, WON'T/CAN'T FIX
+-----------------------------
+* [WONT] treat the top activities bar as solid?
+* [WONT/CANT][THESE ARE NOT SOLID --> direct clutter.actor, we only deal with window actors] test w/ frippery bottom panel/dock/etc
+* [CANT] dual-mon - how to avoid toons going into bad area of stage?

@@ -2,8 +2,9 @@ const Lang = imports.lang;
 const Mainloop = imports.mainloop;
 
 const Clutter = imports.gi.Clutter;
-const Meta = imports.gi.Meta;
-const Shell = imports.gi.Shell;
+const GObject = imports.gi.GObject;
+const Meta    = imports.gi.Meta;
+const Shell   = imports.gi.Shell;
 
 // temp until two distinct versions:
 var Me;
@@ -14,36 +15,12 @@ try {
 }
 const Region = Me.region;
 const XPUtil = Me.util;
-/* Preliminary testing results.
- * notify::focus-app not tested yet (only if onDesktop is FALSE)
- *  --> check StatusTitleBar for a focus-*window* type event?
- *
- * Workspace-switched: 'pause' used to disconnect signals but for now
- * it *isn't* because then it can't listen for switch-workspace back
- * to reconnect them!
- * So: EITHER
- * 1) do not disconnect signals when paused, OR
- * 2) when you pause make sure you connect a signal that resumes.
- *
- * TODO:
- * - test switching workspaces w/ default options [yep]
- * - test switching workspaces w/ onAllWorkspaces [yep]
- * - test ignorePopups                            [yep]
- * - test !onDesktop: stacking order.             [yep]
- * - test w/ different RECALC modes.              [yep]
- * --> change recalc mode on the fly.             [yep]
- * - test GOD MODE
- * FIXME: 'focus-app' fires *twice* per window. Raise is better.
- *
- * NEXT:
- * - run in another window: test that window's signals.
- */
-const BLACK = new Clutter.Color({blue: 0, red: 0, green: 0, alpha: 255});
-const YELLOW = new Clutter.Color({blue: 0, red: 255, green: 255, alpha: 255});
-const RED = new Clutter.Color({blue: 0, red: 255, green: 0, alpha: 255});
-const WHITE = new Clutter.Color({blue: 255, red: 255, green: 255, alpha: 255});
+
+
+const BLACK = Clutter.Color.get_static(Clutter.StaticColor.BLACK);
+const YELLOW = Clutter.Color.get_static(Clutter.StaticColor.YELLOW);
+const RED = Clutter.Color.get_static(Clutter.StaticColor.RED);
 const WINDOW_COLOR = new Clutter.Color({blue: 255, red: 255, green: 255, alpha: 100});
-// aha! border width doesn't show because of scale!!
 const BORDER_WIDTH = 1; /* desired border width *after* scaling */
 const SCALE = 0.2;
 const UNSCALED_BORDER_WIDTH = Math.round(BORDER_WIDTH / SCALE);
@@ -60,6 +37,31 @@ const XPenguins = {
     }
 };
 
+/* for dev mode only (so I can develop on all my computers easily,
+ * one with 3.2 & one with 3.4). Default returns a whitelist.
+ * This function doesn't require an instance.
+ */
+function get_compatible_options(blacklist) {
+    /* enable everything by default */
+    let defOpts = WindowListener.prototype.options;
+    let list = {};
+    for (let opt in defOpts) {
+        if (defOpts.hasOwnProperty(opt)) {
+            list[opt] = !blacklist;
+        }
+    }
+
+    /* disable windowed mode, not working yet */
+    list.onDesktop = blacklist || false;
+
+    /* recalcMode needs grab-op-begin and grab-op-end for global.display,
+     * not in GNOME 3.2
+     */
+    list.recalcMode = GObject.signal_lookup('grab-op-begin', GObject.type_from_name('MetaDisplay')) && !blacklist;
+    return list;
+}
+
+
 function WindowListener() {
     this._init.apply(this, arguments);
 }
@@ -73,6 +75,7 @@ WindowListener.prototype = {
         onDesktop: true,
         onAllWorkspaces: false
     },
+
     _init: function (i_options) {
          /*
           * Everyone:
@@ -278,6 +281,7 @@ WindowListener.prototype = {
         this._connectSignals();
     },
 
+
     _connectSignals: function () {
         XPUtil.LOG('connectSignals');
         this._listeningPerWindow = false; /* whether we have to listen to individual windows for signals */
@@ -303,6 +307,9 @@ WindowListener.prototype = {
             /* if RECALC.PAUSE, pause on grab-op-begin with resume hook on grabOpEnd.
              * Otherwise, just recalc on grab-op-end.
              */
+            // UPTO: GNOME 3.2 doesn't have grab-op-begin.
+            // Can use imports.misc.config.PACKAGE_VERSION and
+            // imports.util.extensionSystem.versionCheck.
             if (this.options.recalcMode === XPenguins.RECALC.PAUSE) {
                 this.connect_and_track(this, global.display, 'grab-op-begin',
                     Lang.bind(this, function () {
@@ -317,55 +324,39 @@ WindowListener.prototype = {
             }
         }
 
-        /* maximize, unmaximize, minimize */
+        /* maximize, unmaximize */
         if (this.options.recalcMode !== XPenguins.RECALC.ALWAYS) {
-            /* TODO: ignoreMaximised: do not connect 'maximize' signal up? */
             this.connect_and_track(this, global.window_manager, 'maximize', Lang.bind(this, function () { this._dirtyToonWindows('maximize'); }));
             this.connect_and_track(this, global.window_manager, 'unmaximize', Lang.bind(this, function () { this._dirtyToonWindows('unmaximize'); }));
-            this.connect_and_track(this, global.window_manager, 'minimize', Lang.bind(this, function () { this._dirtyToonWindows('minimize'); }));
-        }   /* allocation-changed covers all of the above. */
+        }   /* Otherwise allocation-changed covers all of the above. */
 
-        /* unminimize. Options: notify::minimize for each window, or hope that notify::focus-app covers it.
-         * TODO: check focus-app vs notify::minimize
-         */
+        /* minimize/unminimize */
         if (this.options.ignorePopups) {
-            // FIXME: focus-app does do for unminimize, but perhaps notify::minimize would prevent so many bogus recalculations.
-            this.connect_and_track(this, Shell.WindowTracker.get_default(), 'notify::focus-app', Lang.bind(this, function () {
-                Mainloop.idle_add(Lang.bind(this, function () {
-                    this._dirtyToonWindows('notify::focus-app');
-                    return false;
-                }));
-            }));
-        } /* otherwise, map covers it */
+            /* can either listen to notify::focus-app, or notify::minimize.
+             * Done in _onWindowAdded.
+             * Focus-app fires twice per window... */
+            this._listeningPerWindow = true;
+        } else {
+            /* Otherwise 'map' covers unminimize */
+            if (this.options.recalcMode !== XPenguins.RECALC.ALWAYS) {
+                this.connect_and_track(this, global.window_manager, 'minimize', Lang.bind(this, function () { this._dirtyToonWindows('minimize'); }));
+            } /* Otherwise 'allocation-changed' covers minimize. */
+        }
 
-        /* stacking order: NOTE: this *only* matters if we are not running on the desktop! */
-        if (!this.options.onDesktop) {
-            if (this.options.recalcMode === XPenguins.RECALC.ALWAYS) {
-                /* already listening to per-window events, so why not add 'raised' to the list? */
-                // DONE IN _onWindowAdded.
-                this._listeningPerWindow = true;
-            } else if (!this.options.ignorePopups) {
-                /* Not listening to any per-window events yet, so stick with notify::focus-app
-                 * and hope for the best.
-                 * Don't connect if we've already done so in this.options.ignorePopups above (for unminimize)
-                 */
-                //this.connect_and_track(this, Shell.WindowTracker.get_default(), 'notify::focus-app', Lang.bind(this, function () { this._dirtyToonWindows('notify::focus-app') }));
-                this.connect_and_track(this, Shell.WindowTracker.get_default(), 'notify::focus-app', Lang.bind(this, function () {
-                    Mainloop.idle_add(Lang.bind(this, function () {
-                        this._dirtyToonWindows('notify::focus-app');
-                        return false;
-                    }));
-                }));
-            }
+        /* stacking order: NOTE: this *only* matters if we are not running on the desktop, or
+         * if we are ignoring maximised windows (& windows underneath them) - must remember them when
+         * they become visible.
+         * Just listen to notify::raise on all windows (notify::focus-app fires twice).
+         */
+        if (!this.options.onDesktop || this.options.ignoreMaximised) {
+            this._listeningPerWindow = true;
+            /* done in _onWindowAdded */
         }
 
         /*** if listening to any events from each window, we need to listen to window-added and window-removed
              in order to add the appropriate listeners.
              Then, we also need to listen to workspace-changed to reconnect these signals.
-
-             Note - we do not listen to signals emitted by windows that do not trigger 'window-added'.
          ***/
-        // CHECK: should we listen to 'mapped' and add signals there, or is window-added, removed enough?
         if (this._listeningPerWindow) {
             this.connect_and_track(this, ws, 'window-added', Lang.bind(this, this._onWindowAdded));
             this.connect_and_track(this, ws, 'window-removed', Lang.bind(this, this._onWindowRemoved));
@@ -378,7 +369,6 @@ WindowListener.prototype = {
                 }
             }));
         }
-        // FIXME LATER: reduce cases. This RECALC business is silly - just recalc *always* !
         // FIXME LATER: events for the XPenguins Window.
 
     }, // _connectSignals
@@ -422,8 +412,16 @@ WindowListener.prototype = {
             return;
         }
 
-        /* Stacking order. If we're not running on the desktop & aren't already listening to focus-app, then listen to 'raised' */
-        if (!this.options.onDesktop && this.options.recalcMode === XPenguins.RECALC.ALWAYS && !this.options.ignorePopups) {
+        /* minimize/unminimize: notify::minimize */
+        if (this.options.ignorePopups) {
+            this.connect_and_track(winActor, metaWin, 'notify::minimized',
+                Lang.bind(this, function () {
+                    this._dirtyToonWindows('notify::minimized');
+                }));
+        }
+
+        /* Stacking order. If we're not running on the desktop, then listen to 'raised' */
+        if (!this.options.Desktop || this.options.ignoreMaximised) {
             this.connect_and_track(winActor, metaWin, 'raised', Lang.bind(this, function () {
                 this._dirtyToonWindows('raised');
             }));
@@ -511,9 +509,8 @@ WindowListener.prototype = {
         this.draw();
     },
 
-    // BIG TODO: how to handle global vs local coords? (toons in local rel. to window?)
     _updateToonWindows: function () {
-        XPUtil.LOG('updateToonWindows');
+        XPUtil.LOG('[WL] updateToonWindows');
         this.toon_windows.clear();
         /* Add windows to region. If we use list_windows() we wont' get popups,
          * if we use get_window_actors() we will. */
@@ -521,10 +518,6 @@ WindowListener.prototype = {
         let winList;
         if (this.options.ignorePopups) {
             winList = ws.list_windows();
-            /* sort by stacking (if !onDesktop) */
-            if (!this.options.onDesktop) {
-                winList = global.display.sort_windows_by_stacking(winList);
-            }
         } else {
             // already sorted.
             winList = global.get_window_actors().map(function (act) { return act.meta_window; });
@@ -532,29 +525,39 @@ WindowListener.prototype = {
             winList = winList.filter(function (win) { return win.get_workspace() === ws; });
         }
 
+        /* sort by stacking (if !onDesktop or ignoreMaximised).
+         * Supposedly global.get_window_actors() is already sorted by stacking order
+         * but sometimes it needs a Mainloop.idle_add before it works properly.
+         * If I resort them it all seems to go fine.
+         */
+        if (!this.options.onDesktop || this.options.ignoreMaximised) {
+            winList = global.display.sort_windows_by_stacking(winList);
+        }
+
         /* iterate through backwards: every window up to winList[i] == winActor has a chance
          * of being on top of you. Once you hit winList[i] == winActor, the other windows
          * are *guaranteed* to be behind you.
          */
-        /* filter out maximised & desktop & nonvisible/mapped windows windows */
+        /* filter out desktop & nonvisible/mapped windows windows */
         winList = winList.filter(Lang.bind(this, function (win) {
             return (win.get_compositor_private().mapped &&
                     win.get_compositor_private().visible &&
-                   !((this.options.ignoreMaximised &&
-                      win.get_maximized() === (Meta.MaximizeFlags.HORIZONTAL |
-                                               Meta.MaximizeFlags.VERTICAL)) ||
-                     (win.get_window_type() === Meta.WindowType.DESKTOP)));
+                    win.get_window_type() !== Meta.WindowType.DESKTOP);
         }));
 
         let i = winList.length;
         while (i--) {
-            /* exit once you hit the window actor (if !onDesktop) */
-            if ((!this.options.onDesktop &&
-                   winList[i] === this.XPenguinsWindow.meta_window)) {
+            /* exit once you hit the window actor (if !onDesktop),
+             * or once you hit a maximised window (if ignoreMaximised) 
+             */ 
+            if ((!this.options.onDesktop && winList[i] === this.XPenguinsWindow.meta_window) ||
+                    (this.options.ignoreMaximised && winList[i].get_maximized() ===
+                        (Meta.MaximizeFlags.HORIZONTAL | Meta.MaximizeFlags.VERTICAL))) {
                 break;
             }
-            // 0, 0 is top-left corner
-            this.toon_windows.add_rectangle(winList[i].get_outer_rect());
+            let rect = winList[i].get_outer_rect();
+            rect.wid = winList[i].get_stable_sequence(); /* "Unique integer assigned to each MetaWindow on creation" */
+            this.toon_windows.add_rectangle(rect);
         }
         // bah: toon_windows.intersect(new_rectangle) gives the rectangle bounding box. Not the shape.
         // winList[0].meta_window.get_frame_bounds(): meant to return a Cairo.region

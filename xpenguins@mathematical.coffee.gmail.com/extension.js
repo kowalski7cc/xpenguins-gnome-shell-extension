@@ -1,9 +1,9 @@
 const Lang     = imports.lang;
 const Mainloop = imports.mainloop;
-const Gio = imports.gi.Gio;
-const Gtk = imports.gi.Gtk;
-const Pango = imports.gi.Pango;
-const St    = imports.gi.St;
+const Gio      = imports.gi.Gio;
+const Gtk      = imports.gi.Gtk;
+const Pango    = imports.gi.Pango;
+const St       = imports.gi.St;
 
 const Main      = imports.ui.main;
 const ModalDialog = imports.ui.modalDialog;
@@ -295,24 +295,9 @@ XPenguinsMenu.prototype = {
         this._populateThemeMenu();
 
 
-        /* Options menu:
-         * + theme chooser
-         * advanced theme chooser (checkboxes + info button + select multiple)
-         * + npenguins (??)              --> + TODO 'choose default set by theme'!
-         * + ignore maximised windows
-         * + always on visible workspace
-         * + god mode
-         * + angels
-         * + blood
-         * + verbose toggle
-         * - choose window to run in
-         * - RECALC mode
-         */
-
-        // NOTE: I don't think I need the 'Options' submenu here?
+        /* options submenu */
         this._optionsMenu = new PopupMenu.PopupSubMenuMenuItem(_('Options'));
         this.menu.addMenuItem(this._optionsMenu);
-
 
         /* Number of penguins */
         dummy = new PopupMenu.PopupMenuItem(_('Max penguins'), { reactive: false });
@@ -323,39 +308,39 @@ XPenguinsMenu.prototype = {
         // set to default from theme that was just loaded.
         this._items.nPenguins = new PopupMenu.PopupSliderMenuItem(0);
         this._items.nPenguins.connect('value-changed', Lang.bind(this, this._nPenguinsSliderChanged));
-        this._items.nPenguins.connect('drag-end', Lang.bind(this, this._onNPenguinsChanged)); // TODO: SEND TO LOOP
+        this._items.nPenguins.connect('drag-end', Lang.bind(this, this._onNPenguinsChanged));
         this._optionsMenu.menu.addMenuItem(this._items.nPenguins);
 
         /* ignore maximised, always on visible workspace, angels, blood, god mode, verbose toggles */
         let defaults = XPenguins.XPenguinsLoop.prototype.defaultOptions();
+        let blacklist = XPenguins.get_compatible_options(true);
         defaults.windowPreview = false;
         for (let propName in this._toggles) {
-            if (this._toggles.hasOwnProperty(propName)) {
+            if (this._toggles.hasOwnProperty(propName) && !blacklist[propName]) {
                 this._items[propName] = new PopupMenu.PopupSwitchMenuItem(this._toggles[propName], defaults[propName] || false);
                 this._items[propName].connect('toggled', Lang.bind(this, this.changeOption, propName));
                 this._optionsMenu.menu.addMenuItem(this._items[propName]);
             }
         }
 
-        /* TODO: "Resize behaviour": {calculate on resize, calculate on resize-end, pause during resize} */
-
-        /* RecalcMode combo box */
-        dummy = new PopupMenu.PopupMenuItem(_('Recalc mode'), {reactive: false});
-        this._optionsMenu.menu.addMenuItem(dummy);
-        this._items.recalc = new PopupMenu.PopupComboBoxMenuItem({});
-        this._optionsMenu.menu.addMenuItem(this._items.recalc);
-        for (let mode in XPenguins.RECALC) {
-            if (XPenguins.RECALC.hasOwnProperty(mode)) {
-                dummy = new PopupMenu.PopupMenuItem(mode);
-                this._items.recalc.addMenuItem(dummy, XPenguins.RECALC[mode]);
+        /* RecalcMode combo box: only if global.display has grab-op- events. */
+        if (!blacklist.recalcMode) {
+            dummy = new PopupMenu.PopupMenuItem(_('Recalc mode'), {reactive: false});
+            this._optionsMenu.menu.addMenuItem(dummy);
+            this._items.recalc = new PopupMenu.PopupComboBoxMenuItem({});
+            this._optionsMenu.menu.addMenuItem(this._items.recalc);
+            for (let mode in XPenguins.RECALC) {
+                if (XPenguins.RECALC.hasOwnProperty(mode)) {
+                    dummy = new PopupMenu.PopupMenuItem(mode);
+                    this._items.recalc.addMenuItem(dummy, XPenguins.RECALC[mode]);
+                }
             }
+            this._items.recalc.setActiveItem(XPenguins.RECALC.ALWAYS);
+            this._items.recalc.connect('active-item-changed',
+                Lang.bind(this, function (item, id) { 
+                    this.changeOption(null, id, 'recalcMode'); 
+                }));
         }
-        this._items.recalc.setActiveItem(XPenguins.RECALC.ALWAYS);
-        this._items.recalc.connect('active-item-changed',
-            Lang.bind(this, function (item, id) { 
-                this.changeOption(null, 'recalcMode', id); 
-            }));
-
     },
 
     _populateThemeMenu: function () {
@@ -363,11 +348,6 @@ XPenguinsMenu.prototype = {
         this._themeMenu.menu.removeAll();
         this._items.themes = {};
         let themeList = ThemeManager.list_themes();
-
-        //  @@
-        //this._themeMenu2 = new PopupMenu.PopupSubMenuMenuItem(_('Theme'));
-        //this.menu.addMenuItem(this._themeMenu2);
-        // !@@
 
         if (themeList.length === 0) {
             // TODO: add new item saying 'click to reload', or just modify dropdown menu label?
@@ -385,9 +365,6 @@ XPenguinsMenu.prototype = {
                 this._items.themes[sanitised_name].connect('toggled', Lang.bind(this, this._onChangeTheme));
                 this._items.themes[sanitised_name].connect('button-clicked', Lang.bind(this, this._onShowHelp, sanitised_name));
                 this._themeMenu.menu.addMenuItem(this._items.themes[sanitised_name]);
-
-                //@@
-                //this._themeMenu2.menu.addMenuItem(new ThemeMenuItem2(_(themeList[i]), themeList[i] == 'Penguins'));
             }
         }
     },
@@ -473,99 +450,3 @@ XPenguinsMenu.prototype = {
 
 };
 
-function ThemeMenuItem2() {
-    this._init.apply(this, arguments);
-}
-
-ThemeMenuItem2.prototype = {
-    __proto__: PopupMenu.PopupBaseMenuItem.prototype,
-
-    _init: function (text, state, icon_path, params) {
-        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
-        /* FIXME: if I just use this.addActor there's heaps of space between all the items,
-         * regardless of setting this.actor's spacing or padding to 0, same with constituent items.
-         * So currently using this.box  and this.box.add.
-         */
-        this.box = new St.BoxLayout({vertical: false});
-        this.addActor(this.box, {expand: true, span: -1});
-
-
-        /* icon */
-        this.icon = new St.Icon({
-            icon_name: 'image-missing', //placeholder
-            icon_type: St.IconType.FULLCOLOR,
-            style_class: 'popup-menu-icon'
-        });
-        this.box.add(this.icon);
-
-        /* label */
-        this.label = new St.Label({text: text}); // reactive: false?
-        this.box.add(this.label, {expand: true, align: St.Align.START});
-
-        /* info button */
-        this.button = new St.Button();
-        let icon = new St.Icon({
-            icon_name: 'help-contents',
-            style_class: 'popup-menu-icon',
-            // FIXME: appears not to have symbolic icon
-            icon_type: St.IconType.FULLCOLOR
-        });
-        this.button.set_child(icon);
-        this.box.add(this.button, {align: St.Align.END});
-
-        /* toggle */
-        this.state = state || false;
-        this.setShowDot(true); /* connect up toggle event to setShowDot */
-        this.connect('activate', Lang.bind(this, function () {
-            this.state = !this.state;
-        }));
-        this.set_icon(icon_path);
-
-        /* debugging.
-        this.icon.set_style('border: 1px solid #ffffff');
-        this.label.set_style('border: 1px solid #ffffff');
-        this.button.actor.set_style('border: 1px solid #ffffff');
-        this.box.set_style('border: 1px solid #ffff00');
-
-        NOTE: could simply style a checkbox in the same style as setShowDot.
-        */
-
-    },
-
-    _onRepaintDot: function (area) {
-        log('_onRepaintDot');
-        let cr = area.get_context(),
-            colour = area.get_theme_node().get_foreground_color(),
-            width = area.get_surface_size(),
-            height;
-        height = width[1];
-        width = width[0];
-
-        cr.setSourceRGBA(
-            colour.red / 255,
-            colour.green / 255,
-            colour.blue / 255,
-            colour.alpha / 255
-        );
-
-        /* draw box */
-        // FIXME: make this a St.Button in toggle mode instead of this??
-
-        cr.rectangle(0, 0, width, height);
-        if (this.state) {
-            cr.fill();
-        }
-        cr.stroke();
-    },
-
-    get state() { return this.toggle.state; },
-
-    /* sets the icon from a path */
-    set_icon: function (icon_path) {
-        let path = icon_path ? Gio.file_new_for_path(icon_path) : null;
-        if (path && path.query_exists(null)) {
-            this.icon.set_gicon(new Gio.FileIcon({file: path}));
-        }
-    }
-
-};
