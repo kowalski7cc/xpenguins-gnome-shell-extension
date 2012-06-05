@@ -1,8 +1,7 @@
-const Clutter  = imports.gi.Clutter;
-const GLib     = imports.gi.GLib;
-const Lang     = imports.lang;
+const Clutter = imports.gi.Clutter;
+const Lang = imports.lang;
 const Mainloop = imports.mainloop;
-const Shell    = imports.gi.Shell;
+const Shell = imports.gi.Shell;
 
 const Main = imports.ui.main;
 
@@ -230,6 +229,64 @@ XPenguinsLoop.prototype = {
         }
     },
 
+    /* setnPenguins: whether to recalculate nPenguins (add
+     *  the default number for that theme to the current count)
+     *  or keep the same total the user has specified.
+     */
+    appendTheme: function (name, setnPenguins) {
+        let nPenguinsBefore = this._theme.total,
+            playing = this._playing,
+            sanitised_name = ThemeManager.sanitiseThemeName(name);
+        if (playing) {
+            this.exit();
+        }
+
+        this.options.themes.push(sanitised_name);
+        if (!this._theme) {
+            this._theme = new Theme.Theme([name]);
+        } else {
+            this._theme.appendTheme(sanitised_name);
+        }
+
+        if (this.options.nPenguins < 0) {
+            this.setNumber(this._theme.total);
+        } else if (setnPenguins) {
+            this.setNumber(this.options.nPenguins + this._theme.total - nPenguinsBefore);
+        }
+        if (playing) {
+            this.start();
+        }
+    },
+
+    /* setnPenguins: whether to recalculate nPenguins (add
+     *  the default number for that theme to the current count)
+     *  or keep the same total the user has specified.
+     */
+    removeTheme: function (name) {
+        let nPenguinsBefore = this._theme.total,
+            playing = this._playing,
+            sanitised_name = ThemeManager.sanitiseThemeName(name);
+        if (playing) {
+            this.exit();
+        }
+        //UPTO. pop sanitised_name.
+        this.options.themes
+        this._theme.removeTheme(name); // only change... UPTO UPTO
+
+        if (this.options.nPenguins < 0) {
+            this.setNumber(this._theme.total);
+        } else if (setnPenguins) {
+            this.setNumber(this.options.nPenguins + this._theme.total - nPenguinsBefore);
+        }
+        if (playing) {
+            this.start();
+        }
+    },
+
+    getThemeNames: function () {
+        return this.options.themes;
+    },
+
     /******************
      * START STOP ETC *
      * ****************/
@@ -246,7 +303,7 @@ XPenguinsLoop.prototype = {
     exit: function () {
         WindowListener.exit.apply(this, arguments);
         if (this._playing) {
-            Clutter.threads_remove_timeout(this._playing);
+            Clutter.threads_remove_repaint_func(this._playing);
             this._playing = 0;
         }
     },
@@ -257,10 +314,7 @@ XPenguinsLoop.prototype = {
     start: function () {
         /* calls this.init */
         WindowListener.start.apply(this, arguments);
-        /* FIXME: call with lower priority (say GLib.PRIORITY_HIGH_IDLE or DEFAULT_IDLE)? 
-         * http://developer.gnome.org/glib/2.31/glib-The-Main-Event-Loop.html#G-PRIORITY-DEFAULT:CAPS 
-         */
-        this._playing = Clutter.threads_add_timeout(GLib.PRIORITY_DEFAULT, this.options.sleep_msec, Lang.bind(this, this._frame), null, function() { log("DONEEEE"); });
+        this._playing = Clutter.threads_add_repaint_func(Lang.bind(this, this._frame), null, function () { log("DONEEEE"); });
     },
 
     /* pauses the timeline & temporarily stops listening for events,
@@ -270,7 +324,7 @@ XPenguinsLoop.prototype = {
         /* pauses the window tracker */
         WindowListener.pause.call(this, hide, owner, eventName, cb); 
         if (this._playing) {
-            Clutter.threads_remove_timeout(this._playing);
+            Clutter.threads_remove_repaint_func(this._playing);
             this._playing = 0;
             if (hide) {
                 this._hideToons();
@@ -285,7 +339,7 @@ XPenguinsLoop.prototype = {
         if (this._toons[0] && !this._toons[0].visible) {
             this._showToons();
         }
-        this._playing = Clutter.threads_add_timeout(GLib.PRIORITY_DEFAULT, this.options.sleep_msec, Lang.bind(this, this._frame));
+        this._playing = Clutter.threads_add_repaint_func(Lang.bind(this, this._frame));
     },
 
     /* stop xpenguins, but play the exit sequence */
@@ -305,9 +359,9 @@ XPenguinsLoop.prototype = {
         XPUtil.DEBUG('[XP] _cleanUp');
         let i;
 
-        /* clean up Clutter.threads_add_timeout */
+        /* clean up Clutter.threads_add_repaint_func */
         if (this._playing) {
-            Clutter.threads_remove_timeout(this._playing);
+            Clutter.threads_remove_repaint_func(this._playing);
             this._playing = 0;
         }
 
@@ -390,16 +444,6 @@ XPenguinsLoop.prototype = {
             this.setNumber(opt.nPenguins);
         }
 
-        /* Load theme into this._theme, if not already done */
-        if (!this._theme) {
-            this.setThemes(opt.themes);
-        }
-
-        /* theme-specific options */
-        if (!opt.sleep_msec) {
-            opt.sleep_msec = this._theme.delay;
-        }
-
         /* See if load averaging will work */
         if (opt.load1 >= 0) {
             let load = XPUtil.loadAverage();
@@ -412,6 +456,15 @@ XPenguinsLoop.prototype = {
             }
         }
 
+        /* Load theme into this._theme, if not already done */
+        if (!this._theme) {
+            this.setThemes(opt.themes);
+        }
+
+        /* theme-specific options */
+        if (!opt.sleep_msec) {
+            opt.sleep_msec = this._theme.delay;
+        }
         /* Set up the window we're drawing on.
          * (has not been implemented yet beyond this._XPenguinsWindow = global.stage).
          * _XPenguinsWindow is the *actor*.
@@ -501,7 +554,7 @@ XPenguinsLoop.prototype = {
     },
 
     /**************** GOD MODE **************/
-    toggleGodMode: function(onoff) {
+    toggleGodMode: function (onoff) {
         XPUtil.DEBUG('!!!!!!!!!! toggling GOD MODE !!!!!!!!!!');
         let i = this._toons.length;
         if (onoff) {
@@ -520,7 +573,7 @@ XPenguinsLoop.prototype = {
         }
     },
 
-    _addSquishEvents: function(toon) {
+    _addSquishEvents: function (toon) {
         if (toon.actor.get_reactive()) {
             /* already has squish events. */
             return;
@@ -545,7 +598,7 @@ XPenguinsLoop.prototype = {
             }); 
     },
 
-    _removeSquishEvents: function(toon) {
+    _removeSquishEvents: function (toon) {
         XPUtil.DEBUG('removing squish events');
         toon.actor.set_reactive(false);
         this._disconnectTrackedSignals(toon);
@@ -586,13 +639,13 @@ XPenguinsLoop.prototype = {
 
     /******** TOONS ********/
     _hideToons: function () {
-        for (let i=0; i<this._toons.length; ++i) {
+        for (let i = 0; i < this._toons.length; ++i) {
             this._toons[i].hide();
         }
     },
 
     _showToons: function () {
-        for (let i=0; i<this._toons.length; ++i) {
+        for (let i = 0; i < this._toons.length; ++i) {
             this._toons[i].show();
         }
     },

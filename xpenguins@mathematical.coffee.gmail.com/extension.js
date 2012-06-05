@@ -223,7 +223,7 @@ XPenguinsMenu.prototype = {
         this._windowListener = new WindowListener.WindowListener();
 
         /* initialise as 'Penguins' */
-        this._onChangeTheme(null, null, 'Penguins');
+        this._onChangeTheme(null, true, 'Penguins');
     },
 
     getConf: function () {
@@ -336,12 +336,12 @@ XPenguinsMenu.prototype = {
         } else {
             this._themeInfo = ThemeManager.describeThemes(themeList, false);
             for (let i = 0; i < themeList.length; ++i) {
-                let sanitised_name = themeList[i].replace(/ /g, '_');
+                let sanitised_name = ThemeManager.sanitiseThemeName(themeList[i]);
                 this._items.themes[sanitised_name] = new ThemeMenuItem(_(themeList[i]), themeList[i] === 'Penguins');
                 if (this._themeInfo[sanitised_name].icon) {
                     this._items.themes[sanitised_name].setIcon(this._themeInfo[sanitised_name].icon);
                 }
-                this._items.themes[sanitised_name].connect('toggled', Lang.bind(this, this._onChangeTheme));
+                this._items.themes[sanitised_name].connect('toggled', Lang.bind(this, this._onChangeTheme, sanitised_name));
                 this._items.themes[sanitised_name].connect('button-clicked', Lang.bind(this, this._onShowHelp, sanitised_name));
                 this._themeMenu.menu.addMenuItem(this._items.themes[sanitised_name]);
             }
@@ -368,21 +368,17 @@ XPenguinsMenu.prototype = {
         dialog.open(global.get_current_time());
     },
 
-    _onChangeTheme: function () {
+    _onChangeTheme: function (item, state, sanitised_name) {
         XPUtil.DEBUG('_onChangeTheme');
-
-        let themeList = [];
-        /* THIS IS ALWAYS TURNING OUT 0 */
-        for (let name in this._items.themes) {
-            if (this._items.themes.hasOwnProperty(name) && this._items.themes[name].state) {
-                themeList.push(name);
-            }
+        if (state) {
+            this._XPenguinsLoop.appendTheme(sanitised_name);
+        } else {
+            this._XPenguinsLoop.removeTheme(sanitised_name);
         }
 
-        this._XPenguinsLoop.setThemes(themeList, true);
-
-        let themeListFlat = themeList.map(function (name) {
-                return _(name.replace(/ /g, '_'));
+        let themeListFlat = this._XPenguinsLoop.getThemeNames().map(
+            function (name) {
+                return ThemeManager.prettyThemeName(name);
             }).reduce(function (x, y) {
                 return x + ',' + y;
             });
@@ -394,7 +390,6 @@ XPenguinsMenu.prototype = {
         /* Set the label to match */
         this._items.nPenguins.setValue(this._XPenguinsLoop.options.nPenguins / XPenguins.PENGUIN_MAX);
         this._items.nPenguinsLabel.set_text(this._XPenguinsLoop.options.nPenguins.toString());
-
     },
 
     _startXPenguins: function (item, state) {

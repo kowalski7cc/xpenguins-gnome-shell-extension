@@ -1,10 +1,6 @@
-Convention- features are bookmarks, versions (GNOME 3.2 vs 3.4 say) are branches.
 --------------------------
            UPTO
 --------------------------
-* remove_theme.
-* slider to speed up toons
-* rewrite on-the-fly theme changing to use append_theme and remove_theme?
 * jslint again.
 * error handling: what to do on throw new Error
 * load averaging + options/sliders.
@@ -13,16 +9,14 @@ Convention- features are bookmarks, versions (GNOME 3.2 vs 3.4 say) are branches
 * sometimes: fatal IO error 11 Resource temporarily unavailable.
 * speed up (seems to lag the computer, perhaps because of Mainloop)
 
-SPLIT into branches:
-- take away _tempFrameNumber
-- remove further comments.
-GNOME 3.2 
+
+BRANCH GNOME 3.2  [from default]
 - no RECALC mode
 - ui.extensionSystem
 - toon.actor (??)
 - no 'debug' toggle.
 - remove windowListener?
-GNOME 3.4 
+BRANCH GNOME 3.4  [from 3.2]
 - RECALC mode
 - misc.extensionutils
 - toon == actor (??)
@@ -33,34 +27,31 @@ Toon.Toon = new Lang.Class({
     Extends: Clutter.Clone,
     _init: ....
 });
-DEV
+BRANCH default
 - polyglot (try/catch for diff versions)
 
-windowed
+BOOKMARK themes [from default]
+- sliders for each theme (nPenguins)
+- smoother on-the-fly changing
+- no need to re-read from disk every time.
+BOOKMARK windowed-mode [from default]
 - try implement windowed mode.
-// Also, if in window: Main.layoutManager._chrome._trackActor(..). not approved.
-XPenguinsWindow.width & height is wider than the window.
-listen to signals from XPenguinsWindow
-onAllWorkspaces only applies for on the desktop toons.
-
---------------------------
-SEPARATE BRANCH
---------------------------
-* windowed mode (onDesktop) --> need to think of an interface. Show overview & pick one? {start a new branch, this is tricky}
+- XPenguinsWindow.width & height is wider than the window.
+- listen to signals from XPenguinsWindow
+- onAllWorkspaces only applies for on the desktop toons.
+BOOKMARK 'efficiency' toggle
+- in God Mode, don't change cursor on mouseover: use Clutter.set_motion_events_enabled(false) for optimisations
+- use RECALC.PAUSE or RECALC.END
+- if in a window, listen to window button-pressed, not per-actor button-pressed.
+- enable load averaging
 
 --------------------------
 FUTURE
 --------------------------
-
+* error handling from extension level to stop the timeline on error (only way I can think of is a try/catch in this._frame?)
+ --> on error, 'off' toggle should call this.exit(), not this._onInterrupt().
 * translations from xpenguins, '' -> _("")
 * toggle n toons per theme: don't need a checkbox, just a theme & a slider.
-
-* "Efficient" toggle:
-  - in God Mode, don't change cursor on mouseover: use Clutter.set_motion_events_enabled(false) for optimisations
-  - use RECALC.PAUSE or RECALC.END
-  - if in a window, listen to window button-pressed, not per-actor button-pressed.
-  - enable load averaging
-  - * reduce priority of the timeout (GLib.PRIORITY_DEFAULT).
 * swap in themes on the fly
 * They appear in the overview. should they?
 * when you smite a toon or it dies, show a little speech bubble '- owwie!' for a second after.

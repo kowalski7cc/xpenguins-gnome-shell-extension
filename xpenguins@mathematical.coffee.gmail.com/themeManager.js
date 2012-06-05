@@ -36,6 +36,15 @@ const ThemeManager = {
     _userDirectory: '.xpenguins',
     _configFile: 'config',
 
+    sanitiseThemeName: function (name) {
+        return name.replace(/ /g,'_');
+    },
+
+    prettyThemeName: function (name) {
+        return name.replace(/_/g, ' ');
+    },
+
+
     /* xpenguins_list_themes */
     /* Return a list of names of apparently valid themes -
      * basically the directory names from either the user or the system
@@ -130,7 +139,7 @@ const ThemeManager = {
                 }
             }
 
-            infos[theme].name = theme.replace(/_/g, ' ');
+            infos[theme].name = theme.replace(/_/g, ' ');;
             infos[theme].sanitised_name = theme;
             infos[theme].location = loc;
         } // theme loop
