@@ -1,9 +1,9 @@
 /* Containts ThemeManager static methods:
  * for listing/describing themes.
  */
-const Lang = imports.lang;
 const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
+const Lang = imports.lang;
 const Shell = imports.gi.Shell;
 
 const fileUtils = imports.misc.fileUtils;
@@ -31,10 +31,10 @@ const ThemeManager = {
      * $HOME/.xpenguins/themes
      * [xpenguins_directory]/themes
      */
-    theme_directory: 'themes',
-    system_directory: extensionPath,
-    user_directory: '.xpenguins',
-    config_file: 'config',
+    _themeDirectory: 'themes',
+    _systemDirectory: extensionPath,
+    _userDirectory: '.xpenguins',
+    _configFile: 'config',
 
     /* xpenguins_list_themes */
     /* Return a list of names of apparently valid themes -
@@ -46,11 +46,11 @@ const ThemeManager = {
      * directory names containing spaces, but theme names containing
      * underscores are ugly.
      */
-    list_themes: function () {
+    listThemes: function () {
         let themes_dir, info, fileEnum, i,
             themeList = [],
-            paths = [ GLib.build_filenamev([ GLib.get_home_dir(), this.user_directory, this.theme_directory ]),
-                      GLib.build_filenamev([ this.system_directory, this.theme_directory ]) ];
+            paths = [ GLib.build_filenamev([ GLib.get_home_dir(), this._userDirectory, this._themeDirectory ]),
+                      GLib.build_filenamev([ this._systemDirectory, this._themeDirectory ]) ];
         for (i = 0; i < paths.length; ++i) {
             themes_dir = Gio.file_new_for_path(paths[i]);
             if (!themes_dir.query_exists(null)) {
@@ -61,7 +61,7 @@ const ThemeManager = {
             while ((info = fileEnum.next_file(null)) !== null) {
                 let configFile = GLib.build_filenamev([themes_dir.get_path(),
                                                         info.get_name(),
-                                                        this.config_file]);
+                                                        this._configFile]);
                 if (GLib.file_test(configFile, GLib.FileTest.EXISTS)) {
                     themeList.push(info.get_name());
                 }
@@ -84,16 +84,16 @@ const ThemeManager = {
     /* xpenguins_theme_info (xpenguins_theme.c)
      * DescribeThemes (main.c)
      */
-    describe_themes: function (themes) {
+    describeThemes: function (themes) {
         let theme, loc, i,
             th = themes.length,
             infos = {};
         while (th--) {
             theme = themes[th].replace(/ /g, '_');
-            loc = this.get_theme_path(theme, 'about');
+            loc = this.getThemePath(theme, 'about');
             infos[theme] = {};
             if (!loc || !GLib.file_test(loc, GLib.FileTest.EXISTS)) {
-                XPUtil.warn('Theme %s not found'.format(theme));
+                XPUtil.warn('Theme %s not found', theme);
                 continue;
             }
 
@@ -130,7 +130,6 @@ const ThemeManager = {
                 }
             }
 
-            /* print (popup box? append all?) */
             infos[theme].name = theme.replace(/_/g, ' ');
             infos[theme].sanitised_name = theme;
             infos[theme].location = loc;
@@ -144,16 +143,16 @@ const ThemeManager = {
      * xpenguins_theme_directory
      * It returns the *directory* name if the theme is "valid", i.e. contains a file 'config'.
      */
-    get_theme_dir: function (iname) {
+    getThemeDir: function (iname) {
         /* Convert spaces to underscores */
         /* first look in $HOME/.xpenguins/themes for config,
          * then in [xpenguins_dir]/themes
          */
         let name = iname.replace(/ /g, '_'),
-            dirs = [ GLib.build_filenamev([ GLib.get_home_dir(), this.user_directory, this.theme_directory, name ]),
-                      GLib.build_filenamev([ this.system_directory, this.theme_directory, name ]) ];
+            dirs = [ GLib.build_filenamev([ GLib.get_home_dir(), this._userDirectory, this._themeDirectory, name ]),
+                      GLib.build_filenamev([ this._systemDirectory, this._themeDirectory, name ]) ];
         for (let i = 0; i < dirs.length; ++i) {
-            if (GLib.file_test(GLib.build_filenamev([dirs[i], this.config_file]),
+            if (GLib.file_test(GLib.build_filenamev([dirs[i], this._configFile]),
                                 GLib.FileTest.EXISTS)) {
                 return dirs[i];
             }
@@ -163,9 +162,9 @@ const ThemeManager = {
         return null;
     },
 
-    get_theme_path: function (iname, fName) {
-        let dir = this.get_theme_dir(iname);
-        return GLib.build_filenamev([dir, fName || this.config_file]);
+    getThemePath: function (iname, fName) {
+        let dir = this.getThemeDir(iname);
+        return GLib.build_filenamev([dir, fName || this._configFile]);
     }
 }; // ThemeManager
 

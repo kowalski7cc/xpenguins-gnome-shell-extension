@@ -1,26 +1,20 @@
 --------------------------
            UPTO
 --------------------------
-* test theme.ngenera with 1) loading all at once 2) appending.
+* seems to lag computer; try Timeline or interval_add instead of repaint?
 * remove_theme.
 * rewrite on-the-fly theme changing to use append_theme and remove_theme?
-* all the TODOs, remove log/replace with XPUtil, tidy, ...
-  - toon.js
-  - extension.js
-  - theme.js
-  - [DONE] util.js
-  - [DONE] theme_manager.js
-  - windowListener.js
-  - xpenguins.js
-  - region.js
+* jslint again.
 * error handling: what to do on throw new Error
 * load averaging + options/sliders.
+* edge block sidebottomblock
+
 * sometimes: fatal IO error 11 Resource temporarily unavailable.
 * speed up (seems to lag the computer, perhaps because of Mainloop)
-* Performance: addChrome vs add_actor ? only addChrome in god mode?
-* Performance/stability: just 'return true;' at the end of _frame to avoid having to keep re-adding
 
 SPLIT into branches:
+- take away _tempFrameNumber
+- remove further comments.
 GNOME 3.2 
 - no RECALC mode
 - ui.extensionSystem
@@ -33,22 +27,21 @@ GNOME 3.4
 - toon == actor (??)
 - no 'debug' toggle.
 - remove windowListener?
+Toon.Toon = new Lang.Class({
+    Name: 'Toon',
+    Extends: Clutter.Clone,
+    _init: ....
+});
 DEV
 - polyglot (try/catch for diff versions)
 
 windowed
 - try implement windowed mode.
+// Also, if in window: Main.layoutManager._chrome._trackActor(..). not approved.
+XPenguinsWindow.width & height is wider than the window.
+listen to signals from XPenguinsWindow
+onAllWorkspaces only applies for on the desktop toons.
 
---------------------------
-CODE TIDYING
---------------------------
-- XPenguinLoop properties: this.var vs this._var ?
-- redundant properties: Theme.names, .ngenera (bind to theme.genus.length?)
-- TODOs
-- BIGTODOs
-- FIXMEs
-- comments
-           
 --------------------------
 SEPARATE BRANCH
 --------------------------
@@ -57,7 +50,9 @@ SEPARATE BRANCH
 --------------------------
 FUTURE
 --------------------------
-* translations from xpenguins, '' -> _('')
+* error handling from extension level to stop the timeline on error (only way I can think of is a try/catch in this._frame?)
+ --> on error, 'off' toggle should call this.exit(), not this._onInterrupt().
+* translations from xpenguins, '' -> _("")
 * toggle n toons per theme: don't need a checkbox, just a theme & a slider.
 * "Efficient" toggle:
   - in God Mode, don't change cursor on mouseover: use Clutter.set_motion_events_enabled(false) for optimisations
@@ -71,6 +66,7 @@ FUTURE
 --------------------------
 DONE 
 --------------------------
+* [yep [thread_add_repaint_func]] Clutter.threads_add_repaint_func vs Clutter.Timeline?
 * [yep] god mode
 * OPTIONS:::
 * - [yep] RECALC mode [not in GNOME 3.2]
@@ -89,10 +85,20 @@ DONE
 * [yep] _onInterrupt
 * [yep] jumping penguins
 * [yep] exploded penguins do not turn into angels until you remove what exploded them ('toon changing from explosion to explosion')
+* all the TODOs, remove log/replace with XPUtil, tidy, standardise function names
+  - [DONE] toon.js
+  - [DONE] extension.js
+  - [DONE]theme.js
+  - [DONE] util.js
+  - [DONE] theme_manager.js
+  - [DONE] windowListener.js
+  - [DONE] xpenguins.js
+  - [DONE] region.js
 
 -----------------------------
 KNOWN ISSUES, WON'T/CAN'T FIX
 -----------------------------
+* [WONT] our workspace being destroyed: then they move to the previous workspace (I think)
 * [WONT] treat the top activities bar as solid?
 * [WONT/CANT][THESE ARE NOT SOLID --> direct clutter.actor, we only deal with window actors] test w/ frippery bottom panel/dock/etc
 * [CANT] dual-mon - how to avoid toons going into bad area of stage?

@@ -48,14 +48,14 @@ function LOG() {
     let msg = arguments[0];
     if (arguments.length > 1) {
         [].shift.call(arguments);
-        msg = ''.format.apply(null, arguments);
+        msg = ''.format.apply(msg, arguments);
     }
     log(msg);
     return msg;
 }
 
 function DEBUG() {
-    //LOG.apply(null, arguments);
+    LOG.apply(null, arguments);
 }
 
 /* utility warning function */
