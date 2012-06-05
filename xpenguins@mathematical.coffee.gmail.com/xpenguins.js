@@ -246,7 +246,6 @@ XPenguinsLoop.prototype = {
     exit: function () {
         WindowListener.exit.apply(this, arguments);
         if (this._playing) {
-            Clutter.threads_remove_timeout(this._playing);
             this._playing = 0;
         }
     },
@@ -270,7 +269,6 @@ XPenguinsLoop.prototype = {
         /* pauses the window tracker */
         WindowListener.pause.call(this, hide, owner, eventName, cb); 
         if (this._playing) {
-            Clutter.threads_remove_timeout(this._playing);
             this._playing = 0;
             if (hide) {
                 this._hideToons();
@@ -307,7 +305,6 @@ XPenguinsLoop.prototype = {
 
         /* clean up Clutter.threads_add_timeout */
         if (this._playing) {
-            Clutter.threads_remove_timeout(this._playing);
             this._playing = 0;
         }
 
