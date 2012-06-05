@@ -1,8 +1,8 @@
 --------------------------
            UPTO
 --------------------------
-* seems to lag computer; try Timeline or interval_add instead of repaint?
 * remove_theme.
+* slider to speed up toons
 * rewrite on-the-fly theme changing to use append_theme and remove_theme?
 * jslint again.
 * error handling: what to do on throw new Error
@@ -50,15 +50,16 @@ SEPARATE BRANCH
 --------------------------
 FUTURE
 --------------------------
-* error handling from extension level to stop the timeline on error (only way I can think of is a try/catch in this._frame?)
- --> on error, 'off' toggle should call this.exit(), not this._onInterrupt().
+
 * translations from xpenguins, '' -> _("")
 * toggle n toons per theme: don't need a checkbox, just a theme & a slider.
+
 * "Efficient" toggle:
   - in God Mode, don't change cursor on mouseover: use Clutter.set_motion_events_enabled(false) for optimisations
   - use RECALC.PAUSE or RECALC.END
   - if in a window, listen to window button-pressed, not per-actor button-pressed.
   - enable load averaging
+  - * reduce priority of the timeout (GLib.PRIORITY_DEFAULT).
 * swap in themes on the fly
 * They appear in the overview. should they?
 * when you smite a toon or it dies, show a little speech bubble '- owwie!' for a second after.

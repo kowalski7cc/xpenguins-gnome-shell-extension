@@ -1,7 +1,8 @@
-const Clutter = imports.gi.Clutter;
-const Lang = imports.lang;
+const Clutter  = imports.gi.Clutter;
+const GLib     = imports.gi.GLib;
+const Lang     = imports.lang;
 const Mainloop = imports.mainloop;
-const Shell = imports.gi.Shell;
+const Shell    = imports.gi.Shell;
 
 const Main = imports.ui.main;
 
@@ -245,7 +246,7 @@ XPenguinsLoop.prototype = {
     exit: function () {
         WindowListener.exit.apply(this, arguments);
         if (this._playing) {
-            Clutter.threads_remove_repaint_func(this._playing);
+            Clutter.threads_remove_timeout(this._playing);
             this._playing = 0;
         }
     },
@@ -256,7 +257,10 @@ XPenguinsLoop.prototype = {
     start: function () {
         /* calls this.init */
         WindowListener.start.apply(this, arguments);
-        this._playing = Clutter.threads_add_repaint_func(Lang.bind(this, this._frame), null, function() { log("DONEEEE"); });
+        /* FIXME: call with lower priority (say GLib.PRIORITY_HIGH_IDLE or DEFAULT_IDLE)? 
+         * http://developer.gnome.org/glib/2.31/glib-The-Main-Event-Loop.html#G-PRIORITY-DEFAULT:CAPS 
+         */
+        this._playing = Clutter.threads_add_timeout(GLib.PRIORITY_DEFAULT, this.options.sleep_msec, Lang.bind(this, this._frame), null, function() { log("DONEEEE"); });
     },
 
     /* pauses the timeline & temporarily stops listening for events,
@@ -266,7 +270,7 @@ XPenguinsLoop.prototype = {
         /* pauses the window tracker */
         WindowListener.pause.call(this, hide, owner, eventName, cb); 
         if (this._playing) {
-            Clutter.threads_remove_repaint_func(this._playing);
+            Clutter.threads_remove_timeout(this._playing);
             this._playing = 0;
             if (hide) {
                 this._hideToons();
@@ -281,7 +285,7 @@ XPenguinsLoop.prototype = {
         if (this._toons[0] && !this._toons[0].visible) {
             this._showToons();
         }
-        this._playing = Clutter.threads_add_repaint_func(Lang.bind(this, this._frame));
+        this._playing = Clutter.threads_add_timeout(GLib.PRIORITY_DEFAULT, this.options.sleep_msec, Lang.bind(this, this._frame));
     },
 
     /* stop xpenguins, but play the exit sequence */
@@ -301,9 +305,9 @@ XPenguinsLoop.prototype = {
         XPUtil.DEBUG('[XP] _cleanUp');
         let i;
 
-        /* clean up Clutter.threads_add_repaint_func */
+        /* clean up Clutter.threads_add_timeout */
         if (this._playing) {
-            Clutter.threads_remove_repaint_func(this._playing);
+            Clutter.threads_remove_timeout(this._playing);
             this._playing = 0;
         }
 
@@ -386,6 +390,16 @@ XPenguinsLoop.prototype = {
             this.setNumber(opt.nPenguins);
         }
 
+        /* Load theme into this._theme, if not already done */
+        if (!this._theme) {
+            this.setThemes(opt.themes);
+        }
+
+        /* theme-specific options */
+        if (!opt.sleep_msec) {
+            opt.sleep_msec = this._theme.delay;
+        }
+
         /* See if load averaging will work */
         if (opt.load1 >= 0) {
             let load = XPUtil.loadAverage();
@@ -398,15 +412,6 @@ XPenguinsLoop.prototype = {
             }
         }
 
-        /* Load theme into this._theme, if not already done */
-        if (!this._theme) {
-            this.setThemes(opt.themes);
-        }
-
-        /* theme-specific options */
-        if (!opt.sleep_msec) {
-            opt.sleep_msec = this._theme.delay;
-        }
         /* Set up the window we're drawing on.
          * (has not been implemented yet beyond this._XPenguinsWindow = global.stage).
          * _XPenguinsWindow is the *actor*.
