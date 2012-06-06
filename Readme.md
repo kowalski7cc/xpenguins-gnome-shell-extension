@@ -6,8 +6,6 @@ If you have Linux but not GNOME-shell, just use the original XPenguins.
 Even if you have GNOME-shell you can run the original XPenguins, but you have to set Nautilus to handle the desktop, and the toons will think that the windows are bigger than they actually are so it can look weird.
 
 ![Screenshot of XPenguins extension](http://cdn.bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension/downloads/xpenguins-screenshot.png)
-https://bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension/downloads/xpenguins-screenshot.png
-        ![Window Options screenshot](http://cdn.bitbucket.org/mathematicalcoffee/window-options-gnome-shell-extension/downloads/window-options.png)
 
 Extension written 2012 by mathematical.coffee [mathematical.coffee@gmail.com](mailto:mathematical.coffee@gmail.com?subject=xpenguins%20question).  
 The original XPenguins was written by Robin Hogan ([http://xpenguins.seul.org/](http://xpenguins.seul.org/)).  
