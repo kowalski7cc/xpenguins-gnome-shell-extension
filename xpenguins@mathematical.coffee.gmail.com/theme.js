@@ -56,7 +56,6 @@ Theme.prototype = {
         return Math.min(XPenguins.PENGUIN_MAX, this.number.reduce(function (x, y) { return x + y; }));
     },
 
-
     /* Append the theme named "name" to this theme. */
     appendTheme: function (iname) {
         /* find theme */
