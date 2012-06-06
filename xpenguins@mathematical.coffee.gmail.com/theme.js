@@ -27,7 +27,7 @@ function Theme() {
 
 Theme.prototype = {
     _init: function (themeList) {
-        XPUtil.LOG('creating theme');
+        XPUtil.DEBUG('theme');
         /* members */
         /* Theme: can have one or more genera
          * Genus: class of toons (Penguins has 2: walker & skateboarder).

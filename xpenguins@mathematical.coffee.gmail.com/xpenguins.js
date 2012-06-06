@@ -445,7 +445,7 @@ XPenguinsLoop.prototype = {
             this._dirtyToonWindows('changeOption');
         } else {
         /* XPENGUIN-specific options. */
-            XPUtil.LOG('changeOption[XP]: %s = %s', propName, propVal);
+            XPUtil.DEBUG('changeOption[XP]: %s = %s', propName, propVal);
             if (!this.options.hasOwnProperty(propName) || this.options[propName] === propVal) {
                 return;
             }

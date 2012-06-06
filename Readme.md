@@ -1,11 +1,45 @@
 # xpenguins GNOME Shell Extension
 
-Description of what the extension does.
+This extension is a port of the [original XPenguins](http://xpenguins.seul.org/) to GNOME-shell. Little cute penguins walk around on your desktop and windows, and get squashed if you drag windows over them.
 
-Screenshot of the extension.
+If you have Linux but not GNOME-shell, just use the original XPenguins.
+Even if you have GNOME-shell you can run the original XPenguins, but you have to set Nautilus to handle the desktop, and the toons will think that the windows are bigger than they actually are so it can look weird.
 
-Written 2012 by mathematical.coffee [mathematical.coffee@gmail.com](mailto:mathematical.coffee@gmail.com?subject=xpenguins%20question).
+![Screenshot of XPenguins extension](http://cdn.bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension/downloads/xpenguins-screenshot.png)
+https://bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension/downloads/xpenguins-screenshot.png
+        ![Window Options screenshot](http://cdn.bitbucket.org/mathematicalcoffee/window-options-gnome-shell-extension/downloads/window-options.png)
+
+Extension written 2012 by mathematical.coffee [mathematical.coffee@gmail.com](mailto:mathematical.coffee@gmail.com?subject=xpenguins%20question).  
+The original XPenguins was written by Robin Hogan ([http://xpenguins.seul.org/](http://xpenguins.seul.org/)).  
 Project webpage: [at  bitbucket](https://bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension).
+
+---
+# Options.
+To start/stop XPenguins, use the toggle.
+
+### Theme
+XPenguins is themable, and you can have multiple themes running simultaneously. 
+Use the on/off toggle to toggle themes. 
+Clicking the 'help' button to the left of the theme will give you some more info on the theme and its creators.
+### Max Penguins
+This is the number of penguins running around on your screen. 
+By default, the number recommended by each theme is used.
+If you increase it to 999999999, don't complain to me if your computer crashes.
+### Ignore Popups
+Whether popup windows (right click menu, tooltips) are considered solid to the toons.
+### Ignore Maximised
+Whether maximised windows (and windows underneath these) are ignored.
+Toons only run around on the region of your desktop not covered by windows, so if windows are maximised you won't get any toons. Ignoring maximised windows means you can enjoy toons even with maximised windows. They will only bump into windows that are visible and non-maximised.
+### Always on Visible Workspace
+Whether toons stay on the workspace you started XPenguins on, or follow you around all your workspaces.
+### Blood
+Whether to show animations with blood (for example in the original Penguin theme the 'splat' animation has blood).
+### Angels
+Whether to show penguin angels floating up to heaven after dying.
+### God Mode
+Enabling "God mode" lets you squash (smite) toons by clicking on them.
+### Recalc Mode
+Ignore this. If you are suffering from severe performance issues AND you resize/move your windows really really often you can try switching this to "PAUSE" which will pause toons while you drag windows around. It probably won't make much difference at all.
 
 ---
 
@@ -38,10 +72,54 @@ All together now:
 
 ---
 
+# FAQ
+### I want more themes!
+By default this comes with the Penguins, Big Penguins, Classic Penguins, Turtles, and Bill themes.
+Normal XPenguins themes will work - put them in `~/.xpenguins/themes` or in the folder `themes` in the extension directory and they will be detected.
+
+XPenguins themes Simpsons Sonic the Hedgehog, Lemmings, Winnie the Pooh and Worms can be downloaded from the [XPenguins website](http://xpenguins.seul.org/) (on the right where it says "XPenguins Themes 1.0 (16 December 2002)").
+
+Even more themes created by users of XPenguins can be found [here](http://xpenguins.seul.org/contrib/).
+
+To learn about creating your own themes, read the THEMES section of the `xpenguins` man page and have a look at the config file for the Penguins theme (in `themes/Penguins/config`).
+
+### I found a bug!
+See next question.
+
+### The toons froze and toggling them off doesn't do anything.
+You must have discovered a bug in the extension! Contact me on [the issues page](https://bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension/issues/new) with:
+* your gnome-shell version
+* your extension version (look in metadata.json; give both dev-version and version)
+* your current options configurations: what themes you had turned on and what options (on all workspaces, ignore popups, etc) were on.
+* if you know how to reproduce the bug, do let me know!
+* finally: look at the bottom of `~/.xsession-errors` and if it has any 'JS ERROR !!!' lines, give me those too.
+
+You'll have to restart gnome-shell to wipe those frozen toons off your screen.
+
+# Known issues
+Here are some known issues/limitations of the program (if you think you can fix one, feel free to check out the code and have a go!)
+
+* Toons don't treat the message tray or gnome-shell menus/popups as solid. This is because XPenguins can only make toons interact with objects that the window manager knows about, and things created with GNOME-shell such as the message tray/notifications are not handled by the window manager.
+
+# Wish list
+Patches welcome!
+
+- toons talk to each other with little speech bubbles
+- toons jump up and down when you get new mail
+- run xpenguins in a specified window instead of on the desktop (need some sort of window selector and listeners to signals for when the window moves)
+- when themes are added/removed whilst xpenguins is running, just remove/add the relevant toons to the already-running animation rather than restarting from the beginning.
+- instead of one '# penguins' slider, have one for each theme.
+- toons try to get to your cursor (???) --> climb up windows/turn into superman/etc in order to get there?
+
+---
+
 # Branch Info (for developers)
 
-* Branch 3.2 is compatible with GNOME 3.2 *and* GNOME 3.4, but doesn't have any fancy gsettings or UI for setting options: edit `extension.js` directly.
-It is supposed to be stable.
-* Branch 3.4 is meant to be for GNOME 3.4 witha fancy gsettings interface that ties in with `gnome-shell-extension-prefs`.
-It is supposed to be stable.
-* Default branch is not guaranteed to be stable at *any* commit.
+* Branch `gnome3.2` is compatible with GNOME 3.2. It is supposed to be stable.
+* Branch `gnome3.4` is meant to be for GNOME 3.4. It is supposed to be stable.
+* Default branch is a polyglot - has try/catches in it such that it works simultaneously with 3.2 and 3.4.
+  This is just helpful for me to do testing.
+  It is also a lot more verbose than the release branches.
+  Default branch is not guaranteed to be stable at *any* commit.
+* Bookmark 'themes' is an attempt to get on-the-fly theme loading and removing working such that the animation doesn't have to be restarted every time these change.
+* Bookmark 'windowed-mode' is an attempt to get windowed mode working, i.e. toons run around in a specified window.
