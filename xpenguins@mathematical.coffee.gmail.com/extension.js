@@ -345,15 +345,18 @@ XPenguinsMenu.prototype = {
 
     _onChangeTheme: function (item, state, sanitised_name) {
         XPUtil.DEBUG('_onChangeTheme');
-        if (state) {
-            this._XPenguinsLoop.appendTheme(sanitised_name);
-        } else {
-            this._XPenguinsLoop.removeTheme(sanitised_name);
+
+        let themeList = [];
+        for (let name in this._items.themes) {
+            if (this._items.themes.hasOwnProperty(name) && this._items.themes[name].state) {
+                themeList.push(name);
+            }
         }
 
-        let themeListFlat = this._XPenguinsLoop.getThemeNames().map(
-            function (name) {
-                return ThemeManager.prettyThemeName(name);
+        this._XPenguinsLoop.setThemes(themeList, true);
+
+        let themeListFlat = themeList.map(function (name) {
+                return _(name.replace(/ /g, '_'));
             }).reduce(function (x, y) {
                 return x + ',' + y;
             });
