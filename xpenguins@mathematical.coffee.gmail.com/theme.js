@@ -8,12 +8,12 @@ const Shell = imports.gi.Shell;
 const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
 
-const Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-const ThemeManager = Me.themeManager.ThemeManager;
-const Toon   = Me.toon;
-const WindowListener = Me.windowListener;
-const XPenguins = Me.xpenguins;
-const XPUtil = Me.util;
+const Me = imports.misc.extensionUtils.getCurrentExtension();
+const ThemeManager = Me.imports.themeManager.ThemeManager;
+const Toon   = Me.imports.toon;
+const WindowListener = Me.imports.windowListener;
+const XPenguins = Me.imports.xpenguins;
+const XPUtil = Me.imports.util;
 
 /***********************
  *    Theme Object     *
@@ -27,7 +27,7 @@ function Theme() {
 
 Theme.prototype = {
     _init: function (themeList) {
-        XPUtil.DEBUG('theme');
+        XPUtil.DEBUG('creating theme');
         /* members */
         /* Theme: can have one or more genera
          * Genus: class of toons (Penguins has 2: walker & skateboarder).

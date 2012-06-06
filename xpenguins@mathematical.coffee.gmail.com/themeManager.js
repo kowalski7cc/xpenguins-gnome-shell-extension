@@ -8,9 +8,9 @@ const Shell = imports.gi.Shell;
 
 const fileUtils = imports.misc.fileUtils;
 
-const Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-const XPUtil = Me.util;
-let extensionPath = imports.ui.extensionSystem.extensionMeta['xpenguins@mathematical.coffee.gmail.com'].path;
+const Me = imports.misc.extensionUtils.getCurrentExtension();
+const XPUtil = Me.imports.util;
+let extensionPath = Me.path;
 
 /***********************
  * ThemeManager object *
