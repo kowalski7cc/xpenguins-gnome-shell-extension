@@ -363,7 +363,6 @@ XPenguinsLoop.prototype = {
          */
         this._toonNumber = 0;
         this._cycle = 0;
-        this._tempFRAMENUMBER = 0;
         this._exiting = false;
         this._XPenguinsWindow = null;
         this._genus = 0;
@@ -607,9 +606,6 @@ XPenguinsLoop.prototype = {
      * main.c
      */
     _frame: function () {
-        ++this._tempFRAMENUMBER;
-        log('FRAME ' + this._tempFRAMENUMBER + ' _toonNumber: ' + this._toonNumber);
-
         /* xpenguins_frame() */
         let sstatus = null,
             last_active = -1,

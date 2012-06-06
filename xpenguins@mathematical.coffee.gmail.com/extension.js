@@ -150,13 +150,6 @@ ThemeMenuItem.prototype = {
         this.toggle.connect('toggled', Lang.bind(this, function () { this.emit('toggled', this.toggle.state); }));
         this.button.connect('clicked', Lang.bind(this, function () { this.emit('button-clicked'); }));
 
-        /* debugging.
-        this.icon.set_style('border: 1px solid #ffffff');
-        this.button.set_style('border: 1px solid #ffffff');
-        this.toggle.actor.set_style('border: 1px solid #ffffff; padding-right: 0em');
-        this.box.set_style('border: 1px solid #ffff00');
-        this.actor.set_style('border: 1px solid #ff0000; padding-top: 0px; padding-bottom: 0px');
-        */
     },
 
     get state() { return this.toggle.state; },

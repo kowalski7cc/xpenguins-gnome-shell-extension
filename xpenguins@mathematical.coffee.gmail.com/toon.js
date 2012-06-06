@@ -616,6 +616,8 @@ ToonData.prototype = {
     },
 
     destroy: function () {
-        this.texture.destroy();
+        if (this.texture) {
+            this.texture.destroy();
+        }
     }
 };
