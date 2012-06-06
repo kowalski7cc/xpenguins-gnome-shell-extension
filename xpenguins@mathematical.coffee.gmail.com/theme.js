@@ -40,7 +40,6 @@ Theme.prototype = {
         this.number = [];   // theme penguin numbers
         this.nactions = []; /* Number of random actions the genus has (type actionX) */
         this.delay = 60;
-        this._themeGenusMap = {}; // name -> [genii (idx)] map.
 
         /* Initialise */
         for (let i = 0; i < themeList.length; ++i) {
@@ -102,11 +101,6 @@ Theme.prototype = {
                     }
                     /* store the genus index with the theme name */
                     ++i;
-                    if (this._themeGenusMap[name]) {
-                        this._themeGenusMap[name].push(genus);
-                    } else {
-                        this._themeGenusMap[name] = [genus];
-                    }
                 } else if (word === 'delay') {
                 /* preferred frame delay in milliseconds */
                     this.delay = parseInt(words[++i], 10);
