@@ -5,7 +5,12 @@ const Mainloop = imports.mainloop;
 const Meta    = imports.gi.Meta;
 const Shell   = imports.gi.Shell;
 
-const Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+var Me;
+try {
+    Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+} catch (err) {
+    Me = imports.misc.extensionUtils.getCurrentExtension().imports;
+}
 const Region = Me.region;
 const XPUtil = Me.util;
 

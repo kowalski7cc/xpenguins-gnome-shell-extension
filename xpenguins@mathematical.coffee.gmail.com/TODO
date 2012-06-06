@@ -1,10 +1,9 @@
 --------------------------
            UPTO
 --------------------------
-* jslint again.
 * error handling: what to do on throw new Error
 * [bookmark] load averaging + options/sliders.
-* edge block sidebottomblock
+* test edge block sidebottomblock
 
 * sometimes: fatal IO error 11 Resource temporarily unavailable.
 
@@ -17,15 +16,16 @@ BRANCH GNOME 3.2  [from default]
 - [wont] remove windowListener?
 
 BRANCH GNOME 3.4  [from 3.2]
-- misc.extensionutils
+- [yep] misc.extensionutils
+- [yep] remove windowListener from extension.js
+- [wont] remove windowListener?
 - toon == actor (??)
-- remove windowListener from extension.js
-- remove windowListener?
 Toon.Toon = new Lang.Class({
     Name: 'Toon',
     Extends: Clutter.Clone,
     _init: ....
 });
+
 BRANCH default
 - polyglot (try/catch for diff versions)
 
