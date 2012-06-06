@@ -498,7 +498,7 @@ XPenguinsLoop.prototype = {
     },
 
     /**************** GOD MODE **************/
-    toggleGodMode: function(onoff) {
+    toggleGodMode: function (onoff) {
         XPUtil.DEBUG('!!!!!!!!!! toggling GOD MODE !!!!!!!!!!');
         let i = this._toons.length;
         if (onoff) {
@@ -517,7 +517,7 @@ XPenguinsLoop.prototype = {
         }
     },
 
-    _addSquishEvents: function(toon) {
+    _addSquishEvents: function (toon) {
         if (toon.actor.get_reactive()) {
             /* already has squish events. */
             return;
@@ -542,7 +542,7 @@ XPenguinsLoop.prototype = {
             }); 
     },
 
-    _removeSquishEvents: function(toon) {
+    _removeSquishEvents: function (toon) {
         XPUtil.DEBUG('removing squish events');
         toon.actor.set_reactive(false);
         this._disconnectTrackedSignals(toon);
@@ -583,13 +583,13 @@ XPenguinsLoop.prototype = {
 
     /******** TOONS ********/
     _hideToons: function () {
-        for (let i=0; i<this._toons.length; ++i) {
+        for (let i = 0; i < this._toons.length; ++i) {
             this._toons[i].hide();
         }
     },
 
     _showToons: function () {
-        for (let i=0; i<this._toons.length; ++i) {
+        for (let i = 0; i < this._toons.length; ++i) {
             this._toons[i].show();
         }
     },
