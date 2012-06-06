@@ -9,7 +9,12 @@ const Main = imports.ui.main;
 const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
 
-const Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+var Me;
+try {
+    Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+} catch (err) {
+    Me = imports.misc.extensionUtils.getCurrentExtension().imports;
+}
 const Region = Me.region;
 const Theme  = Me.theme;
 const Toon   = Me.toon;
@@ -363,6 +368,7 @@ XPenguinsLoop.prototype = {
          */
         this._toonNumber = 0;
         this._cycle = 0;
+        this._tempFRAMENUMBER = 0;
         this._exiting = false;
         this._XPenguinsWindow = null;
         this._genus = 0;
@@ -606,6 +612,9 @@ XPenguinsLoop.prototype = {
      * main.c
      */
     _frame: function () {
+        ++this._tempFRAMENUMBER;
+        XPUtil.DEBUG('FRAME ' + this._tempFRAMENUMBER + ' _toonNumber: ' + this._toonNumber);
+
         /* xpenguins_frame() */
         let sstatus = null,
             last_active = -1,

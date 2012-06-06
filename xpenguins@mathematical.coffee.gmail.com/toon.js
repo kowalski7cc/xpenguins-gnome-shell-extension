@@ -18,7 +18,12 @@ const Lang = imports.lang;
 const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
 
-const Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+var Me;
+try {
+    Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+} catch (err) {
+    Me = imports.misc.extensionUtils.getCurrentExtension().imports;
+}
 const XPUtil = Me.util;
 
 /* Constants (toon.h) */

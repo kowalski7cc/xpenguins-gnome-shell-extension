@@ -15,7 +15,12 @@ const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
 
 /* my files */
-const Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+var Me;
+try {
+    Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+} catch (err) {
+    Me = imports.misc.extensionUtils.getCurrentExtension().imports;
+}
 const ThemeManager = Me.themeManager.ThemeManager;
 const WindowListener = Me.windowListener;
 const XPenguins = Me.xpenguins;
@@ -150,6 +155,13 @@ ThemeMenuItem.prototype = {
         this.toggle.connect('toggled', Lang.bind(this, function () { this.emit('toggled', this.toggle.state); }));
         this.button.connect('clicked', Lang.bind(this, function () { this.emit('button-clicked'); }));
 
+        /* debugging.
+        this.icon.set_style('border: 1px solid #ffffff');
+        this.button.set_style('border: 1px solid #ffffff');
+        this.toggle.actor.set_style('border: 1px solid #ffffff; padding-right: 0em');
+        this.box.set_style('border: 1px solid #ffff00');
+        this.actor.set_style('border: 1px solid #ff0000; padding-top: 0px; padding-bottom: 0px');
+        */
     },
 
     get state() { return this.toggle.state; },
@@ -194,6 +206,7 @@ XPenguinsMenu.prototype = {
             blood          : _("Show blood"),
             angels         : _("Show angels"),
             squish         : _("God Mode"),
+            windowPreview  : _("Window Preview"),
         };
         this._ABOUT_ORDER = ['name', 'date', 'artist', 'copyright',
             'license', 'maintainer', 'location', 'icon', 'comment'];
@@ -204,6 +217,9 @@ XPenguinsMenu.prototype = {
 
         /* create an Xpenguin Loop object which stores the XPenguins program */
         this._XPenguinsLoop = new XPenguins.XPenguinsLoop(this.getConf());
+
+        /* @@ debugging windowListener */
+        this._windowListener = new WindowListener.WindowListener();
 
         /* initialise as 'Penguins' */
         this._onChangeTheme(null, true, 'Penguins');
@@ -221,7 +237,19 @@ XPenguinsMenu.prototype = {
 
     changeOption: function (item, propVal, whatChanged) {
         XPUtil.DEBUG(('changeOption[ext]:' + whatChanged + ' -> ' + propVal));
+        if (this._windowListener) {
+            this._windowListener.changeOption(whatChanged, propVal);
+        }
         this._XPenguinsLoop.changeOption(whatChanged, propVal);
+
+        /* start/stop the windowListener */
+        if (whatChanged === 'windowPreview' && this._XPenguinsLoop.is_playing()) {
+            if (propVal) {
+                this._windowListener.start();
+            } else {
+                this._windowListener.stop();
+            }
+        }
     },
 
 
@@ -263,6 +291,9 @@ XPenguinsMenu.prototype = {
         /* ignore maximised, always on visible workspace, angels, blood, god mode, verbose toggles */
         let defaults = XPenguins.XPenguinsLoop.prototype.defaultOptions();
         let blacklist = XPenguins.getCompatibleOptions(true);
+        // remove windowPreview code in release branches
+        blacklist.windowPreview = true;
+        defaults.windowPreview = false;
         for (let propName in this._toggles) {
             if (this._toggles.hasOwnProperty(propName) && !blacklist[propName]) {
                 this._items[propName] = new PopupMenu.PopupSwitchMenuItem(this._toggles[propName], defaults[propName] || false);
@@ -368,8 +399,14 @@ XPenguinsMenu.prototype = {
 
         if (state) {
             this._XPenguinsLoop.start();
+            if (this._items.windowPreview && this._items.windowPreview.state) {
+                this._windowListener.start();
+            }
         } else {
             this._XPenguinsLoop.stop();
+            if (this._items.windowPreview && this._items.windowPreview.state) {
+                this._windowListener.stop();
+            }
         }
     },
 
