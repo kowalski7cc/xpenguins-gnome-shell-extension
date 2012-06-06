@@ -5,21 +5,15 @@
 /* Imports */
 const Shell = imports.gi.Shell;
 
-// temp until two distinct versions:
-var Me;
-try {
-    Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-} catch (err) {
-    Me = imports.misc.extensionUtils.getCurrentExtension().imports;
-}
+const Gettext = imports.gettext.domain('gnome-shell-extensions');
+const _ = Gettext.gettext;
+
+const Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
 const ThemeManager = Me.themeManager.ThemeManager;
 const Toon   = Me.toon;
 const WindowListener = Me.windowListener;
 const XPenguins = Me.xpenguins;
 const XPUtil = Me.util;
-
-const Gettext = imports.gettext.domain('gnome-shell-extensions');
-const _ = Gettext.gettext;
 
 /***********************
  *    Theme Object     *

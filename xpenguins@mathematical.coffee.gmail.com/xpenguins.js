@@ -9,13 +9,7 @@ const Main = imports.ui.main;
 const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
 
-// temp until two distinct versions:
-var Me;
-try {
-    Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-} catch (err) {
-    Me = imports.misc.extensionUtils.getCurrentExtension().imports;
-}
+const Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
 const Region = Me.region;
 const Theme  = Me.theme;
 const Toon   = Me.toon;
@@ -36,11 +30,9 @@ const RECALC = {
     END   : 2
 };
 
-/* for dev mode only (so I can develop on all my computers easily,
- * one with 3.2 & one with 3.4)
+/* Returns a list of XPenguins features that are supported by your version of gnome-shell.
  * Default returns a whitelist (i.e. list.opt == TRUE means supported).
  * Otherwise, you can specificy a blacklist (list.opt == TRUE means blacklisted).
- * Does not need an instance to run.
  */
 function getCompatibleOptions(blacklist) {
     let list = Me.windowListener.getCompatibleOptions(blacklist);
@@ -59,7 +51,14 @@ function getCompatibleOptions(blacklist) {
 }
 
 /************************
- * X penguins main loop *
+ * X penguins main loop: this handles toon behaviour per frame, option configuring,
+ * etc. It's basically main.c and xpenguins_core.c (xpenguins_frame()).
+ * Note: the component that handles toon_windows (making sure the snapshot of all the 
+ * windows on the screen is up to date) is in windowListener.js -- it was helpful
+ * as a standalone class during testing.
+ * I'd like to keep that as a separate class because it just helps me to keep the
+ * two functions (window tracking vs toon stuff) separate in my head and makes
+ * it easier for me to work on them.
  ************************/
 function XPenguinsLoop() {
     this._init.apply(this, arguments);
@@ -86,7 +85,7 @@ XPenguinsLoop.prototype = {
         XPUtil.DEBUG('[XP] _initToons');
         /* set up global vars to feed in to the toons */
         this._toonGlobals = {
-            XPenguinsWindow: this._XPenguinsWindow,
+            XPenguinsWindow   : this._XPenguinsWindow,
             toonData          : this._theme.toonData,
             toon_windows      : this._toonWindows,
             edge_block        : this.options.edge_block,

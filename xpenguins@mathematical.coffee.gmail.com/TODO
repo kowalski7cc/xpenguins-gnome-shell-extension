@@ -3,24 +3,23 @@
 --------------------------
 * jslint again.
 * error handling: what to do on throw new Error
-* load averaging + options/sliders.
+* [bookmark] load averaging + options/sliders.
 * edge block sidebottomblock
 
 * sometimes: fatal IO error 11 Resource temporarily unavailable.
-* speed up (seems to lag the computer, perhaps because of Mainloop)
 
 
 BRANCH GNOME 3.2  [from default]
-- no RECALC mode
-- ui.extensionSystem
-- toon.actor (??)
-- no 'debug' toggle.
-- remove windowListener?
+- [yep] get rid of blacklist stuff??? 
+- [yep] ui.extensionSystem
+- [yep] toon.actor
+- [yep] remove windowListener from extension.js
+- [wont] remove windowListener?
+
 BRANCH GNOME 3.4  [from 3.2]
-- RECALC mode
 - misc.extensionutils
 - toon == actor (??)
-- no 'debug' toggle.
+- remove windowListener from extension.js
 - remove windowListener?
 Toon.Toon = new Lang.Class({
     Name: 'Toon',
@@ -34,11 +33,13 @@ BOOKMARK themes [from default]
 - sliders for each theme (nPenguins)
 - smoother on-the-fly changing
 - no need to re-read from disk every time.
+
 BOOKMARK windowed-mode [from default]
 - try implement windowed mode.
 - XPenguinsWindow.width & height is wider than the window.
 - listen to signals from XPenguinsWindow
 - onAllWorkspaces only applies for on the desktop toons.
+
 BOOKMARK 'efficiency' toggle
 - in God Mode, don't change cursor on mouseover: use Clutter.set_motion_events_enabled(false) for optimisations
 - use RECALC.PAUSE or RECALC.END

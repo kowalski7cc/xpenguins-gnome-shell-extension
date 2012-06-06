@@ -5,13 +5,7 @@ const Mainloop = imports.mainloop;
 const Meta    = imports.gi.Meta;
 const Shell   = imports.gi.Shell;
 
-// temp until two distinct versions:
-var Me;
-try {
-    Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-} catch (err) {
-    Me = imports.misc.extensionUtils.getCurrentExtension().imports;
-}
+const Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
 const Region = Me.region;
 const XPUtil = Me.util;
 
@@ -33,9 +27,9 @@ const XPenguins = {
     }
 };
 
-/* for dev mode only (so I can develop on all my computers easily,
- * one with 3.2 & one with 3.4). Default returns a whitelist.
- * This function doesn't require an instance.
+/* Returns a list of XPenguins features that are supported by your version of gnome-shell.
+ * Default returns a whitelist (i.e. list.opt == TRUE means supported).
+ * Otherwise, you can specificy a blacklist (list.opt == TRUE means blacklisted).
  */
 function getCompatibleOptions(blacklist) {
     /* enable everything by default */

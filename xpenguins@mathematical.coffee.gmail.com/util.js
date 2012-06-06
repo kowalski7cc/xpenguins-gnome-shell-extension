@@ -55,7 +55,7 @@ function LOG() {
 }
 
 function DEBUG() {
-    LOG.apply(null, arguments);
+//    LOG.apply(null, arguments);
 }
 
 /* utility warning function */
