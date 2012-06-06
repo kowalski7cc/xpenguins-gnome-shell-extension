@@ -5,7 +5,6 @@ const Mainloop = imports.mainloop;
 const Meta    = imports.gi.Meta;
 const Shell   = imports.gi.Shell;
 
-// temp until two distinct versions:
 var Me;
 try {
     Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];

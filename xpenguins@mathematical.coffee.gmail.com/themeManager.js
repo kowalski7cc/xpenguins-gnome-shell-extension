@@ -8,7 +8,6 @@ const Shell = imports.gi.Shell;
 
 const fileUtils = imports.misc.fileUtils;
 
-// temp until two distinct versions:
 var Me, extensionPath;
 try {
     // gnome 3.2

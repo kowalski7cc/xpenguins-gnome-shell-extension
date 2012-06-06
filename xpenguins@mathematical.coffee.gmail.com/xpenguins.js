@@ -9,7 +9,6 @@ const Main = imports.ui.main;
 const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
 
-// temp until two distinct versions:
 var Me;
 try {
     Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
