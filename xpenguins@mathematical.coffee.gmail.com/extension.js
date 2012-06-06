@@ -329,6 +329,7 @@ XPenguinsMenu.prototype = {
         this._items.themes = {};
         let themeList = ThemeManager.listThemes();
 
+        
         if (themeList.length === 0) {
             this._themeMenu.label.set_text(_("No themes found, click to reload!"));
             // FIXME: test
@@ -346,6 +347,7 @@ XPenguinsMenu.prototype = {
                 this._themeMenu.menu.addMenuItem(this._items.themes[sanitised_name]);
             }
         }
+        this._themeMenu.menu.addMenuItem(new ThemeSliderMenuItem('test theme', 5, 0, 100, true));
     },
 
     _onShowHelp: function (button, name) {
@@ -420,3 +422,60 @@ XPenguinsMenu.prototype = {
 
 };
 
+
+function ThemeSliderMenuItem() {
+    this._init.apply(this, arguments);
+}
+
+ThemeSliderMenuItem.prototype = {
+    /* since this contains a MenuItem + a SliderItem we need this to be a MenuSection */
+    __proto__: PopupMenu.PopupMenuSection.prototype,
+
+    _init: function (text, defaultVal, min, max, round) {
+        PopupMenu.PopupMenuSection.prototype._init.call(this);
+
+        this.min = min || 0;
+        this.max = max || 1;
+        this.round = round || false;
+
+        /* insert the composite info-icon-thingy... */
+        /* bah have to add the label in at the end */
+        this.label = new PopupMenu.PopupMenuItem(text, {reactive: false});
+        this.addMenuItem(this.label);
+
+        /* insert the slider */
+        this.slider = new PopupMenu.PopupSliderMenuItem((defaultVal - min) / (max - min)); // between 0 and 1
+        //this.slider = new PopupMenu.PopupSliderMenuItem(0); // between 0 and 1
+        this.addMenuItem(this.slider);
+       
+        this._value = defaultVal;
+        if (round) {
+           this._value = Math.round(this._value);
+        } 
+        this.numberLabel = new St.Label({text: this._value.toString()});
+        this.label.addActor(this.numberLabel, {align: St.Align.END});
+
+        /* connect up signals */
+        this.slider.connect('value-changed', Lang.bind(this, this._updateValue));
+        /* pass through the drag-end signal */
+        this.slider.connect('drag-end', Lang.bind(this, function () { this.emit('drag-end'); }));
+    },
+
+    /* hope that this.slider.value and this._value remain in sync... */
+    getValue: function (raw) {
+        if (raw) {
+            return this.slider.value;
+        } else {
+            return this._value;
+        }
+    },
+
+    _updateValue: function (slider, value) {
+        let val = value * (this.max - this.min) + this.min;
+        if (this.round) {
+            val = Math.round(val);
+        }
+        this._value = val;
+        this.numberLabel.set_text(val.toString());
+    }
+};

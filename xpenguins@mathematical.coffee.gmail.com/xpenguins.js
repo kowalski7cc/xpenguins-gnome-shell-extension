@@ -209,6 +209,20 @@ XPenguinsLoop.prototype = {
         return this._playing > 0;
     },
 
+    appendTheme: function (name) {
+        if (this._theme) {
+            /* stop/start etc */
+            this._theme.appendTheme(name);
+            this.options.themes.push(name);
+        } else {
+            this.setThemes([name], true);
+        }
+    },
+
+    getThemeNames: function (name) {
+        return this.options.themes;
+    },
+
     setThemes: function (themeList, setnPenguins) {
         XPUtil.DEBUG('[XP] setThemes');
         /* FIXME: 

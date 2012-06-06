@@ -99,11 +99,11 @@ Theme.prototype = {
         // and you have to shift by the number of elements of genii < you
         // UPTO
         delete this._themeGenusMap[name];
-        for (let tname this._themeGenusMap) {
+        for (let tname in this._themeGenusMap) {
             if (this._themeGenusMap.hasOwnProperty(tname)) {
                 i = this._themeGenusMap[tname].length;
                 while (i--) {
-                    if (this._themeGenusMap[tname][i] > 
+                    //if (this._themeGenusMap[tname][i] > 
                 }
             }
         }
