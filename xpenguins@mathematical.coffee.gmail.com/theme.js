@@ -8,12 +8,12 @@ const Shell = imports.gi.Shell;
 const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
 
-const Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-const ThemeManager = Me.themeManager.ThemeManager;
-const Toon   = Me.toon;
-const WindowListener = Me.windowListener;
-const XPenguins = Me.xpenguins;
-const XPUtil = Me.util;
+const Me = imports.misc.extensionUtils.getCurrentExtension();
+const ThemeManager = Me.imports.themeManager.ThemeManager;
+const Toon   = Me.imports.toon;
+const WindowListener = Me.imports.windowListener;
+const XPenguins = Me.imports.xpenguins;
+const XPUtil = Me.imports.util;
 
 /***********************
  *    Theme Object     *
@@ -40,7 +40,6 @@ Theme.prototype = {
         this.number = [];   // theme penguin numbers
         this.nactions = []; /* Number of random actions the genus has (type actionX) */
         this.delay = 60;
-        this._themeGenusMap = {}; // name -> [genii (idx)] map.
 
         /* Initialise */
         for (let i = 0; i < themeList.length; ++i) {
@@ -57,51 +56,6 @@ Theme.prototype = {
         return Math.min(XPenguins.PENGUIN_MAX, this.number.reduce(function (x, y) { return x + y; }));
     },
 
-
-    removeTheme: function (iname) {
-        /* Hmm, can't really remove it from toonData because all the toons
-         * references ToonData[this.genus][this.type] which will be bad if you
-         * splice these indices out of the array.
-         *
-         * Could delete from toonData, nactions, number etc to leave 'undefined' there
-         * (and add it back again later).
-         *
-         * But need to override this.ngenera and this.total.
-         */
-        // UPTO: could just delete from this.toonData, nactions, ngenera, toonData
-        //       but leave the slots there for later re-adding? (ngenera/total might be off though)
-        /* note: guaranteed to be increasing. */
-        let name = ThemeManager.sanitiseThemeName(iname),
-            genii = this._themeGenusMap[name];
-        if (!genii) {
-            return;
-        }
-        let i = genii.length;
-        while (i--) { /* splice in decreasing genus index order */
-            /* remove fron toonData, nactions, ngenera, toonData */
-            this.number.splice(genii[i], 1);
-            this.nactions.splice(genii[i], 1);
-            for (let itype in this.toonData[genii[i]]) {
-                if (this.toonData[genii[i]].hasOwnProperty(itype)) {
-                    this.toonData[genii[i]][itype].destroy();
-                }
-            }
-            delete this.toonData[genii[i]];
-        }
-        /* remove from _themeGenusMap. 
-         * NOTE: all indices > genii[i] must be shifted! */
-        // and you have to shift by the number of elements of genii < you
-        // UPTO
-        delete this._themeGenusMap[name];
-        for (let tname this._themeGenusMap) {
-            if (this._themeGenusMap.hasOwnProperty(tname)) {
-                i = this._themeGenusMap[tname].length;
-                while (i--) {
-                    if (this._themeGenusMap[tname][i] > 
-                }
-            }
-        }
-    },
 
     /* Append the theme named "name" to this theme. */
     appendTheme: function (iname) {
@@ -148,11 +102,6 @@ Theme.prototype = {
                     }
                     /* store the genus index with the theme name */
                     ++i;
-                    if (this._themeGenusMap[name]) {
-                        this._themeGenusMap[name].push(genus);
-                    } else {
-                        this._themeGenusMap[name] = [genus];
-                    }
                 } else if (word === 'delay') {
                 /* preferred frame delay in milliseconds */
                     this.delay = parseInt(words[++i], 10);

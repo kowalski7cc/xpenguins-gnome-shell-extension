@@ -9,12 +9,12 @@ const Main = imports.ui.main;
 const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
 
-const Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-const Region = Me.region;
-const Theme  = Me.theme;
-const Toon   = Me.toon;
-const WindowListener = Me.windowListener.WindowListener.prototype; // this is how we'll keep it in sync for now.
-const XPUtil = Me.util;
+const Me = imports.misc.extensionUtils.getCurrentExtension();
+const Region = Me.imports.region;
+const Theme  = Me.imports.theme;
+const Toon   = Me.imports.toon;
+const WindowListener = Me.imports.windowListener.WindowListener.prototype; // this is how we'll keep it in sync for now.
+const XPUtil = Me.imports.util;
 
 /* constants */
 const PENGUIN_MAX = 255;
@@ -35,7 +35,7 @@ const RECALC = {
  * Otherwise, you can specificy a blacklist (list.opt == TRUE means blacklisted).
  */
 function getCompatibleOptions(blacklist) {
-    let list = Me.windowListener.getCompatibleOptions(blacklist);
+    let list = Me.imports.windowListener.getCompatibleOptions(blacklist);
     /* enable everything else by default */
     let defOpts = XPenguinsLoop.prototype.defaultOptions();
     for (let opt in XPenguinsLoop.prototype.defaultOptions()) {
