@@ -5,3 +5,16 @@
 
 .xpenguins-about-text {
 }
+
+.theme-slider-menu-item-top-box {
+    padding-left: 0em;
+    padding-right: 1.75em;
+    background-color: #0000ff;
+    color: #ff0000;
+}
+.theme-slider-menu-item-bottom-box {
+    padding-left: 0em;
+    padding-right: 0em;
+    background-color: #0000ff;
+    color: #ff0000;
+}

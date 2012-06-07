@@ -79,6 +79,7 @@ Toon.prototype = {
         this.genus = null;
         this.type = 'faller';
         this.direction = null;
+        this.theme = null;
 
         /* toon is associated with a window */
         this.associate = UNASSOCIATED; 
@@ -145,8 +146,10 @@ Toon.prototype = {
     },
 
     /* Only call this *after* setting the toon's genus */
-    init: function () {
-        XPUtil.DEBUG(('TOON.INIT: genus: ' + this.genus + ' type: ' + this.type));
+    init: function (genus) {
+        if (genus) {
+            this.genus = genus;
+        }
         this.data = this._globals.toonData[this.genus][this.type];
         this.direction = XPUtil.RandInt(2);
         this.setType('faller', this.direction, UNASSOCIATED);

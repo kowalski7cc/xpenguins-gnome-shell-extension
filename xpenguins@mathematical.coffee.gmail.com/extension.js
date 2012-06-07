@@ -22,7 +22,7 @@ try {
 } catch (err) {
     Me = imports.misc.extensionUtils.getCurrentExtension().imports;
 }
-const ThemeManager = Me.themeManager.ThemeManager;
+const ThemeManager = Me.themeManager;
 const WindowListener = Me.windowListener;
 const XPenguins = Me.xpenguins;
 const XPUtil = Me.util;
@@ -110,34 +110,36 @@ AboutDialog.prototype = {
     }
 };
 
-
-function ThemeMenuItem() {
+function ThemeSliderMenuItem() {
     this._init.apply(this, arguments);
 }
 
-ThemeMenuItem.prototype = {
+ThemeSliderMenuItem.prototype = {
     __proto__: PopupMenu.PopupBaseMenuItem.prototype,
 
-    _init: function (text, state, icon_path, params) {
+    _init: function (text, defaultVal, min, max, round, icon_path, params) {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
-        /* NOTE: if I just use this.addActor there's heaps of space between all the items,
-         * regardless of setting this.actor's spacing or padding to 0, same with constituent items.
-         * So currently using this.box  and this.box.add.
-         */
-        this.actor.set_style('padding-top: 0px; padding-bottom: 0px');
-        this.box = new St.BoxLayout({vertical: false});
+
+        /* set up properties */
+        this.min = min || 0;
+        this.max = max || 1;
+        this.round = round || false;
+        this._value = defaultVal;
+        if (round) {
+           this._value = Math.round(this._value);
+        } 
+
+        /* set up item */
+        this.box = new St.BoxLayout({vertical: true, name: 'xpenguins'});
         this.addActor(this.box, {expand: true, span: -1});
 
-        /* Info button */
-        /* Could just set style-class with background-image... */
-        this.button = new St.Button();
-        let icon = new St.Icon({
-            icon_name: 'help-contents',
-            style_class: 'popup-menu-icon',
-            icon_type: St.IconType.FULLCOLOR
-        });
-        this.button.set_child(icon);
-        this.box.add(this.button);
+        this.topBox = new St.BoxLayout({vertical: false, style_class: 'theme-slider-menu-item-top-box'});
+        this.topBox.add_style_class_name('theme-slider-menu-item-top-box');
+        this.topBox.set_style('padding-left: 0em; padding-right: 1.75em'); /* workaround: can't get stylesheet.css to work */
+        this.box.add(this.topBox, {x_fill: true});
+        this.bottomBox = new St.BoxLayout({vertical: false, style_class: 'theme-slider-menu-item-bottom-box'});
+        this.bottomBox.set_style('padding: 0px'); /* workaround: can't get stylesheet.css to work */
+        this.box.add(this.bottomBox, {x_fill: true});
 
         /* Icon (default no icon) */
         this.icon = new St.Icon({
@@ -145,24 +147,72 @@ ThemeMenuItem.prototype = {
             icon_type: St.IconType.FULLCOLOR,
             style_class: 'popup-menu-icon'
         });
-        this.box.add(this.icon);
+        //this.icon.set_style('icon-size: 1.14em; background-color: #333333');
         this.setIcon(icon_path);
 
-        /* toggle. */
-        this.toggle = new PopupMenu.PopupSwitchMenuItem(text, state || false);
-        this.box.add(this.toggle.actor, {expand: true, align: St.Align.END});
+        /* text */
+        this.label = new St.Label({text: text, reactive: false});
+        this.label.set_style('padding-left: 0.5em');
 
-        /* Pass through events */
-        this.toggle.connect('toggled', Lang.bind(this, function () { this.emit('toggled', this.toggle.state); }));
+        /* number */
+        this.numberLabel = new St.Label({text: this._value.toString(), reactive: false});
+
+        /* Info button */
+        this.button = new St.Button();
+        let icon = new St.Icon({
+            icon_name: 'help-contents',
+            style_class: 'popup-menu-icon',
+            icon_type: St.IconType.FULLCOLOR
+        });
+        this.button.set_child(icon);
+
+        /* slider */
+        this.slider = new PopupMenu.PopupSliderMenuItem((defaultVal - min) / (max - min)); // between 0 and 1
+        this.slider.actor.set_style('padding-left: 0.5em; padding-right: 0em');
+       
+        /* connect up signals */
+        this.slider.connect('value-changed', Lang.bind(this, this._updateValue));
+        /* pass through the drag-end, clicked signal */
+        this.slider.connect('drag-end', Lang.bind(this, function () { this.emit('drag-end', this._value); }));
         this.button.connect('clicked', Lang.bind(this, function () { this.emit('button-clicked'); }));
 
-        /* debugging.
+        /* assemble the item */
+        this.topBox.add(this.icon);
+        this.topBox.add(this.label, {expand: true});
+        this.topBox.add(this.numberLabel, {align: St.Align.END});
+        this.bottomBox.add(this.button);
+        this.bottomBox.add(this.slider.actor, {expand: true, span: -1});
+
+        /* debugging. */
+        /*
+        this.label.set_style('border:1px solid #00ffff');
+        this.numberLabel.set_style('border:1px solid #ffff00');
         this.icon.set_style('border: 1px solid #ffffff');
         this.button.set_style('border: 1px solid #ffffff');
-        this.toggle.actor.set_style('border: 1px solid #ffffff; padding-right: 0em');
+        this.slider.actor.set_style('border: 1px solid #ffffff; padding-left: 0px; padding-right: 0px');
         this.box.set_style('border: 1px solid #ffff00');
+        this.topBox.set_style('border: 1px solid #00ff00; padding: 0px');
+        this.bottomBox.set_style('border: 1px solid #0000ff; padding: 0px');
         this.actor.set_style('border: 1px solid #ff0000; padding-top: 0px; padding-bottom: 0px');
         */
+    },
+
+    /* hope that this.slider.value and this._value remain in sync... */
+    getValue: function (raw) {
+        if (raw) {
+            return this.slider.value;
+        } else {
+            return this._value;
+        }
+    },
+
+    _updateValue: function (slider, value) {
+        let val = value * (this.max - this.min) + this.min;
+        if (this.round) {
+            val = Math.round(val);
+        }
+        this._value = val;
+        this.numberLabel.set_text(val.toString());
     },
 
     get state() { return this.toggle.state; },
@@ -223,7 +273,7 @@ XPenguinsMenu.prototype = {
         this._windowListener = new WindowListener.WindowListener();
 
         /* initialise as 'Penguins' */
-        this._onChangeTheme(null, true, 'Penguins');
+        this._onChangeTheme(null, -1, 'Penguins');
     },
 
     getConf: function () {
@@ -338,16 +388,17 @@ XPenguinsMenu.prototype = {
             this._themeInfo = ThemeManager.describeThemes(themeList, false);
             for (let i = 0; i < themeList.length; ++i) {
                 let sanitised_name = ThemeManager.sanitiseThemeName(themeList[i]);
-                this._items.themes[sanitised_name] = new ThemeMenuItem(_(themeList[i]), themeList[i] === 'Penguins');
-                if (this._themeInfo[sanitised_name].icon) {
-                    this._items.themes[sanitised_name].setIcon(this._themeInfo[sanitised_name].icon);
-                }
-                this._items.themes[sanitised_name].connect('toggled', Lang.bind(this, this._onChangeTheme, sanitised_name));
+                this._items.themes[sanitised_name] = new ThemeSliderMenuItem(
+                    _(themeList[i]), 0, 0, XPenguins.PENGUIN_MAX, true,
+                    this._themeInfo[sanitised_name].icon);
+                this._items.themes[sanitised_name].connect('drag-end', Lang.bind(this, this._onChangeTheme, sanitised_name));
                 this._items.themes[sanitised_name].connect('button-clicked', Lang.bind(this, this._onShowHelp, sanitised_name));
                 this._themeMenu.menu.addMenuItem(this._items.themes[sanitised_name]);
             }
         }
-        this._themeMenu.menu.addMenuItem(new ThemeSliderMenuItem('test theme', 5, 0, 100, true));
+
+        /* by default, just Penguins is set */
+
     },
 
     _onShowHelp: function (button, name) {
@@ -370,13 +421,10 @@ XPenguinsMenu.prototype = {
         dialog.open(global.get_current_time());
     },
 
-    _onChangeTheme: function (item, state, sanitised_name) {
-        XPUtil.DEBUG('_onChangeTheme');
-        if (state) {
-            this._XPenguinsLoop.appendTheme(sanitised_name);
-        } else {
-            this._XPenguinsLoop.removeTheme(sanitised_name);
-        }
+    _onChangeTheme: function (item, value, sanitised_name) {
+        XPUtil.DEBUG('_onChangeTheme: ' + sanitised_name);
+
+        this._XPenguinsLoop.setTheme(sanitised_name, value);
 
         let themeListFlat = this._XPenguinsLoop.getThemeNames().map(
             function (name) {
@@ -388,10 +436,6 @@ XPenguinsMenu.prototype = {
             themeListFlat = themeListFlat.substr(0, this._THEME_STRING_LENGTH_MAX-3) + '...';
         }
         this._themeMenu.label.set_text(_("Theme") + ' (%s)'.format(themeListFlat));
-
-        /* Set the label to match */
-        this._items.nPenguins.setValue(this._XPenguinsLoop.options.nPenguins / XPenguins.PENGUIN_MAX);
-        this._items.nPenguinsLabel.set_text(this._XPenguinsLoop.options.nPenguins.toString());
     },
 
     _startXPenguins: function (item, state) {
@@ -422,60 +466,3 @@ XPenguinsMenu.prototype = {
 
 };
 
-
-function ThemeSliderMenuItem() {
-    this._init.apply(this, arguments);
-}
-
-ThemeSliderMenuItem.prototype = {
-    /* since this contains a MenuItem + a SliderItem we need this to be a MenuSection */
-    __proto__: PopupMenu.PopupMenuSection.prototype,
-
-    _init: function (text, defaultVal, min, max, round) {
-        PopupMenu.PopupMenuSection.prototype._init.call(this);
-
-        this.min = min || 0;
-        this.max = max || 1;
-        this.round = round || false;
-
-        /* insert the composite info-icon-thingy... */
-        /* bah have to add the label in at the end */
-        this.label = new PopupMenu.PopupMenuItem(text, {reactive: false});
-        this.addMenuItem(this.label);
-
-        /* insert the slider */
-        this.slider = new PopupMenu.PopupSliderMenuItem((defaultVal - min) / (max - min)); // between 0 and 1
-        //this.slider = new PopupMenu.PopupSliderMenuItem(0); // between 0 and 1
-        this.addMenuItem(this.slider);
-       
-        this._value = defaultVal;
-        if (round) {
-           this._value = Math.round(this._value);
-        } 
-        this.numberLabel = new St.Label({text: this._value.toString()});
-        this.label.addActor(this.numberLabel, {align: St.Align.END});
-
-        /* connect up signals */
-        this.slider.connect('value-changed', Lang.bind(this, this._updateValue));
-        /* pass through the drag-end signal */
-        this.slider.connect('drag-end', Lang.bind(this, function () { this.emit('drag-end'); }));
-    },
-
-    /* hope that this.slider.value and this._value remain in sync... */
-    getValue: function (raw) {
-        if (raw) {
-            return this.slider.value;
-        } else {
-            return this._value;
-        }
-    },
-
-    _updateValue: function (slider, value) {
-        let val = value * (this.max - this.min) + this.min;
-        if (this.round) {
-            val = Math.round(val);
-        }
-        this._value = val;
-        this.numberLabel.set_text(val.toString());
-    }
-};
