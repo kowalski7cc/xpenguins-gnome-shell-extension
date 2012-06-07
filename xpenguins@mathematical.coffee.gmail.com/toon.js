@@ -113,7 +113,7 @@ Toon.prototype = {
             }
         }
         this.actor.set_position(0, 0);
-        if (this.genus !== null) {
+        if (this.genus) {
             this.init();
         }
 

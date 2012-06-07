@@ -63,3 +63,9 @@ function warn() {
     let msg = LOG.apply(null, arguments);
     global.log(msg);
 }
+
+function error() {
+    let msg = LOG.apply(null, arguments);
+    global.log(msg);
+    throw new Error(msg);
+}

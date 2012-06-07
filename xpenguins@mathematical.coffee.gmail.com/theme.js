@@ -138,7 +138,7 @@ Theme.prototype = {
             current,    // holds the current ToonData
             def = {},   // holds default ToonData
             dummy = {}, // any unknown ToonData
-            gdata,
+            gdata,      // various looping variables
             itype,
             igenus;
 
@@ -154,7 +154,7 @@ Theme.prototype = {
 
         /* make space for the next toon */
         try {
-            for (i = 0; i < words.length; ++i) {
+            for (let i = 0; i < words.length; ++i) {
                 let word = words[i].toLowerCase();
                 /* define a new genus of toon (walker, skateboarder, ...) 
                  * note: the 'toon' word is optional in one-genus themes.
@@ -177,7 +177,6 @@ Theme.prototype = {
                         current = def;
                     } else if (type.match(/^(walker|faller|tumbler|floater|climber|runner|action[0-5]|exit|explosion|splatted|squashed|zapped|angel)$/)) {
                     /* other types of toon */
-                        started = 1;
                         /* note: passed by reference. */
                         this.toonData[genus][type] = new Toon.ToonData(def);
                         current = this.toonData[genus][type];
@@ -263,7 +262,10 @@ Theme.prototype = {
                 }
             } // while read word
         } catch (err) {
-            throw new Error(_("Error reading config file: config file ended unexpectedly: Line " + err.lineNumber + ": " + err.message));
+            XPUtil.error(
+                _("Error reading config file: config file ended unexpectedly: Line %d: %s"),
+                err.lineNumber, err.message); // throws error
+            return;
         } /* end config file parsing */
 
         /* Now valid our widths, heights etc with the size of the image
@@ -314,7 +316,7 @@ Theme.prototype = {
         this.number[genus] = 1;
 
         if (!this._themeGenusMap[themeName]) {
-            this._themeGenusMapp[themeName] = [];
+            this._themeGenusMap[themeName] = [];
         }
         this._themeGenusMap[themeName].push(genus);
         this.totalsPerTheme[themeName] = 0;

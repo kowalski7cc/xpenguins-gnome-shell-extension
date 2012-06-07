@@ -36,12 +36,6 @@ const RECALC = {
     END   : 2
 };
 
-// UPTO
-const 
-    ALL: 0,
-    EACH: 1
-};
-
 /* Returns a list of XPenguins features that are supported by your version of gnome-shell.
  * Default returns a whitelist (i.e. list.opt == TRUE means supported).
  * Otherwise, you can specificy a blacklist (list.opt == TRUE means blacklisted).
@@ -106,44 +100,31 @@ XPenguinsLoop.prototype = {
             max_relocate_right: this.options.max_relocate_right,
             max_relocate_left : this.options.max_relocate_left
         };
-        /* set the genus of each penguin, respecting the ratios in theme.number? */
-        /* Xpenguins makes one of each type, & then give the requested number
-         * per genus, so if your genus is at the end and you run out of penguins,
-         * then you miss out on all but one.
-         * Also initialise them.
-         */
-         let i,
-             genus_numbers = this._theme.number.map(Lang.bind(this,
-                    function (i) {
-                    return Math.floor(i / this._theme.total * this.options.nPenguins);
-                })),
-            leftover = this.options.nPenguins - genus_numbers.reduce(function (x, y) { return x + y; }); // note: guaranteed <= theme.ngenera
-        while (leftover) { // genera 0 to leftover-1 get 1 extra.
-            genus_numbers[--leftover] += 1;
-        }
 
-        this._genus = genus_numbers.indexOf(Math.min.apply(null, genus_numbers));
-        for (i = 0; i < genus_numbers.length; ++i) {
-            while (genus_numbers[i]--) {
-                /* Initialise toons */
-                this._toons.push(new Toon.Toon(this._toonGlobals, {genus: i, reactive: true}));
-                if (this.options.squish) {
-                    this._addSquishEvents(this._toons[this._toons.length-1]);
-                }
-            }
+        /* temporarily set _playing = true so .setNumber will initialise toons.
+         * Use default amount if none specified by now (??)
+         */ 
+        this._playing = true;
+        let i = this.themeList.length;
+        while (i--) {
+            this.setThemeNumbers(this.themeList[i], this._numbers[this.themeList[i]] || -1);
         }
+        this._playing = 0;
 
         /* set the stage */
-        i = this._theme.toonData.length;
         /* add ToonDatas to the stage so clones can be added properly */
-        while (i--) {
-            for (let type in this._theme.toonData[i]) {
-                if (this._theme.toonData[i].hasOwnProperty(type) && !this._theme.toonData[i][type].master) {
+        for (let igenus in this._theme.toonData) {
+            if (!this._theme.toonData.hasOwnProperty(igenus)) {
+                continue;
+            }
+            let gdata = this._theme.toonData[igenus];
+            for (let type in gdata) {
+                if (gdata.hasOwnProperty(type) && !gdata[type].master) {
                     /* to fix "Attempting to add actor of type '...' to a container of type '...',
                      * but the actor already has a parent of type '...'.
                      */
-                    Main.uiGroup.add_actor(this._theme.toonData[i][type].texture);
-                    this._theme.toonData[i][type].texture.hide();
+                    Main.uiGroup.add_actor(gdata[type].texture);
+                    gdata[type].texture.hide();
                 }
             }
         }
@@ -251,21 +232,28 @@ XPenguinsLoop.prototype = {
      * If you specify number = -1, the default for that theme will be used.
      */
     setThemeNumbers: function(inames, ns) {
+        XPUtil.DEBUG('[XP] setThemeNumbers');
+        if (!(inames instanceof Array)) {
+            inames = [inames];
+        }
+        if (!this._theme) {
+            this.setThemes(inames, false);
+        }
         let i = inames.length;
         while (i--) {
-            let n = ns.length ? ns[i] : ns,
+            let n = ns instanceof Array ? ns[i] : ns,
                 name = inames[i];
             if (!this._theme.hasTheme(name)) {
                 if (n) {
                     this._theme.appendTheme(name);
                     this.themeList.push(name);
                 } else {
-                    return;
+                    continue;
                 }
             }
             // if n is <0, use default.
             if (n < 0) {
-                n = this._theme.getTotalForTheme(names);
+                n = this._theme.getTotalForTheme(name);
             } else if (n === 0) {
                 this.themeList.splice(this.themeList.indexOf(name), 1);
             }
@@ -290,6 +278,8 @@ XPenguinsLoop.prototype = {
     },
 
     /* sets the toon number. for a *single* theme. */
+    // UPTO: why being called twice on init?
+    // UPTO: emit signals to update sliders.
     _setNumber: function (iname, n) {
         let name = ThemeManager.sanitiseThemeName(iname);
         n = Math.min(PENGUIN_MAX, Math.max(0, n));
@@ -352,7 +342,7 @@ XPenguinsLoop.prototype = {
                 }
                 this._toons[i].active = true;
             }
-            this._numbers[name] = n; // FIXME
+            this._numbers[name] = n;
         } else if (n < current) {
             /* kill toons of that theme. 
              * A bit inefficient - will have to loop through the entire

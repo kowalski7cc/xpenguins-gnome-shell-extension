@@ -273,7 +273,10 @@ XPenguinsMenu.prototype = {
         this._windowListener = new WindowListener.WindowListener();
 
         /* initialise as 'Penguins' */
-        this._onChangeTheme(null, -1, 'Penguins');
+        /* by default, just Penguins is set */
+        if (this._items.themes['Penguins']) {
+            this._onChangeTheme(this._items.themes['Penguins'], -1, 'Penguins');
+        }
     },
 
     getConf: function () {
@@ -396,9 +399,6 @@ XPenguinsMenu.prototype = {
                 this._themeMenu.menu.addMenuItem(this._items.themes[sanitised_name]);
             }
         }
-
-        /* by default, just Penguins is set */
-
     },
 
     _onShowHelp: function (button, name) {
@@ -424,9 +424,9 @@ XPenguinsMenu.prototype = {
     _onChangeTheme: function (item, value, sanitised_name) {
         XPUtil.DEBUG('_onChangeTheme: ' + sanitised_name);
 
-        this._XPenguinsLoop.setTheme(sanitised_name, value);
-
-        let themeListFlat = this._XPenguinsLoop.getThemeNames().map(
+        this._XPenguinsLoop.setThemeNumbers(sanitised_name, value);
+        // UPTO: set labels.
+        let themeListFlat = this._XPenguinsLoop.themeList.map(
             function (name) {
                 return ThemeManager.prettyThemeName(name);
             }).reduce(function (x, y) {
