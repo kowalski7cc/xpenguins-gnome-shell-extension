@@ -206,6 +206,12 @@ ThemeSliderMenuItem.prototype = {
         }
     },
 
+    setValue: function (value, raw) {
+        value = (raw ? value : (value - this.min) / (this.max - this.min));
+        this._updateValue(this.slider, value);
+        this.slider.setValue(value);
+    },
+
     _updateValue: function (slider, value) {
         let val = value * (this.max - this.min) + this.min;
         if (this.round) {
@@ -240,6 +246,7 @@ XPenguinsMenu.prototype = {
         XPUtil.DEBUG('_init');
         /* Initialise */
         PanelMenu.SystemStatusButton.prototype._init.call(this, 'emblem-favorite', 'xpenguins');
+        this.actor.add_style_class_name('xpenguins-icon');
         this.setGIcon(new Gio.FileIcon({
             file: Gio.file_new_for_path(GLib.build_filenamev([extensionPath, 'penguin.png']))
         }));
@@ -268,6 +275,8 @@ XPenguinsMenu.prototype = {
 
         /* create an Xpenguin Loop object which stores the XPenguins program */
         this._XPenguinsLoop = new XPenguins.XPenguinsLoop(this.getConf());
+        /* Listen to 'ntoons-changed' and adjust slider accordingly */
+        this._XPenguinsLoop.connect('ntoons-changed', Lang.bind(this, this._onChangeThemeNumber));
 
         /* @@ debugging windowListener */
         this._windowListener = new WindowListener.WindowListener();
@@ -275,7 +284,7 @@ XPenguinsMenu.prototype = {
         /* initialise as 'Penguins' */
         /* by default, just Penguins is set */
         if (this._items.themes['Penguins']) {
-            this._onChangeTheme(this._items.themes['Penguins'], -1, 'Penguins');
+            this._onChangeTheme(this._items.themes['Penguins'], -1, 'Penguins', false);
         }
     },
 
@@ -330,18 +339,6 @@ XPenguinsMenu.prototype = {
         this._optionsMenu = new PopupMenu.PopupSubMenuMenuItem(_("Options"));
         this.menu.addMenuItem(this._optionsMenu);
 
-        /* Number of penguins */
-        dummy = new PopupMenu.PopupMenuItem(_("Max penguins"), { reactive: false });
-        this._items.nPenguinsLabel = new St.Label({ text: '-1' });
-        dummy.addActor(this._items.nPenguinsLabel, { align: St.Align.END });
-        this._optionsMenu.menu.addMenuItem(dummy);
-
-        // set to default from theme that was just loaded.
-        this._items.nPenguins = new PopupMenu.PopupSliderMenuItem(0);
-        this._items.nPenguins.connect('value-changed', Lang.bind(this, this._nPenguinsSliderChanged));
-        this._items.nPenguins.connect('drag-end', Lang.bind(this, this._onNPenguinsChanged));
-        this._optionsMenu.menu.addMenuItem(this._items.nPenguins);
-
         /* ignore maximised, always on visible workspace, angels, blood, god mode, verbose toggles */
         let defaults = XPenguins.XPenguinsLoop.prototype.defaultOptions();
         let blacklist = XPenguins.getCompatibleOptions(true);
@@ -394,7 +391,7 @@ XPenguinsMenu.prototype = {
                 this._items.themes[sanitised_name] = new ThemeSliderMenuItem(
                     _(themeList[i]), 0, 0, XPenguins.PENGUIN_MAX, true,
                     this._themeInfo[sanitised_name].icon);
-                this._items.themes[sanitised_name].connect('drag-end', Lang.bind(this, this._onChangeTheme, sanitised_name));
+                this._items.themes[sanitised_name].connect('drag-end', Lang.bind(this, this._onChangeTheme, sanitised_name, true));
                 this._items.themes[sanitised_name].connect('button-clicked', Lang.bind(this, this._onShowHelp, sanitised_name));
                 this._themeMenu.menu.addMenuItem(this._items.themes[sanitised_name]);
             }
@@ -421,26 +418,41 @@ XPenguinsMenu.prototype = {
         dialog.open(global.get_current_time());
     },
 
-    _onChangeTheme: function (item, value, sanitised_name) {
+    _onChangeTheme: function (item, value, sanitised_name, silent) {
         XPUtil.DEBUG('_onChangeTheme: ' + sanitised_name);
 
-        this._XPenguinsLoop.setThemeNumbers(sanitised_name, value);
-        // UPTO: set labels.
-        let themeListFlat = this._XPenguinsLoop.themeList.map(
-            function (name) {
-                return ThemeManager.prettyThemeName(name);
-            }).reduce(function (x, y) {
-                return x + ',' + y;
-            });
-        if (themeListFlat.length > this._THEME_STRING_LENGTH_MAX) {
-            themeListFlat = themeListFlat.substr(0, this._THEME_STRING_LENGTH_MAX-3) + '...';
+        /* set the numbers so we can read them back to the slider bars */
+        this._XPenguinsLoop.setThemeNumbers(sanitised_name, value, silent);
+
+        let themeListFlat = this._XPenguinsLoop.getThemes();
+        if (themeListFlat.length) {
+            themeListFlat = themeListFlat.map(
+                function (name) {
+                    return ThemeManager.prettyThemeName(name);
+                }).reduce(function (x, y) {
+                    return x + ',' + y;
+                });
+            if (themeListFlat.length > this._THEME_STRING_LENGTH_MAX) {
+                themeListFlat = themeListFlat.substr(0, this._THEME_STRING_LENGTH_MAX-3) + '...';
+            }
+        } else {
+            themeListFlat = 'none';
         }
         this._themeMenu.label.set_text(_("Theme") + ' (%s)'.format(themeListFlat));
     },
 
+    _onChangeThemeNumber: function (loop, sanitised_name, n) {
+        XPUtil.DEBUG('[ext] _onChangeThemeNumber[%s] to %d; updating slider',
+            sanitised_name, n);
+        if (n != this._items.themes[sanitised_name].getValue()) {
+            this._items.themes[sanitised_name].setValue(n);
+        }
+    },
+
     _startXPenguins: function (item, state) {
         XPUtil.DEBUG((state ? 'STARTING ' : 'STOPPING ') + 'XPenguins');
-
+        // UPTO: set numbers back from 0 (if second start, sliders
+        // may not be in sync with XPenguinsLoop._number)
         if (state) {
             this._XPenguinsLoop.start();
             if (this._items.windowPreview && this._items.windowPreview.state) {

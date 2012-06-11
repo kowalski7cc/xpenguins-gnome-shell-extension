@@ -1,3 +1,7 @@
+.xpenguins-icon {
+}
+
+/* About dialog */
 .xpenguins-about-title {
     font-weight: bold;
     font-size: 1.5em;
@@ -6,15 +10,13 @@
 .xpenguins-about-text {
 }
 
+/* Theme slider items */
 .theme-slider-menu-item-top-box {
     padding-left: 0em;
     padding-right: 1.75em;
-    background-color: #0000ff;
-    color: #ff0000;
 }
+
 .theme-slider-menu-item-bottom-box {
     padding-left: 0em;
     padding-right: 0em;
-    background-color: #0000ff;
-    color: #ff0000;
 }

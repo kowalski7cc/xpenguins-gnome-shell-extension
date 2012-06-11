@@ -3,6 +3,7 @@
  * xpenguins_theme.c
  *********************/
 /* Imports */
+const Lang  = imports.lang;
 const Shell = imports.gi.Shell;
 
 // temp until two distinct versions:
@@ -312,7 +313,7 @@ Theme.prototype = {
             return;
         }
         this.toonData[genus] = {};
-        this.nactions[genus] = 1;
+        this.nactions[genus] = 0;
         this.number[genus] = 1;
 
         if (!this._themeGenusMap[themeName]) {
