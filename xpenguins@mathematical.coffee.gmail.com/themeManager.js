@@ -54,15 +54,23 @@ function prettyThemeName(name) {
 function listThemes() {
     let themes_dir, info, fileEnum, i,
         themeList = [],
-        paths = [ GLib.build_filenamev([ GLib.get_home_dir(), this._userDirectory, this._themeDirectory ]),
-                  GLib.build_filenamev([ this._systemDirectory, this._themeDirectory ]) ];
+        paths = [
+            GLib.build_filenamev([
+                GLib.get_home_dir(), 
+                this._userDirectory, 
+                this._themeDirectory]),
+            GLib.build_filenamev([
+                this._systemDirectory,
+                this._themeDirectory]) 
+        ];
     for (i = 0; i < paths.length; ++i) {
         themes_dir = Gio.file_new_for_path(paths[i]);
         if (!themes_dir.query_exists(null)) {
             continue;
         }
 
-        fileEnum = themes_dir.enumerate_children('standard::*', Gio.FileQueryInfoFlags.NONE, null);
+        fileEnum = themes_dir.enumerate_children('standard::*',
+                Gio.FileQueryInfoFlags.NONE, null);
         while ((info = fileEnum.next_file(null)) !== null) {
             let configFile = GLib.build_filenamev([themes_dir.get_path(),
                                                     info.get_name(),
@@ -146,7 +154,7 @@ function describeThemes(themes) {
 /* Return the full path or directory of the specified theme.
  * Spaces in theme name are converted to underscores
  * xpenguins_theme_directory
- * It returns the *directory* name if the theme is "valid", i.e. contains a file 'config'.
+ * It returns the *directory* name if the theme contains a file 'config'.
  */
 function getThemeDir(iname) {
     /* Convert spaces to underscores */
@@ -154,8 +162,16 @@ function getThemeDir(iname) {
      * then in [xpenguins_dir]/themes
      */
     let name = sanitiseThemeName(iname),
-        dirs = [ GLib.build_filenamev([ GLib.get_home_dir(), this._userDirectory, this._themeDirectory, name ]),
-                  GLib.build_filenamev([ this._systemDirectory, this._themeDirectory, name ]) ];
+        dirs = [GLib.build_filenamev([
+                    GLib.get_home_dir(), 
+                    this._userDirectory, 
+                    this._themeDirectory, 
+                    name]),
+                GLib.build_filenamev([
+                      this._systemDirectory, 
+                      this._themeDirectory, 
+                      name])
+               ];
     for (let i = 0; i < dirs.length; ++i) {
         if (GLib.file_test(GLib.build_filenamev([dirs[i], this._configFile]),
                             GLib.FileTest.EXISTS)) {

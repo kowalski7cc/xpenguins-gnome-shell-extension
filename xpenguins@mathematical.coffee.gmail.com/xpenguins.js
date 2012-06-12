@@ -1,7 +1,5 @@
 /* BIG UPTO:
- * Added some toons, and not all were deleted when I said so.
- * It did say current: 9 request: 0 but only 5 were changed to explosion.
- * Perhaps the others were in _deadToons?
+ * * test load averaging
  */
 const Clutter  = imports.gi.Clutter;
 const GLib     = imports.gi.GLib;
@@ -25,28 +23,32 @@ const Region = Me.region;
 const Theme  = Me.theme;
 const ThemeManager = Me.themeManager;
 const Toon   = Me.toon;
-const WindowListener = Me.windowListener.WindowListener.prototype; // this is how we'll keep it in sync for now.
+// this is how we'll keep in sync with this functionality for now.
+const WindowListener = Me.windowListener.WindowListener.prototype;
 const XPUtil = Me.util;
 
 /* constants */
-const PENGUIN_MAX = 50; /* per genus (???) */
+const PENGUIN_MAX = 50; /* per theme */
 const PENGUIN_JUMP = 8;
 /* When to recalculate window position/size changes.
- * ALWAYS: always (even during the resize/move)
- * PAUSE : pause until resize/move has finished, then recalc at the end.
- * END   : run while resize/move is in progress, but only recalculate at the end. (So toons could walk off-window).
+ * In order of decreasing awesomeness (increasing efficiency):
+ * ALWAYS: Always (even during the resize/move)
+ * END   : Run while resize/move is in progress, recalculate at the end. 
+ *         (So toons could walk off-window).
+ * PAUSE : Pause until resize/move has finished, then recalc at the end.
  */
 const RECALC = {
     ALWAYS: 0,
-    PAUSE : 1,
-    END   : 2
+    END   : 1,
+    PAUSE : 2
 };
 
 const ALL = -1;
 
-/* Returns a list of XPenguins features that are supported by your version of gnome-shell.
- * Default returns a whitelist (i.e. list.opt == TRUE means supported).
- * Otherwise, you can specificy a blacklist (list.opt == TRUE means blacklisted).
+/* Returns a list of XPenguins features that are supported by your version 
+ * of gnome-shell. 
+ * By default, returns a whitelist (i.e. list.opt TRUE means supported).
+ * Otherwise, you can specificy a blacklist (list.opt TRUE means blacklisted).
  */
 function getCompatibleOptions(blacklist) {
     let list = Me.windowListener.getCompatibleOptions(blacklist);
@@ -57,22 +59,21 @@ function getCompatibleOptions(blacklist) {
             list[opt] = !blacklist;
         }
     }
-    list.onDesktop = blacklist || false; /* for now we can only run in desktop mode. */
-    list.rectangularWindows = blacklist || false; /* for now no shaped windows */
-    /* consider: ignoreMaximised, squish, sleep_msec (depends if we're using
-     * Clutter.Timeline or mainloop) */
+    list.onDesktop = blacklist || false; // for now we can't do windowed mode.
+    list.rectangularWindows = blacklist || false; // for now no shaped windows
     return list;
 }
 
 /************************
- * X penguins main loop: this handles toon behaviour per frame, option configuring,
- * etc. It's basically main.c and xpenguins_core.c (xpenguins_frame()).
- * Note: the component that handles toon_windows (making sure the snapshot of all the 
- * windows on the screen is up to date) is in windowListener.js -- it was helpful
- * as a standalone class during testing.
- * I'd like to keep that as a separate class because it just helps me to keep the
- * two functions (window tracking vs toon stuff) separate in my head and makes
- * it easier for me to work on them.
+ * X penguins main loop: this handles toon behaviour per frame, option 
+ * configuring, etc. It's basically main.c and xpenguins_core.c 
+ * (xpenguins_frame()).
+ * Note: the component that handles toon_windows (making sure the snapshot
+ * of all the windows on the screen is up to date) is in windowListener.js: 
+ * it was helpful as a standalone class during testing.
+ * I'd like to keep that as a separate class because it just helps me to keep 
+ * the two functions (window tracking vs toon stuff) separate in my head 
+ * and makes it easier for me to work on them.
  ************************/
 function XPenguinsLoop() {
     this._init.apply(this, arguments);
@@ -114,17 +115,19 @@ XPenguinsLoop.prototype = {
         this._addToonDataToStage(ALL);
 
         /* temporarily set _playing = true so .setNumber will initialise toons.
-         * Use default amount if none specified by now (??)
+         * Use default amount if none specified by now.
          */ 
         this._playing = true;
-        let i = this.themeList.length;
-        let oldNumbers = this._numbers; /* bit of a hack to get _setNumbers to init penguins */
-        XPUtil.DEBUG(JSON.stringify(oldNumbers));
+        /* bit of a hack to get _setNumbers to init penguins */
+        let i = this.themeList.length,
+            oldNumbers = this._numbers;
         this._numbers = {};
         // BAH: causes segfault when we run if oldNumbers is not {}
         while (i--) {
-            XPUtil.DEBUG('setThemeNumbers(%s, %d)', this.themeList[i], oldNumbers[this.themeList[i]]);
-            this.setThemeNumbers(this.themeList[i], oldNumbers[this.themeList[i]] || -1);
+            XPUtil.DEBUG('setThemeNumbers(%s, %d)', this.themeList[i], 
+                oldNumbers[this.themeList[i]]);
+            this.setThemeNumbers(this.themeList[i], 
+                oldNumbers[this.themeList[i]] || -1);
         }
         this._playing = 0;
 
@@ -148,8 +151,9 @@ XPenguinsLoop.prototype = {
             let gdata = this._theme.toonData[genii[i]];
             for (let type in gdata) {
                 if (gdata.hasOwnProperty(type) && !gdata[type].master) {
-                    /* to fix "Attempting to add actor of type '...' to a container of type '...',
-                     * but the actor already has a parent of type '...'.
+                    /* to fix "Attempting to add actor of type '...' to a 
+                     * container of type '...', but the actor already has
+                     * a parent of type '...'.
                      */
                     Main.uiGroup.add_actor(gdata[type].texture);
                     gdata[type].texture.hide();
@@ -158,59 +162,52 @@ XPenguinsLoop.prototype = {
         }
     },
 
-    /* returns a set of default options (wanted to be able to call it as a static method) */
+    /* returns a set of default options (wanted to be able to call it as a 
+     * static method)
+     */
     defaultOptions: function () {
         return {
             /* Load average checking: kill penguins if load is too high
-               Start killing toons when the 1-min averaged system load exceeds load1;
-                when it exceeds  load2  kill  them  all.
+               Start killing toons when the 1-min averaged system load 
+                exceeds load1; when it exceeds load2  kill them  all.
                The toons  will  reappear  when  the load average comes down.
-               When there are no  toons  on  the screen, XPenguins uses only a miniscule amount of CPU time -
-                it just wakes up every 5 seconds to recheck the load.
-            */
-            load_check_interval : 5000, /* ms between load average checks */
-            load_cycles: 0, /* number of frames between load average checks */
-            load1 : -1.0, /* Start killing penguins if load reaches this amount */
-            load2 : -1.0, /* All gone by this amount (but can come back!) */
+               When there are no  toons  on  the screen, XPenguins uses 
+                only a miniscule amount of CPU time - it just wakes up 
+                every 5 seconds to recheck the load.
+             */
+            load_check_interval : 5000, // ms between load average checks 
+            load_cycles: 0, // number of frames between load average checks 
+            load1 : -1.0, // Start killing penguins if load reaches this amount 
+            load2 : -1.0, // All gone by this amount (but can come back!) 
 
-
-            /* more settings */
-            /* The maximum number of penguins that will exist in this run (up to PENGUIN_MAX).
-             * Default defined by the theme */
-            nPenguins : -1,
-            edge_block : Toon.SIDEBOTTOMBLOCK,
-
+            edge_block : Toon.SIDEBOTTOMBLOCK, // side & edges of screen block
+                                               // toons
             /* flags */
-            /* Do not show any cherubim flying up to heaven when a toon gets squashed. */
-            angels : true,
-            /* Do not show gory death sequences */
-            blood : true,
-            /* Ignore maximised windows */
-            ignoreMaximised : true,
-            /* Ignore popup windows. This means right-click menus, tooltips, and window menus.
-             * Basically, anything that fires "window-added" is included by default,
-             * and anything that fires "map" but not "window-added" is included in ignorePopups. */
-            ignorePopups : false,
-            /* Enable the penguins to be squished using any of the mouse buttons. */
-            squish : false, 
-            /* what happens when we switch workspaces. */
-            onAllWorkspaces: false, // uhh... this works best with XPenguinsLoop.
-            /* whether it's running in windowed mode or on the desktop */
-            onDesktop: true,
+            angels : true, // don't show angels flying up to heaven on squash
+            blood : true,  // don't show gory death sequences
+            ignoreMaximised : true, // maximised windows are not solid
+            ignoreHalfMaximised : true, // if the above is true, half maximised
+                                        // windows are also not solid.
+            ignorePopups : false, // ignore popup windows (right-click menus,
+                                  // tooltips, ...). Ie anything firing 'map'
+                                  // but not 'window-added'.
+            squish : false, // squish toons with the mouse.
+            onAllWorkspaces: false, // what happens when we switch workspaces.
+            onDesktop: true, // whether we're running in windowed mode.
 
             /* possible efficiency gain (really, don't bother changing it).
              * Technically in order of most efficient to least:
              * RECALC.END, RECALC.PAUSE, RECALC.ALWAYS. */
             recalcMode: RECALC.ALWAYS,
 
-
-            /* maximum amount a window can move and the penguin can still cling on */
+            /* maximum amount a window can move for the penguin to still 
+             * cling on */
             max_relocate_up:    16,
             max_relocate_down:  16,
             max_relocate_left:  16,
             max_relocate_right: 16,
 
-            sleep_msec : 0, /* delay in milliseconds between each frame. */
+            sleep_msec : 0, // delay in milliseconds between each frame.
         };
     },
 
@@ -276,6 +273,7 @@ XPenguinsLoop.prototype = {
                     continue;
                 }
             }
+            this._originalNumber -= (this._numbers[name] || 0);
             // if n is <0, use default.
             if (n < 0) {
                 n = this._theme.getTotalForTheme(name);
@@ -284,6 +282,8 @@ XPenguinsLoop.prototype = {
             }
             XPUtil.DEBUG(' .. calling this._setNumber(%s, %d)', name, n);
             this._setNumber(name, n, silent);
+            /* for load averaging: store a copy of the originals */
+            this._originalNumber += this._numbers[name];
         }
     },
 
@@ -318,16 +318,11 @@ XPenguinsLoop.prototype = {
         }
 
         let current = this._numbers[name] || 0;
-        /* Note: we can't just add toons from ._toon_number to + number any more,
-         * because the inactive toons aren't moved to the end of the array.
-         * Will have to either:
-         * 1) splice out toons once they die (in _frame) and append back to _toons to respawn
-         * 2) maintain an array of 'dead' toon indices into _toons and assign back.
-         * Will try 2) for now, *but* if the user (say) made 100000 toons and ran out 
-         * of memory hence scaled it back, the array is still 100000 long!
-         * Perhaps could implement a threshold whereby if at least x% of the toons
-         *  are killed, then cull this._toons.
-         */
+        /* At the moment we maintain an array of 'dead' toons (indices into
+         * this._toons) to respawn new toons.
+         * However, might have to add a check: if they made 100000 toons and
+         * then cut it back to 10, we have 999990 empty slots to carry around.
+         */ 
         XPUtil.DEBUG(' .. current: %d. requested: %d', current, n);
         if (n > current) {
             /* assign the numbers per genus */
@@ -356,19 +351,21 @@ XPenguinsLoop.prototype = {
                     genusThresh += genusNumbers[++genus];
                 }
                 if (this._deadToons.length) {
+                    /* reuse an old toon */
                     idx = this._deadToons.pop();
                     this._toons[idx].init(genii[genus]);
                     this._toons[idx].show();
                 } else {
+                    /* make a new toon */
                     idx = this._toons.push(new Toon.Toon(this._toonGlobals,
                         {genus: genii[genus]})) - 1;
-                    this._toons[idx].theme = name;
                     Main.layoutManager.addChrome(this._toons[idx].actor);
                 } 
+                this._toons[idx].theme = name;
                 if (this.options.squish) {
-                    this._addSquishEvents(this._toons[i]);
+                    this._addSquishEvents(this._toons[idx]);
                 }
-                this._toons[i].active = true;
+                this._toons[idx].active = true;
             }
             this._numbers[name] = n;
             if (!silent) {
@@ -432,10 +429,12 @@ XPenguinsLoop.prototype = {
     start: function () {
         /* calls this.init */
         WindowListener.start.apply(this, arguments);
-        /* FIXME: call with lower priority (say GLib.PRIORITY_HIGH_IDLE or DEFAULT_IDLE)? 
+        /* FIXME: call with lower priority (say GLib.PRIORITY_HIGH_IDLE or 
+         * DEFAULT_IDLE)? 
          * http://developer.gnome.org/glib/2.31/glib-The-Main-Event-Loop.html#G-PRIORITY-DEFAULT:CAPS 
          */
-        this._playing = Clutter.threads_add_timeout(GLib.PRIORITY_DEFAULT, this.options.sleep_msec, Lang.bind(this, this._frame), null, function() { log("DONEEEE"); });
+        this._playing = Clutter.threads_add_timeout(GLib.PRIORITY_DEFAULT,
+            this.options.sleep_msec, Lang.bind(this, this._frame));
     },
 
     /* pauses the timeline & temporarily stops listening for events,
@@ -459,22 +458,21 @@ XPenguinsLoop.prototype = {
         if (this._toons[0] && !this._toons[0].visible) {
             this._showToons();
         }
-        this._playing = Clutter.threads_add_timeout(GLib.PRIORITY_DEFAULT, this.options.sleep_msec, Lang.bind(this, this._frame));
+        this._playing = Clutter.threads_add_timeout(GLib.PRIORITY_DEFAULT, 
+            this.options.sleep_msec, Lang.bind(this, this._frame));
     },
 
     /* stop xpenguins, but play the exit sequence */
     _onInterrupt: function () {
         XPUtil.DEBUG(_("Interrupt received: Exiting."));
 
-        /* set the 'exit gracefully flag' */
-        //ToonConfigure(Toon.EXITGRACEFULLY);
+        /* tell the loop to start the exit sequence */
         this._exiting = true;
         this._setTotalNumber(0, true); // don't emit signal. (?? FIXME)
     },
 
 
-    /* ToonFinishUp in toon_end.c
-     */
+    /* ToonFinishUp in toon_end.c */
     _cleanUp: function () {
         XPUtil.DEBUG('[XP] _cleanUp');
         let i;
@@ -503,11 +501,14 @@ XPenguinsLoop.prototype = {
         }
 
         /* remove toonDatas from the stage */
-        i = this._theme.toonData.length;
-        while (i--) {
-            for (let type in this._theme.toonData[i]) {
-                if (this._theme.toonData[i].hasOwnProperty(type) && !this._theme.toonData[i][type].master) {
-                    Main.uiGroup.remove_actor(this._theme.toonData[i][type].texture);
+        for (i in this._theme.toonData) {
+            if (this._theme.toonData.hasOwnProperty(i)) {
+                let gdata = this._theme.toonData[i];
+                for (let type in gdata) {
+                    if (gdata.hasOwnProperty(type) &&
+                            !this._theme.toonData[i][type].master) {
+                        Main.uiGroup.remove_actor(gdata[type].texture);
+                    }
                 }
             }
         }
@@ -534,15 +535,16 @@ XPenguinsLoop.prototype = {
         /* signals */
         this._sleepID = null;
         this._playing = 0;
-        this._resumeSignal = {}; /* when you pause you have to listen for an event to unpause */
+        this._resumeSignal = {}; // holds the signal we listen to to resume
 
         /* variables */
         this._toons = [];
         this._deadToons = [];
         /* The number of penguins that are active or not terminating.
-         * When 0, we can call xpenguins_exit()
-         */
-        this._numbers = this._numbers || {}; // BAH: causes segfault when we run if this._numbers is not {}
+         * When 0, we can call xpenguins_exit() */
+        this._numbers = this._numbers || {};
+        this._originalNumber = 0; // store original requested nPenguins for 
+                                  // load averaging.
 
         this._cycle = 0;
         this._tempFRAMENUMBER = 0;
@@ -550,7 +552,7 @@ XPenguinsLoop.prototype = {
         this._XPenguinsWindow = null;
 
         this._dirty = true;
-        this._listeningPerWindow = false; /* whether we have to listen to individual windows for signals */
+        this._listeningPerWindow = false;
 
         /* Laziness */
         let opt = this.options;
@@ -589,7 +591,7 @@ XPenguinsLoop.prototype = {
         }
 
         /* Set up the window we're drawing on.
-         * (has not been implemented yet beyond this._XPenguinsWindow = global.stage).
+         * (has not been implemented yet besides global.stage).
          * _XPenguinsWindow is the *actor*.
          */
         if (!opt.onDesktop) {
@@ -627,7 +629,8 @@ XPenguinsLoop.prototype = {
         } else {
         /* XPENGUIN-specific options. */
             XPUtil.DEBUG('changeOption[XP]: %s = %s', propName, propVal);
-            if (!this.options.hasOwnProperty(propName) || this.options[propName] === propVal) {
+            if (!this.options.hasOwnProperty(propName) || 
+                    this.options[propName] === propVal) {
                 return;
             }
             this.options[propName] = propVal;
@@ -637,8 +640,8 @@ XPenguinsLoop.prototype = {
                 /* enable god mode */
                     this.toggleGodMode(propVal);
                 }
-                /* Otherwise, things like angels, blood: these things can just be
-                 * set and no recalculating of signals etc or extra action
+                /* Otherwise, things like angels, blood: these things can just
+                 * be set and no recalculating of signals etc or extra action
                  * need be done.
                  */
             }
@@ -649,12 +652,24 @@ XPenguinsLoop.prototype = {
     /* connects up events required to maintain toonWindows as an accurate
      * snapshot of what the windows on the workspace look like
      */
-    _connectSignals: function () { WindowListener._connectSignals.apply(this, arguments); },
-    _disconnectSignals: function () { WindowListener._disconnectSignals.apply(this, arguments); },
-    _updateSignals: function () { WindowListener._updateSignals.apply(this, arguments); },
-    _onWindowAdded: function () { WindowListener._onWindowAdded.apply(this, arguments); },
-    _onWindowRemoved: function () { WindowListener._onWindowRemoved.apply(this, arguments); },
-    _onWorkspaceChanged: function () { WindowListener._onWorkspaceChanged.apply(this, arguments); },
+    _connectSignals: function () { 
+        WindowListener._connectSignals.apply(this, arguments); 
+    },
+    _disconnectSignals: function () { 
+        WindowListener._disconnectSignals.apply(this, arguments); 
+    },
+    _updateSignals: function () { 
+        WindowListener._updateSignals.apply(this, arguments); 
+    },
+    _onWindowAdded: function () { 
+        WindowListener._onWindowAdded.apply(this, arguments); 
+    },
+    _onWindowRemoved: function () { 
+        WindowListener._onWindowRemoved.apply(this, arguments); 
+    },
+    _onWorkspaceChanged: function () { 
+        WindowListener._onWorkspaceChanged.apply(this, arguments); 
+    },
 
     /********** TOON WINDOWS **************/
     _dirtyToonWindows: function (msg) {
@@ -723,12 +738,13 @@ XPenguinsLoop.prototype = {
 
     _onSmite: function (actor, event, toon) {
         XPUtil.DEBUG('OWWWIEEE!');
-        /* Not in Clutter-gir. button 1 == PRIMARY, 2 == MIDDLE, 3 == SECONDARY */
+        /* Not in Clutter-gir. button 1: PRIMARY, 2: MIDDLE, 3: SECONDARY */
         if (event.get_button() !== 1) {
             return false; /* pass on the event */
         }
         /* Event coordinates are relative to the stage that received the event,
-         * and can be transformed into actor-relative coordinates: actor.transform_stage_point
+         * and can be transformed into actor-relative coordinates using
+         * actor.transform_stage_point().
         let [stageX, stageY] = event.get_coords();
         XPUtil.DEBUG('SMITE at %d, %d'.format(stageX, stageY));
          */
@@ -782,7 +798,8 @@ XPenguinsLoop.prototype = {
      */
     _frame: function () {
         ++this._tempFRAMENUMBER;
-        XPUtil.DEBUG('FRAME %d _toonNumber: %d', this._tempFRAMENUMBER, this._toons.length - this._deadToons.length);
+        XPUtil.DEBUG('FRAME %d _toonNumber: %d', this._tempFRAMENUMBER, 
+            this._toons.length - this._deadToons.length);
 
         /* xpenguins_frame() */
         let i,
@@ -809,12 +826,13 @@ XPenguinsLoop.prototype = {
         }
 
         /* Loop through all the toons *
-         * NOTE: this.options.nPenguins is set always and the max. number of penguins to display.
-         *       this._toonNumber is the number of penguins *currently* active or not terminating,
-         *       and can change from loop to loop.
-         *       If it's 0, we quit.
-         * this.options.nPenguins    <-> npenguins
-         * this._toonNumber <-> penguin_number
+         * NOTE: this.number is set always and the max. number of toons
+         *  in the simulation to display.
+         * this._toonNumber is the number of penguins *currently* active or not
+         *  terminating, and can change from loop to loop.
+         * If it's 0, we quit.
+         * \sum{this._numbers} <-> npenguins
+         * this._toons.length - this._deadToons.length <-> penguin_number
          */
         i = this._toons.length;
         while (i--) {
@@ -839,7 +857,8 @@ XPenguinsLoop.prototype = {
                     gdata = this._theme.toonData[toon.genus];
 
                 /* see if the toon is squashed */
-                if (!((toon.data.conf & Toon.NOBLOCK) || (toon.data.conf & Toon.INVULNERABLE)) &&
+                if (!((toon.data.conf & Toon.NOBLOCK) || 
+                        (toon.data.conf & Toon.INVULNERABLE)) &&
                         toon.blocked(Toon.HERE)) {
                     XPUtil.DEBUG('EXPLODING');
                     if (o.blood && gdata.squashed) {
@@ -861,11 +880,12 @@ XPenguinsLoop.prototype = {
                             /* if it has landed change type appropriately */
                             if (toon.blocked(Toon.DOWN)) {
                                 toon.direction = (toon.pref_direction > -1 ?
-                                                   toon.pref_direction : XPUtil.RandInt(2));
+                                                   toon.pref_direction : 
+                                                   XPUtil.RandInt(2));
                                 toon.makeWalker(false);
                                 toon.pref_direction = -1;
                             } else {
-                                /* turn into climber (if exists) or bounce off */
+                                /* turn into climber or bounce off */
                                 if (!gdata.climber || XPUtil.RandInt(2)) {
                                     toon.setVelocity(-toon.u, gdata.faller.speed);
                                 } else {
@@ -880,7 +900,7 @@ XPenguinsLoop.prototype = {
                     /* tumbler */
                     } else if (toon.type === 'tumbler') {
                         if (sstatus !== Toon.OK) {
-                            /* should it splat? (33% chance if reached terminal velocity) */
+                            /* splat? (33% chance if reached terminal velocity) */
                             if (o.blood && gdata.splatted &&
                                     toon.v >= toon.data.terminal_velocity &&
                                     !XPUtil.RandInt(3)) {
@@ -888,9 +908,10 @@ XPenguinsLoop.prototype = {
                                 toon.setAssociation(Toon.DOWN);
                                 toon.setVelocity(0, 0);
                             } else {
-                                /* got lucky - didn't splat (or !options.blood): walk */
+                                /* got lucky: walk */
                                 toon.direction = (toon.pref_direction > -1 ?
-                                                   toon.pref_direction : XPUtil.RandInt(2));
+                                                   toon.pref_direction : 
+                                                   XPUtil.RandInt(2));
                                 toon.makeWalker(false);
                                 toon.pref_direction = -1;
                             }
@@ -929,13 +950,15 @@ XPenguinsLoop.prototype = {
                                             let newdir = +!toon.direction; // coerce to int
                                             toon.setType('floater', newdir, Toon.DOWN);
                                             toon.setAssociation(Toon.UNASSOCIATED);
-                                            toon.setVelocity((XPUtil.RandInt(5) + 1) * (newdir * 2 - 1),
-                                                               -gdata.floater.speed);
+                                            toon.setVelocity(
+                                                (XPUtil.RandInt(5) + 1) * (newdir * 2 - 1),
+                                                -gdata.floater.speed);
                                             // break
                                         }
                                     } else {
-                                      /* Change direction *after* creating toon to make sure
-                                      that a runner doesn't get instantly squashed... */
+                                      /* Change direction *after* creating toon
+                                       * to make sure that a runner doesn't get
+                                       * instantly squashed... */
                                         toon.makeWalker(false);
                                         toon.direction = +!toon.direction; //coerce to int
                                         toon.u = -toon.u;
@@ -950,7 +973,8 @@ XPenguinsLoop.prototype = {
                             if (sstatus === Toon.OK) {
                                 toon.pref_direction = toon.direction;
                                 if (gdata.tumbler) {
-                                    toon.setType('tumbler', toon.direction, Toon.DOWN);
+                                    toon.setType('tumbler', toon.direction, 
+                                        Toon.DOWN);
                                     toon.setAssociation(Toon.UNASSOCIATED);
                                     toon.setVelocity(0, gdata.tumbler.speed);
                                 } else {
@@ -964,12 +988,14 @@ XPenguinsLoop.prototype = {
                         /* 1/100 chance of becoming actionX */
                         } else if (gdata.action0 && !XPUtil.RandInt(100)) {
                             /* pick a random action */
-                            let actionN = 'action%d'.format(XPUtil.RandInt(this._theme.nactions[toon.genus]));
+                            let actionN = 'action%d'.format(
+                                XPUtil.RandInt(this._theme.nactions[toon.genus]));
                             log('new action: ' + actionN);
                             /* If we have enough space, start the action: */
                             if (!toon.checkBlocked(actionN, Toon.DOWN)) {
                                 toon.setType(actionN, toon.direction, Toon.DOWN);
-                                toon.setVelocity(gdata[actionN].speed * (2 * toon.direction - 1), 0);
+                                toon.setVelocity(gdata[actionN].speed * 
+                                    (2 * toon.direction - 1), 0);
                             }
                         } else if (Math.abs(toon.u) < toon.data.terminal_velocity) {
                         /* otherwise, just keep walking/running & accelerate. */
@@ -999,7 +1025,8 @@ XPenguinsLoop.prototype = {
                             sstatus = toon.advance(Toon.MOVE);
                             if (sstatus === Toon.OK) {
                                 if (gdata.tumbler) {
-                                    toon.setType('tumbler', toon.direction, Toon.DOWN);
+                                    toon.setType('tumbler', toon.direction,
+                                        Toon.DOWN);
                                     toon.setAssociation(Toon.UNASSOCIATED);
                                     toon.setVelocity(0, gdata.tumbler.speed);
                                 } else {
@@ -1008,10 +1035,12 @@ XPenguinsLoop.prototype = {
                                 toon.pref_climb = false;
                             } else {
                                 /* can't drift down, go sideways */
-                                toon.setVelocity(toon.data.speed * (2 * toon.direction - 1), 0);
+                                toon.setVelocity(toon.data.speed * 
+                                    (2 * toon.direction - 1), 0);
                             }
                         } else if (toon.frame === 0) {
-                            /* continue the action, or if you're finished loop/turn into walker */
+                            /* continue the action, or if you're finished, 
+                             * loop/turn into walker */
                             let loop = toon.data.loop;
                             if (!loop) {
                                 loop = -10;
@@ -1038,7 +1067,8 @@ XPenguinsLoop.prototype = {
                                 xoffset = (1 - direction * 2) * PENGUIN_JUMP;
                             if (!toon.offsetBlocked(xoffset, v)) {
                                 toon.move_by(xoffset, v);
-                                toon.setVelocity(-xoffset - (1 - direction * 2), 0);
+                                toon.setVelocity(-xoffset - (1 - direction * 2), 
+                                    0);
                                 toon.advance(Toon.MOVE);
                                 toon.setVelocity(0, v);
                             } else {
@@ -1048,8 +1078,10 @@ XPenguinsLoop.prototype = {
                             }
                         } else if (!toon.blocked(direction)) {
                             /* reached the top, start walking */
-                            if (toon.offsetBlocked((2 * direction - 1) * PENGUIN_JUMP, 0)) {
-                                toon.setVelocity((2 * direction - 1) * (PENGUIN_JUMP - 1), 0);
+                            if (toon.offsetBlocked((2 * direction - 1) * 
+                                    PENGUIN_JUMP, 0)) {
+                                toon.setVelocity((2 * direction - 1) * 
+                                    (PENGUIN_JUMP - 1), 0);
                                 toon.advance(Toon.MOVE);
                                 toon.setVelocity(0, -toon.data.speed);
                             } else {
@@ -1081,7 +1113,8 @@ XPenguinsLoop.prototype = {
                         /* turn into angel */
                         if (o.angels && !toon.terminating && gdata.angel) {
                             toon.setType('angel', toon.direction, Toon.HERE);
-                            toon.setVelocity(XPUtil.RandInt(5) - 2, -gdata.angel.speed);
+                            toon.setVelocity(XPUtil.RandInt(5) - 2, 
+                                -gdata.angel.speed);
                             toon.setAssociation(Toon.UNASSOCIATED);
                         }
                     /* angel */
@@ -1125,18 +1158,21 @@ XPenguinsLoop.prototype = {
                 o.load1 >= 0) {
             let newp,
                 load = XPUtil.loadAverage();
+
             if (o.load2 > o.load1) {
-                newp = Math.round(((o.load2 - load) * o.nPenguins) / (o.load2 - o.load1));
-                newp = Math.min(o.nPenguins, Math.max(0, newp));
+                newp = Math.round(((o.load2 - load) * this._originalNumber) / 
+                    (o.load2 - o.load1));
+                newp = Math.min(this._originalNumber, Math.max(0, newp));
             } else if (load < o.load1) {
-                newp = o.nPenguins;
+                newp = this._originalNumber;
             } else {
                 newp = 0;
             }
-            if (o.nPenguins !== newp) {
+            if (this._originalNumber !== newp) {
                 this._setTotalNumber(newp);
+                XPUtil.DEBUG(_("Adjusting number according to load: %d -> %d"),
+                        this._toons.length - this._deadToons.length, newp);
             }
-            XPUtil.DEBUG(_("Adjusting number according to load"));
             this._cycle = 0;
         } else if (!numActive) {
             /* No penguins active, but not exiting either.
@@ -1158,8 +1194,9 @@ XPenguinsLoop.prototype = {
     /*********************
      *      UTILITY      *
      *********************/
-    /* Note : my connect/disconnect tracker takes ideas from shellshape extension:
-     * signals are stored by the owner, storing both the target & the id to clean up later
+    /* Note : my connect/disconnect tracker takes ideas from shellshape 
+     * extension: signals are stored by the owner, storing both the target & 
+     * the id to clean up later
      */
     _connectAndTrack: function () {
         WindowListener._connectAndTrack.apply(this, arguments);

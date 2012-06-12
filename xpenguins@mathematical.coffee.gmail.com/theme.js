@@ -39,12 +39,9 @@ Theme.prototype = {
         /* Theme: can have one or more genera
          * Genus: class of toons (Penguins has 2: walker & skateboarder).
          * Each genus has toon types: walker, floater, tumbler, faller, ...
-         *
-         * this.toonData: array, one per genus (per theme). this.toonData[i] = { type_of_toon: ToonData }
-         * this.number: array of numbers, one per genus
          */
         /* per genus in each theme */
-        this.toonData = {}; // [genus][type], where genus == <Theme_Genus>, Genus is 1 if none.
+        this.toonData = {}; // [genus][type], where genus == <Theme_Genus||1>.
         this.nactions = {};
         this.number   = {};
         /* per theme */
@@ -102,19 +99,6 @@ Theme.prototype = {
         }
         this.total -= this.number[genus];
         this.number[genus] = 0;
-        /*
-        let genii = this._themeGenusMap[name],
-            i = genii.length;
-        while (i--) {
-            let genus = genii[i];
-            delete this.number[genus];
-            delete this.nactions[genus];
-            // note no .master references go bad because we only use that within a single theme.
-            delete this.toonData[genus];
-            this.names.splice(this.names.indexOf(genus), 1);
-        }
-        delete this._themeGenusMap[name];
-        */
     },
 
     /* Append the theme named "name" to this theme. */
@@ -127,7 +111,8 @@ Theme.prototype = {
         }
         /* if theme has already been parsed, do not re-parse */
         if (this._themeGenusMap[name]) {
-            XPUtil.warn("Warning: theme %s already exists, not re-parsing", iname);
+            XPUtil.warn("Warning: theme %s already exists, not re-parsing", 
+                iname);
             return;
         }
 
@@ -146,6 +131,10 @@ Theme.prototype = {
         /* iterate through the words to parse the config file. */
         words = words.replace(/#.+/g, '');
         words = words.replace(/\s+/g, ' ');
+        /* Note: the 'toon' word is optional in one-genus themes.
+         * If the 'toon' word is present there must be a genus name
+         * so no need to use the default '_1'.
+         */
         if (!words.match(/\btoon\b/)) {
             this.grow(genus, name);
             added_genii.push(genus);
@@ -157,11 +146,6 @@ Theme.prototype = {
         try {
             for (let i = 0; i < words.length; ++i) {
                 let word = words[i].toLowerCase();
-                /* define a new genus of toon (walker, skateboarder, ...) 
-                 * note: the 'toon' word is optional in one-genus themes.
-                 * If we've already seen the 'toon' word before this must be a
-                 *  multi-genus theme so make space for it & increment 'genus' index.
-                 */
                 if (word === 'toon') {
                     /* store the genus index with the theme name */
                     genus = name + '_' + words[++i];
@@ -185,7 +169,8 @@ Theme.prototype = {
                             this.nactions[genus]++;
                         }
                     } else {
-                        XPUtil.warn(_("Warning: unknown type '%s': ignoring".format(type)));
+                        XPUtil.warn(_("Warning: unknown type '%s': ignoring"),
+                            type);
                         current = dummy;
                     }
                     /* extra configuration */
@@ -225,21 +210,25 @@ Theme.prototype = {
 
                         /* Pixmap is already defined! */
                         if (current.texture) {
-                            XPUtil.warn(_("Warning: resetting pixmap to %s".format(pixmap)));
+                            XPUtil.warn(_("Warning: resetting pixmap to %s"),
+                                pixmap);
                             /* Free old pixmap if it is not a copy */
                             if (!current.master) {
                                 current.texture.destroy();
                             }
                         }
 
-                        /* Check if the file has been used before, but only look in the genii for the current theme */
+                        /* Check if the file has been used before, but only 
+                         * look in the genii for the current theme */
                         let new_pixmap = true;
                         for (igenus = 0; igenus < added_genii.length && new_pixmap; ++igenus) {
                             gdata = this.toonData[added_genii[igenus]];
                             for (itype in gdata) {
                                 /* data already exists in theme, set master */
-                                if (gdata.hasOwnProperty(itype) && gdata[itype].filename &&
-                                        !gdata[itype].master && gdata[itype].filename === pixmap) {
+                                if (gdata.hasOwnProperty(itype) && 
+                                        gdata[itype].filename &&
+                                        !gdata[itype].master && 
+                                        gdata[itype].filename === pixmap) {
                                          // set .master & .texture (& hence .filename)
                                     current.setMaster(gdata[itype]);
                                     new_pixmap = false;
@@ -259,7 +248,8 @@ Theme.prototype = {
                     this.number[genus] = parseInt(words[++i], 10);
                 } else {
                 /* unknown word */
-                    XPUtil.warn(_("Warning: Unrecognised word %s, ignoring".format(word)));
+                    XPUtil.warn(_("Warning: Unrecognised word %s, ignoring"),
+                        word);
                 }
             } // while read word
         } catch (err) {
@@ -287,18 +277,18 @@ Theme.prototype = {
                         if (imwidth < current.width) {
                             throw new Error(_("Width of xpm image too small for even a single frame"));
                         } else {
-                            XPUtil.warn(_("Warning: width of %s is too small to display all frames".format(
+                            XPUtil.warn(_("Warning: width of %s is too small to display all frames"),
                                 current.filename
-                            )));
+                            );
                         }
                     }
                     if (imheight < current.height * current.ndirections) {
                         if ((current.ndirections = imheight / current.height) < 1) {
                             throw new Error(_("Height of xpm image too small for even a single frame"));
                         } else {
-                            XPUtil.warn(_("Warning: height of %s is too small to display all frames".format(
+                            XPUtil.warn(_("Warning: height of %s is too small to display all frames"),
                                 current.filename
-                            )));
+                            );
                         }
                     }
                 }

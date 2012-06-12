@@ -1,3 +1,4 @@
+/* *** CODE *** */
 const Gio      = imports.gi.Gio;
 const GLib     = imports.gi.GLib;
 const Gtk      = imports.gi.Gtk;
@@ -60,15 +61,18 @@ AboutDialog.prototype = {
     __proto__: ModalDialog.ModalDialog.prototype,
 
     _init: function (title, text) {
-        ModalDialog.ModalDialog.prototype._init.call(this, {styleClass: 'modal-dialog'});
+        ModalDialog.ModalDialog.prototype._init.call(this, 
+            {styleClass: 'modal-dialog'});
 
         let monitor = global.screen.get_monitor_geometry(global.screen.get_primary_monitor()),
             width   = Math.max(250, Math.round(monitor.width / 4)),
             height  = Math.max(400, Math.round(monitor.height / 2.5));
 
         /* title */
-        this.title = new St.Label({text: title || '', style_class: 'xpenguins-about-title'});
-        this.contentLayout.add(this.title, {x_fill: false, x_align: St.Align.MIDDLE});
+        this.title = new St.Label({text: title || '', 
+            style_class: 'xpenguins-about-title'});
+        this.contentLayout.add(this.title, 
+            {x_fill: false, x_align: St.Align.MIDDLE});
 
         /* scroll box */
         this.scrollBox = new St.ScrollView({
@@ -78,22 +82,29 @@ AboutDialog.prototype = {
             height: height
         });
         // automatic horizontal scrolling, automatic vertical scrolling
-        this.scrollBox.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC);
+        this.scrollBox.set_policy(Gtk.PolicyType.AUTOMATIC, 
+            Gtk.PolicyType.AUTOMATIC);
 
-        /* text in scrollbox. For some reason it won't display unless in a St.BoxLayout. */
-        this.text = new St.Label({text: (text || ''), style_class: 'xpenguins-about-text'});
+        /* text in scrollbox. 
+         * For some reason it won't display unless in a St.BoxLayout. */
+        this.text = new St.Label({text: (text || ''), 
+            style_class: 'xpenguins-about-text'});
         this.text.clutter_text.ellipsize = Pango.EllipsizeMode.NONE; // allows scrolling
         //this.text.clutter_text.line_wrap = true;
 
         this.box = new St.BoxLayout();
         this.box.add(this.text, { expand: true });
-        this.scrollBox.add_actor(this.box, {expand: true, x_fill: true, y_fill: true});
-        this.contentLayout.add(this.scrollBox, {expand: true, x_fill: true, y_fill: true});
+        this.scrollBox.add_actor(this.box, 
+            {expand: true, x_fill: true, y_fill: true});
+        this.contentLayout.add(this.scrollBox, 
+            {expand: true, x_fill: true, y_fill: true});
 
         /* OK button */
         this.setButtons([{ 
             label: _("OK"),
-            action: Lang.bind(this, function () {this.close(global.get_current_time()); })
+            action: Lang.bind(this, function () {
+                this.close(global.get_current_time()); 
+            })
         }]);
 	},
 
@@ -133,12 +144,13 @@ ThemeSliderMenuItem.prototype = {
         this.box = new St.BoxLayout({vertical: true, name: 'xpenguins'});
         this.addActor(this.box, {expand: true, span: -1});
 
-        this.topBox = new St.BoxLayout({vertical: false, style_class: 'theme-slider-menu-item-top-box'});
+        this.topBox = new St.BoxLayout({vertical: false, 
+            style_class: 'theme-slider-menu-item-top-box'});
         this.topBox.add_style_class_name('theme-slider-menu-item-top-box');
-        this.topBox.set_style('padding-left: 0em; padding-right: 1.75em'); /* workaround: can't get stylesheet.css to work */
         this.box.add(this.topBox, {x_fill: true});
-        this.bottomBox = new St.BoxLayout({vertical: false, style_class: 'theme-slider-menu-item-bottom-box'});
-        this.bottomBox.set_style('padding: 0px'); /* workaround: can't get stylesheet.css to work */
+
+        this.bottomBox = new St.BoxLayout({vertical: false, 
+            style_class: 'theme-slider-menu-item-bottom-box'});
         this.box.add(this.bottomBox, {x_fill: true});
 
         /* Icon (default no icon) */
@@ -155,7 +167,8 @@ ThemeSliderMenuItem.prototype = {
         this.label.set_style('padding-left: 0.5em');
 
         /* number */
-        this.numberLabel = new St.Label({text: this._value.toString(), reactive: false});
+        this.numberLabel = new St.Label({text: this._value.toString(), 
+            reactive: false});
 
         /* Info button */
         this.button = new St.Button();
@@ -167,14 +180,19 @@ ThemeSliderMenuItem.prototype = {
         this.button.set_child(icon);
 
         /* slider */
-        this.slider = new PopupMenu.PopupSliderMenuItem((defaultVal - min) / (max - min)); // between 0 and 1
+        this.slider = new PopupMenu.PopupSliderMenuItem((defaultVal - min) / 
+            (max - min)); // between 0 and 1
         this.slider.actor.set_style('padding-left: 0.5em; padding-right: 0em');
        
         /* connect up signals */
         this.slider.connect('value-changed', Lang.bind(this, this._updateValue));
         /* pass through the drag-end, clicked signal */
-        this.slider.connect('drag-end', Lang.bind(this, function () { this.emit('drag-end', this._value); }));
-        this.button.connect('clicked', Lang.bind(this, function () { this.emit('button-clicked'); }));
+        this.slider.connect('drag-end', Lang.bind(this, function () { 
+            this.emit('drag-end', this._value); 
+        }));
+        this.button.connect('clicked', Lang.bind(this, function () { 
+            this.emit('button-clicked'); 
+        }));
 
         /* assemble the item */
         this.topBox.add(this.icon);
@@ -189,11 +207,11 @@ ThemeSliderMenuItem.prototype = {
         this.numberLabel.set_style('border:1px solid #ffff00');
         this.icon.set_style('border: 1px solid #ffffff');
         this.button.set_style('border: 1px solid #ffffff');
-        this.slider.actor.set_style('border: 1px solid #ffffff; padding-left: 0px; padding-right: 0px');
+        this.slider.actor.set_style('border: 1px solid #ffffff;');
         this.box.set_style('border: 1px solid #ffff00');
-        this.topBox.set_style('border: 1px solid #00ff00; padding: 0px');
-        this.bottomBox.set_style('border: 1px solid #0000ff; padding: 0px');
-        this.actor.set_style('border: 1px solid #ff0000; padding-top: 0px; padding-bottom: 0px');
+        this.topBox.set_style('border: 1px solid #00ff00;');
+        this.bottomBox.set_style('border: 1px solid #0000ff;');
+        this.actor.set_style('border: 1px solid #ff0000;');
         */
     },
 
@@ -245,10 +263,12 @@ XPenguinsMenu.prototype = {
     _init: function (extensionPath) {
         XPUtil.DEBUG('_init');
         /* Initialise */
-        PanelMenu.SystemStatusButton.prototype._init.call(this, 'emblem-favorite', 'xpenguins');
+        PanelMenu.SystemStatusButton.prototype._init.call(this, 
+            'emblem-favorite', 'xpenguins');
         this.actor.add_style_class_name('xpenguins-icon');
         this.setGIcon(new Gio.FileIcon({
-            file: Gio.file_new_for_path(GLib.build_filenamev([extensionPath, 'penguin.png']))
+            file: Gio.file_new_for_path(GLib.build_filenamev([extensionPath, 
+                      'penguin.png']))
         }));
 
         /* items */
@@ -257,14 +277,15 @@ XPenguinsMenu.prototype = {
         this._items = {};
         this._themeInfo = {};
         this._toggles = {
-            ignorePopups   : _("Ignore popups"),
-            ignoreMaximised: _("Ignore maximised windows"),
-            onAllWorkspaces: _("Always on visible workspace"), // <-- this is the only one
-            onDesktop      : _("Run on desktop"), // not fully implemented
-            blood          : _("Show blood"),
-            angels         : _("Show angels"),
-            squish         : _("God Mode"),
-            windowPreview  : _("Window Preview"),
+            ignorePopups       : _("Ignore popups"),
+            ignoreMaximised    : _("Ignore maximised windows"),
+            ignoreHalfMaximised: _("..and half-maximised too"),
+            onAllWorkspaces    : _("Always on visible workspace"),
+            onDesktop          : _("Run on desktop"), // not fully implemented
+            blood              : _("Show blood"),
+            angels             : _("Show angels"),
+            squish             : _("God Mode"),
+            windowPreview      : _("Window Preview"),
         };
         this._ABOUT_ORDER = ['name', 'date', 'artist', 'copyright',
             'license', 'maintainer', 'location', 'icon', 'comment'];
@@ -276,7 +297,8 @@ XPenguinsMenu.prototype = {
         /* create an Xpenguin Loop object which stores the XPenguins program */
         this._XPenguinsLoop = new XPenguins.XPenguinsLoop(this.getConf());
         /* Listen to 'ntoons-changed' and adjust slider accordingly */
-        this._XPenguinsLoop.connect('ntoons-changed', Lang.bind(this, this._onChangeThemeNumber));
+        this._XPenguinsLoop.connect('ntoons-changed', Lang.bind(this, 
+            this._onChangeThemeNumber));
 
         /* @@ debugging windowListener */
         this._windowListener = new WindowListener.WindowListener();
@@ -284,7 +306,8 @@ XPenguinsMenu.prototype = {
         /* initialise as 'Penguins' */
         /* by default, just Penguins is set */
         if (this._items.themes['Penguins']) {
-            this._onChangeTheme(this._items.themes['Penguins'], -1, 'Penguins', false);
+            this._onChangeTheme(this._items.themes['Penguins'], -1, 'Penguins', 
+                false);
         }
     },
 
@@ -324,8 +347,10 @@ XPenguinsMenu.prototype = {
         this.menu.removeAll();
 
         /* toggle to start xpenguins */
-        this._items.start = new PopupMenu.PopupSwitchMenuItem(_("Start"), false);
-        this._items.start.connect('toggled', Lang.bind(this, this._startXPenguins));
+        this._items.start = new PopupMenu.PopupSwitchMenuItem(_("Start"), 
+            false);
+        this._items.start.connect('toggled', Lang.bind(this, 
+            this._startXPenguins));
         this.menu.addMenuItem(this._items.start);
 
         /* theme submenu */
@@ -339,7 +364,8 @@ XPenguinsMenu.prototype = {
         this._optionsMenu = new PopupMenu.PopupSubMenuMenuItem(_("Options"));
         this.menu.addMenuItem(this._optionsMenu);
 
-        /* ignore maximised, always on visible workspace, angels, blood, god mode, verbose toggles */
+        /* ignore maximised, ignore popups, ignore half maximised, god mode,
+         * always on visible workspace, angels, blood, verbose toggles */
         let defaults = XPenguins.XPenguinsLoop.prototype.defaultOptions();
         let blacklist = XPenguins.getCompatibleOptions(true);
         // remove windowPreview code in release branches
@@ -347,16 +373,27 @@ XPenguinsMenu.prototype = {
         defaults.windowPreview = false;
         for (let propName in this._toggles) {
             if (this._toggles.hasOwnProperty(propName) && !blacklist[propName]) {
-                this._items[propName] = new PopupMenu.PopupSwitchMenuItem(this._toggles[propName], defaults[propName] || false);
-                this._items[propName].connect('toggled', Lang.bind(this, this.changeOption, propName));
+                this._items[propName] = new PopupMenu.PopupSwitchMenuItem(
+                    this._toggles[propName], defaults[propName] || false);
+                this._items[propName].connect('toggled', 
+                    Lang.bind(this, this.changeOption, propName));
                 this._optionsMenu.menu.addMenuItem(this._items[propName]);
             }
         }
 
+        /* ignore half maximised should be greyed out/unusble if
+         * 'ignoreMaximised' is false, and usable if it's true.
+         * reactive: false?
+         */
+        if (this._items.ignoreHalfMaximised && this._items.ignoreMaximised) {
+            this._items.ignoreMaximised.connect('toggled', Lang.bind(this,
+                this._onIgnoreMaximisedToggled));
+            this._onIgnoreMaximisedToggled(this._items.ignoreMaximised, 
+                this._items.ignoreMaximised.state);
+        }
+
         /* RecalcMode combo box: only if global.display has grab-op- events. */
         if (!blacklist.recalcMode) {
-            //dummy = new PopupMenu.PopupMenuItem(_("Recalc mode"), {reactive: false});
-            //this._optionsMenu.menu.addMenuItem(dummy);
             this._items.recalc = new PopupMenu.PopupComboBoxMenuItem({});
             this._optionsMenu.menu.addMenuItem(this._items.recalc);
             for (let mode in XPenguins.RECALC) {
@@ -383,7 +420,8 @@ XPenguinsMenu.prototype = {
         if (themeList.length === 0) {
             this._themeMenu.label.set_text(_("No themes found, click to reload!"));
             // FIXME: test
-            this._themeMenu.connect('open', Lang.bind(this, this._populateThemeMenu));
+            this._themeMenu.connect('open', 
+                Lang.bind(this, this._populateThemeMenu));
         } else {
             this._themeInfo = ThemeManager.describeThemes(themeList, false);
             for (let i = 0; i < themeList.length; ++i) {
@@ -391,8 +429,10 @@ XPenguinsMenu.prototype = {
                 this._items.themes[sanitised_name] = new ThemeSliderMenuItem(
                     _(themeList[i]), 0, 0, XPenguins.PENGUIN_MAX, true,
                     this._themeInfo[sanitised_name].icon);
-                this._items.themes[sanitised_name].connect('drag-end', Lang.bind(this, this._onChangeTheme, sanitised_name, true));
-                this._items.themes[sanitised_name].connect('button-clicked', Lang.bind(this, this._onShowHelp, sanitised_name));
+                this._items.themes[sanitised_name].connect('drag-end', 
+                    Lang.bind(this, this._onChangeTheme, sanitised_name, true));
+                this._items.themes[sanitised_name].connect('button-clicked', 
+                    Lang.bind(this, this._onShowHelp, sanitised_name));
                 this._themeMenu.menu.addMenuItem(this._items.themes[sanitised_name]);
             }
         }
@@ -403,7 +443,6 @@ XPenguinsMenu.prototype = {
             this._themeInfo[name] = ThemeManager.describeThemes([name], false)[name];
         }
 
-        /* make a popup dialogue (that needs to be dismissed), see perhaps alt-tab or panel-docklet? */
         let dialog = new AboutDialog(this._themeInfo[name].name);
         for (let i = 0; i < this._ABOUT_ORDER.length; ++i) {
             let propName = this._ABOUT_ORDER[i];
@@ -433,7 +472,8 @@ XPenguinsMenu.prototype = {
                     return x + ',' + y;
                 });
             if (themeListFlat.length > this._THEME_STRING_LENGTH_MAX) {
-                themeListFlat = themeListFlat.substr(0, this._THEME_STRING_LENGTH_MAX-3) + '...';
+                themeListFlat = themeListFlat.substr(0, 
+                    this._THEME_STRING_LENGTH_MAX-3) + '...';
             }
         } else {
             themeListFlat = 'none';
@@ -446,6 +486,15 @@ XPenguinsMenu.prototype = {
             sanitised_name, n);
         if (n != this._items.themes[sanitised_name].getValue()) {
             this._items.themes[sanitised_name].setValue(n);
+        }
+    },
+    
+    // UPTO
+    _onIgnoreMaximisedToggled: function (item, state) {
+        if (state) {
+            this._items.ignoreHalfMaximised.enable();
+        } else {
+            this._items.ignoreHalfMaximised.disable();
         }
     },
 
@@ -464,17 +513,6 @@ XPenguinsMenu.prototype = {
                 this._windowListener.stop();
             }
         }
-    },
-
-    _nPenguinsSliderChanged: function (slider, value) {
-        this._items.nPenguinsLabel.set_text(Math.ceil(value * XPenguins.PENGUIN_MAX).toString());
-    },
-
-    _onNPenguinsChanged: function () {
-        if (this._XPenguinsLoop) {
-            this._XPenguinsLoop.setNumber(parseInt(this._items.nPenguinsLabel.get_text(), 10));
-        }
     }
-
 };
 
