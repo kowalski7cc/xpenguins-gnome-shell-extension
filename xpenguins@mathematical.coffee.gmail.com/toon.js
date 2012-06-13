@@ -74,6 +74,7 @@ Toon.prototype = {
         this.genus = null;
         this.type = 'faller';
         this.direction = null;
+        this.theme = null;
 
         /* toon is associated with a window */
         this.associate = UNASSOCIATED; 
@@ -107,7 +108,7 @@ Toon.prototype = {
             }
         }
         this.actor.set_position(0, 0);
-        if (this.genus !== null) {
+        if (this.genus) {
             this.init();
         }
 
@@ -140,12 +141,16 @@ Toon.prototype = {
     },
 
     /* Only call this *after* setting the toon's genus */
-    init: function () {
-        XPUtil.DEBUG(('TOON.INIT: genus: ' + this.genus + ' type: ' + this.type));
+    init: function (genus) {
+        if (genus) {
+            this.genus = genus;
+        }
         this.data = this._globals.toonData[this.genus][this.type];
         this.direction = XPUtil.RandInt(2);
         this.setType('faller', this.direction, UNASSOCIATED);
-        this.actor.set_position(XPUtil.RandInt(this._globals.XPenguinsWindow.get_width() - this.data.width), 1 - this.data.height);
+        this.actor.set_position(
+            XPUtil.RandInt(this._globals.XPenguinsWindow.get_width() - this.data.width),
+            1 - this.data.height);
         this.setAssociation(UNASSOCIATED);
         this.setVelocity(this.direction * 2 - 1, this.data.speed);
         this.terminating = false;
@@ -275,15 +280,18 @@ Toon.prototype = {
      */
     offsetBlocked: function (xoffset, yoffset) {
         if (this._globals.edge_block) {
-            if ((this.x + xoffset <= 0)
-                    || (this.x + this.data.width + xoffset >= this._globals.XPenguinsWindow.get_width())
-                    || ((this.y + yoffset <= 0) && this._globals.edge_block !== SIDEBOTTOMBLOCK)
-                    || (this.y + this.data.height + yoffset >= this._globals.XPenguinsWindow.get_height())) {
+            if ((this.x + xoffset <= 0) ||
+                    (this.x + this.data.width + xoffset >= 
+                        this._globals.XPenguinsWindow.get_width()) ||
+                    ((this.y + yoffset <= 0) && this._globals.edge_block 
+                        !== SIDEBOTTOMBLOCK) ||
+                    (this.y + this.data.height + yoffset 
+                        >= this._globals.XPenguinsWindow.get_height())) {
                 return true;
             }
         }
-        return this._globals.toon_windows.overlaps(this.x + xoffset, this.y + yoffset,
-                    this.data.width, this.data.height);
+        return this._globals.toon_windows.overlaps(this.x + xoffset, 
+            this.y + yoffset, this.data.width, this.data.height);
     },
 
     /* Check to see if a toon would be squashed instantly if changed to
@@ -294,14 +302,16 @@ Toon.prototype = {
     checkBlocked: function (type, gravity) {
         let newpos = this.calculateNewPosition(this.genus, type, gravity),
             newdata = this._globals.toonData[this.genus][type];
-        return this._globals.toon_windows.overlaps(newpos[0], newpos[1], newdata.width, newdata.height);
+        return this._globals.toon_windows.overlaps(newpos[0], newpos[1], 
+            newdata.width, newdata.height);
     },
 
     /**** MORPHING FUNCTIONS ****/
     /* Turn a penguin into a climber */
     // __xpenguins_make_climber
     makeClimber: function () {
-        this.setType('climber', this.direction, (this.direction ? DOWNRIGHT : DOWNLEFT));
+        this.setType('climber', this.direction,
+            (this.direction ? DOWNRIGHT : DOWNLEFT));
         this.setAssociation(this.direction);
         this.setVelocity(0, -this.data.speed);
     },
@@ -338,7 +348,7 @@ Toon.prototype = {
         this.setAssociation(UNASSOCIATED);
     },
 
-    /**** HANDLING TOON ASSOCIATIONS WITH MOVING WINDOWS (toon_associate.c) ****/
+    /*** HANDLING TOON ASSOCIATIONS WITH MOVING WINDOWS (toon_associate.c) ***/
     /* The first thing to be done when the windows move is to work out
        which windows the associated toons were associated with just before
        the windows moved
@@ -371,7 +381,7 @@ Toon.prototype = {
                 width = 1;
                 height = this.data.height;
             } else {
-                throw new Error(_("Error: illegal direction %d".format(this.associate)));
+                throw new Error(_("Error: illegal direction %d"), this.associate);
             } // switch(this.associate)
             this.wid = -1;
 
@@ -444,7 +454,8 @@ Toon.prototype = {
             if (newx < 0) {
                 newx = 0;
                 result = PARTIALMOVE;
-            } else if (newx + this.data.width > this._globals.XPenguinsWindow.get_width()) {
+            } else if (newx + this.data.width > 
+                this._globals.XPenguinsWindow.get_width()) {
                 newx = this._globals.XPenguinsWindow.get_width() - this.data.width;
                 result = PARTIALMOVE;
             }
@@ -455,7 +466,8 @@ Toon.prototype = {
                 if (newy < 0 && this._globals.edge_block !== SIDEBOTTOMBLOCK) {
                     newy = 0;
                     result = PARTIALMOVE;
-                } else if (newy + this.data.height > this._globals.XPenguinsWindow.get_height()) {
+                } else if (newy + this.data.height >
+                    this._globals.XPenguinsWindow.get_height()) {
                     newy = this._globals.XPenguinsWindow.get_height() - this.data.height;
                     result = PARTIALMOVE;
                 }
@@ -465,7 +477,8 @@ Toon.prototype = {
             }
 
             /* Is new toon location fully/partially filled with windows? */
-            if (this._globals.toon_windows.overlaps(newx, newy, this.data.width, this.data.height) && mode === MOVE &&
+            if (this._globals.toon_windows.overlaps(newx, newy, this.data.width,
+                    this.data.height) && mode === MOVE &&
                     result !== BLOCKED && !stationary) {
                 let tryx, tryy,
                     step = 1,
@@ -480,7 +493,8 @@ Toon.prototype = {
                     }
                     for (tryx = newx + step; tryx !== this.x; tryx += step) {
                         tryy = this.y + (tryx - this.x) * v / u;
-                        if (!this._globals.toon_windows.overlaps(tryx, tryy, this.data.width, this.data.height)) {
+                        if (!this._globals.toon_windows.overlaps(tryx, tryy,
+                                this.data.width, this.data.height)) {
                             newx = tryx;
                             newy = tryy;
                             result = PARTIALMOVE;
@@ -494,7 +508,8 @@ Toon.prototype = {
                     }
                     for (tryy = newy + step; tryy !== this.y; tryy += step) {
                         tryx = this.x + (tryy - this.y) * u / v;
-                        if (!this._globals.toon_windows.overlaps(tryx, tryy, this.data.width, this.data.height)) {
+                        if (!this._globals.toon_windows.overlaps(tryx, tryy,
+                                this.data.width, this.data.height)) {
                             newx = tryx;
                             newy = tryy;
                             result = PARTIALMOVE;
@@ -505,7 +520,6 @@ Toon.prototype = {
                 }
             }
         } /* what sort of blocking to consider */
-        //XPUtil.DEBUG('toon.advance: moving from (%d,%d) to (%d,%d)'.format(this.x, this.y, newx, newy));
         if (move_ahead) {
             this.actor.set_position(newx, newy);
             // see if we've scrolled to the end of the filmstrip
@@ -530,7 +544,8 @@ Toon.prototype = {
     draw: function () {
         /* Draw the toon on */
         if (this.active) {
-            let direction = (this.direction >= this.data.ndirections ? 0 : this.direction),
+            let direction = (this.direction >= this.data.ndirections ? 0 : 
+                    this.direction),
                 anchor_x = this.data.width * this.frame,
                 anchor_y = this.data.height * direction;
 
@@ -564,17 +579,16 @@ ToonData.prototype = {
     /* __xpenguins_copy_properties */
     _init: function (otherToonData) {
         /* Properties: set default values */
-        this.conf = DEFAULTS;      /* bitmask of toon properties such as cycling etc */
-        this.texture = null; /* Clutter.Texture, replaces .image, .mask and .pixmap */
-
-        // .master is needed to make sure all clones point to the one same source.
-        this.master = null;             /* If pixmap data is duplicated from another toon, this is it */
-        this.nframes = 0;               /* number of frames in image */
-        this.ndirections = 1;           /* number directions in image (1 or 2) */
-        this.width = this.height = 30;  /* width & height of individual frame/dir */
+        this.conf = DEFAULTS;// bitmask of toon properties such as cycling etc 
+        this.texture = null; // Clutter.Texture
+        this.master = null;  // If pixmap data is duplicated from another toon, 
+                             //  this is it .
+        this.nframes = 0;    // number of frames in image 
+        this.ndirections = 1;           // number directions in image (1 or 2) 
+        this.width = this.height = 30;  // width & height of individual frame
         this.acceleration = this.terminal_velocity = 0;
         this.speed = 4;
-        this.loop = 0;                  /* Number of times to repeat cycle */
+        this.loop = 0;                  // Number of times to repeat cycle 
 
         /* Copy select properties from otherToonData to here. */
         let propListToCopy = ['nframes', 'ndirections', 'width', 'height',

@@ -3,13 +3,14 @@
  * xpenguins_theme.c
  *********************/
 /* Imports */
+const Lang  = imports.lang;
 const Shell = imports.gi.Shell;
 
 const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
 
 const Me = imports.misc.extensionUtils.getCurrentExtension();
-const ThemeManager = Me.imports.themeManager.ThemeManager;
+const ThemeManager = Me.imports.themeManager;
 const Toon   = Me.imports.toon;
 const WindowListener = Me.imports.windowListener;
 const XPenguins = Me.imports.xpenguins;
@@ -32,28 +33,66 @@ Theme.prototype = {
         /* Theme: can have one or more genera
          * Genus: class of toons (Penguins has 2: walker & skateboarder).
          * Each genus has toon types: walker, floater, tumbler, faller, ...
-         *
-         * this.toonData: array, one per genus (per theme). this.toonData[i] = { type_of_toon: ToonData }
-         * this.number: array of numbers, one per genus
          */
-        this.toonData = []; // data, one per genus
-        this.number = [];   // theme penguin numbers
-        this.nactions = []; /* Number of random actions the genus has (type actionX) */
+        /* per genus in each theme */
+        this.toonData = {}; // [genus][type], where genus == <Theme_Genus||1>.
+        this.nactions = {};
+        this.number   = {};
+        /* per theme */
+        this._themeGenusMap = {}; // theme => [genus1, genus2]
+        this.totalsPerTheme = {}; //per THEME.
+
+        /* global across all themes/genii */
         this.delay = 60;
+        this.total = 0;
 
         /* Initialise */
+        themeList = themeList || [];
         for (let i = 0; i < themeList.length; ++i) {
             XPUtil.DEBUG(' ... appending theme %s', themeList[i]);
             this.appendTheme(themeList[i]);
         }
     }, // _init
 
-    get ngenera() {
-        return this.number.length;
+    hasTheme: function (iname) {
+        return this._themeGenusMap[ThemeManager.sanitiseThemeName(iname)] !== undefined;
     },
 
-    get total() {
-        return Math.min(XPenguins.PENGUIN_MAX, this.number.reduce(function (x, y) { return x + y; }));
+    /* get genus names for a theme as an array */
+    getGeniiForTheme: function (iname) {
+        return this._themeGenusMap[ThemeManager.sanitiseThemeName(iname)] || [];
+    },
+
+    /* gets numbers per genus for a theme as an array. */
+    getGenusNumbersForTheme: function (iname) {
+        let name = ThemeManager.sanitiseThemeName(iname);
+        if (!this._themeGenusMap[name]) {
+            return [];
+        }
+        return this._themeGenusMap[name].map(Lang.bind(this, function (genus) {
+            return this.number[genus];
+        }));
+    },
+
+    /* get number of toons for that theme */
+    getTotalForTheme: function (iname) {
+        let name = ThemeManager.sanitiseThemeName(iname);
+        return this.totalsPerTheme[name] || 0;
+    },
+
+    removeTheme: function (iname) {
+        /* Note: we do not actually delete this.toonData[genus_names] etc
+         * because we want on-the-fly theme swapping, meaning toons that
+         * are in the "dead" genus should explode using their old genus data
+         * and then respawn with the new genus data.
+         * They'll need to have this.toonData[genus_name] for that.
+         */
+        let name = ThemeManager.sanitiseThemeName(iname);
+        if (!this._themeGenusMap[name]) {
+            return;
+        }
+        this.total -= this.number[genus];
+        this.number[genus] = 0;
     },
 
     /* Append the theme named "name" to this theme. */
@@ -62,45 +101,48 @@ Theme.prototype = {
         let name = ThemeManager.sanitiseThemeName(iname),
             file_name = ThemeManager.getThemePath(name);
         if (!file_name) {
-            throw new Error('Theme ' + name + ' not found or config file not present');
+            throw new Error("Theme " + name + " not found or config file not present");
         }
+        /* if theme has already been parsed, do not re-parse */
+        if (this._themeGenusMap[name]) {
+            XPUtil.warn("Warning: theme %s already exists, not re-parsing", 
+                iname);
+            return;
+        }
+
 
         /* Read config file, ignoring comments ('#') and whitespace */
         let words = Shell.get_file_contents_utf8_sync(file_name),
-            started = false, // whether we've encountered the 'toon' keyword yet
-                             // (may be omitted in single-genera files)
-            first_genus = this.ngenera,
-            genus = this.ngenera,
+            added_genii = [],
+            genus = name + '_1',
             current,    // holds the current ToonData
             def = {},   // holds default ToonData
-            dummy = {}; // any unknown ToonData
+            dummy = {}, // any unknown ToonData
+            gdata,      // various looping variables
+            itype,
+            igenus;
 
         /* iterate through the words to parse the config file. */
         words = words.replace(/#.+/g, '');
         words = words.replace(/\s+/g, ' ');
+        /* Note: the 'toon' word is optional in one-genus themes.
+         * If the 'toon' word is present there must be a genus name
+         * so no need to use the default '_1'.
+         */
+        if (!words.match(/\btoon\b/)) {
+            this.grow(genus, name);
+            added_genii.push(genus);
+        }
         words = words.trim().split(' ');
-
-        /* make space for the next toon */
-        this.grow();
 
         try {
             for (let i = 0; i < words.length; ++i) {
                 let word = words[i].toLowerCase();
-                /* define a new genus of toon (walker, skateboarder, ...) 
-                 * note: the 'toon' word is optional in one-genus themes.
-                 * If we've already seen the 'toon' word before this must be a
-                 *  multi-genus theme so make space for it & increment 'genus' index.
-                 */
                 if (word === 'toon') {
-                    if (started) {
-                        this.grow();
-                        ++genus;
-                    } else {
-                        // first toon in file, don't have to ++genus.
-                        started = 1;
-                    }
                     /* store the genus index with the theme name */
-                    ++i;
+                    genus = name + '_' + words[++i];
+                    this.grow(genus, name); // will abort if alredy exists
+                    added_genii.push(genus);
                 } else if (word === 'delay') {
                 /* preferred frame delay in milliseconds */
                     this.delay = parseInt(words[++i], 10);
@@ -112,7 +154,6 @@ Theme.prototype = {
                         current = def;
                     } else if (type.match(/^(walker|faller|tumbler|floater|climber|runner|action[0-5]|exit|explosion|splatted|squashed|zapped|angel)$/)) {
                     /* other types of toon */
-                        started = 1;
                         /* note: passed by reference. */
                         this.toonData[genus][type] = new Toon.ToonData(def);
                         current = this.toonData[genus][type];
@@ -120,7 +161,8 @@ Theme.prototype = {
                             this.nactions[genus]++;
                         }
                     } else {
-                        XPUtil.warn(_("Warning: unknown type '%s': ignoring".format(type)));
+                        XPUtil.warn(_("Warning: unknown type '%s': ignoring"),
+                            type);
                         current = dummy;
                     }
                     /* extra configuration */
@@ -160,24 +202,28 @@ Theme.prototype = {
 
                         /* Pixmap is already defined! */
                         if (current.texture) {
-                            XPUtil.warn(_("Warning: resetting pixmap to %s".format(pixmap)));
+                            XPUtil.warn(_("Warning: resetting pixmap to %s"),
+                                pixmap);
                             /* Free old pixmap if it is not a copy */
                             if (!current.master) {
                                 current.texture.destroy();
                             }
                         }
 
-                        /* Check if the file has been used before */
-                        let new_pixmap = 1;
-                        for (let igenus = first_genus; igenus <= genus && new_pixmap; ++igenus) {
-                            let data = this.toonData[igenus];
-                            for (let itype in data) {
+                        /* Check if the file has been used before, but only 
+                         * look in the genii for the current theme */
+                        let new_pixmap = true;
+                        for (igenus = 0; igenus < added_genii.length && new_pixmap; ++igenus) {
+                            gdata = this.toonData[added_genii[igenus]];
+                            for (itype in gdata) {
                                 /* data already exists in theme, set master */
-                                if (data.hasOwnProperty(itype) && data[itype].filename &&
-                                        !data[itype].master && data[itype].filename === pixmap) {
+                                if (gdata.hasOwnProperty(itype) && 
+                                        gdata[itype].filename &&
+                                        !gdata[itype].master && 
+                                        gdata[itype].filename === pixmap) {
                                          // set .master & .texture (& hence .filename)
-                                    current.setMaster(data[itype]);
-                                    new_pixmap = 0;
+                                    current.setMaster(gdata[itype]);
+                                    new_pixmap = false;
                                     break;
                                 }
                             }
@@ -194,52 +240,69 @@ Theme.prototype = {
                     this.number[genus] = parseInt(words[++i], 10);
                 } else {
                 /* unknown word */
-                    XPUtil.warn(_("Warning: Unrecognised word %s, ignoring".format(word)));
+                    XPUtil.warn(_("Warning: Unrecognised word %s, ignoring"),
+                        word);
                 }
             } // while read word
         } catch (err) {
-            throw new Error(_("Error reading config file: config file ended unexpectedly: Line " + err.lineNumber + ": " + err.message));
+            XPUtil.error(
+                _("Error reading config file: config file ended unexpectedly: Line %d: %s"),
+                err.lineNumber, err.message); // throws error
+            return;
         } /* end config file parsing */
 
         /* Now valid our widths, heights etc with the size of the image
          * for all the types of the genera we just added
          */
-        for (let i = first_genus; i < this.ngenera; ++i) {
-            for (let j in this.toonData[i]) {
-                if (this.toonData[i].hasOwnProperty(j)) {
-                    current = this.toonData[i][j];
+        igenus = added_genii.length;
+        while (igenus--) {
+            gdata = this.toonData[added_genii[igenus]];
+            if (!gdata.walker || !gdata.faller) {
+                throw new Error(_("Theme must contain at least walkers and fallers"));
+            }
+            for (itype in gdata) {
+                if (gdata.hasOwnProperty(itype)) {
+                    current = gdata[itype];
                     let imwidth = current.texture.width,
                         imheight = current.texture.height;
                     if ((current.nframes = imwidth / current.width) < 1) {
                         if (imwidth < current.width) {
                             throw new Error(_("Width of xpm image too small for even a single frame"));
                         } else {
-                            XPUtil.warn(_("Warning: width of %s is too small to display all frames".format(
+                            XPUtil.warn(_("Warning: width of %s is too small to display all frames"),
                                 current.filename
-                            )));
+                            );
                         }
                     }
                     if (imheight < current.height * current.ndirections) {
                         if ((current.ndirections = imheight / current.height) < 1) {
                             throw new Error(_("Height of xpm image too small for even a single frame"));
                         } else {
-                            XPUtil.warn(_("Warning: height of %s is too small to display all frames".format(
+                            XPUtil.warn(_("Warning: height of %s is too small to display all frames"),
                                 current.filename
-                            )));
+                            );
                         }
                     }
                 }
             } // loop through Toon type
-            if (!this.toonData[i].walker || !this.toonData[i].faller) {
-                throw new Error(_("Theme must contain at least walkers and fallers"));
-            }
-        }
+            this.total += this.number[added_genii[igenus]];
+            this.totalsPerTheme[name] += this.number[added_genii[igenus]];
+        } // loop through added genii
     },  // appendTheme
 
-    grow: function () {
-        this.nactions.push(0);
-        this.number.push(1);
-        this.toonData.push({}); // object 'toonType': ToonData
+    grow: function (genus, themeName) {
+        if (this.toonData[genus]) {
+            return;
+        }
+        this.toonData[genus] = {};
+        this.nactions[genus] = 0;
+        this.number[genus] = 1;
+
+        if (!this._themeGenusMap[themeName]) {
+            this._themeGenusMap[themeName] = [];
+        }
+        this._themeGenusMap[themeName].push(genus);
+        this.totalsPerTheme[themeName] = 0;
     },
 
     destroy: function () {
@@ -254,4 +317,3 @@ Theme.prototype = {
         }
     }
 };
-
