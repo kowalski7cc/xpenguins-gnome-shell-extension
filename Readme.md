@@ -5,7 +5,9 @@ This extension is a port of the [original XPenguins](http://xpenguins.seul.org/)
 If you have Linux but not GNOME-shell, just use the original XPenguins.
 Even if you have GNOME-shell you can run the original XPenguins, but you have to set Nautilus to handle the desktop, and the toons will think that the windows are bigger than they actually are so it can look weird.
 
-![Screenshot of XPenguins extension](http://cdn.bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension/downloads/xpenguins-screenshot.png)
+| Penguins walk all over your windows | Configure via menu |
+|:-----:|:-----:|
+| ![Screenshot of XPenguins extension](http://cdn.bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension/downloads/xpenguins-screenshot.png) | ![Configure XPenguins](http://cdn.bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension/downloads/xpenguins-menu.png) |
 
 Extension written 2012 by mathematical.coffee [mathematical.coffee@gmail.com](mailto:mathematical.coffee@gmail.com?subject=xpenguins%20question).  
 The original XPenguins was written by Robin Hogan ([http://xpenguins.seul.org/](http://xpenguins.seul.org/)).  
@@ -97,6 +99,7 @@ You'll have to restart gnome-shell to wipe those frozen toons off your screen.
 # Known issues
 Here are some known issues/limitations of the program (if you think you can fix one, feel free to check out the code and have a go!)
 
+* When you have dual monitors of different sizes, toons will happily walk in the areas of the combined screens' bounding box that are not visible to the user (patches welcome!).
 * Toons don't treat the message tray or gnome-shell menus/popups as solid. This is because XPenguins can only make toons interact with objects that the window manager knows about, and things created with GNOME-shell such as the message tray/notifications are not handled by the window manager.
 
 # Wish list
