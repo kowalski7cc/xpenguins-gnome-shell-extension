@@ -1,6 +1,3 @@
-/* BIG UPTO:
- * * test load averaging
- */
 const Clutter  = imports.gi.Clutter;
 const GLib     = imports.gi.GLib;
 const Lang     = imports.lang;
@@ -93,7 +90,11 @@ XPenguinsLoop.prototype = {
             }
         }
         this.options = options;
-        this._playing = 0; /* when this is non-0, the animation is playing */
+        /* when this is non-0, the animation is playing.
+         * If the animation is paused but not stopped, _playing is
+         * still true. 
+         */ 
+        this._playing = 0; 
         this._numbers = {};
     },
 
@@ -211,6 +212,10 @@ XPenguinsLoop.prototype = {
         };
     },
 
+    /* returns whether the animation is currently running.
+     * If it is paused/sleeping (say because there are no toons) but the user
+     * hasn't asked it to actually stop, this is regarded as playing.
+     */
     is_playing: function () {
         return this._playing > 0;
     },
@@ -267,11 +272,13 @@ XPenguinsLoop.prototype = {
             if (!this._theme.hasTheme(name)) {
                 if (n) {
                     this._theme.appendTheme(name);
-                    this.themeList.push(name);
                     this._addToonDataToStage(name);
                 } else {
                     continue;
                 }
+            }
+            if (this.themeList.indexOf(name) < 0) {
+                this.themeList.push(name);
             }
             this._originalNumber -= (this._numbers[name] || 0);
             // if n is <0, use default.
@@ -375,14 +382,15 @@ XPenguinsLoop.prototype = {
             /* kill toons of that theme. 
              * A bit inefficient - will have to loop through the entire
              * this._toons looking for the first (current-n) toons.
-             * TODO: if we're maining deadToon then why not
-             *  toonIdxs[genus] ?
              */
             let left = (current - n);
             for (let i = 0; i < this._toons.length && left; ++i) {
+                XPUtil.DEBUG('toon %d: theme: %s genus: %s active: %s', i, 
+                        this._toons[i].theme, this._toons[i].genus, 
+                        this._toons[i].active);
                 if (this._toons[i].theme === name) {
-                    left--;
                     if (this._toons[i].active) {
+                        left--;
                         let toon = this._toons[i],
                             gdata = this._theme.toonData[toon.genus];
                         if (this.options.blood && gdata.exit) {
@@ -394,7 +402,7 @@ XPenguinsLoop.prototype = {
                         }
                     }
                     if (this.options.squish) {
-                        this._removeSquishEvents(this._toons[i]);
+                        this._removeSquishEvents(toon);
                     }
                     // regardless, set it terminating.
                     this._toons[i].terminating = true;
@@ -408,7 +416,7 @@ XPenguinsLoop.prototype = {
      * ****************/
     /* when you send the stop signal to xpenguins (through the toggle) */
     stop: function () {
-        XPUtil.DEBUG('STOP');
+        XPUtil.DEBUG('[XP] STOP');
         this._onInterrupt();
     },
 
@@ -417,7 +425,7 @@ XPenguinsLoop.prototype = {
      * xpenguins_exit()
      */
     exit: function () {
-        WindowListener.exit.apply(this, arguments);
+        this._cleanUp();
         if (this._playing) {
             this._playing = 0;
         }
@@ -427,8 +435,8 @@ XPenguinsLoop.prototype = {
      * init() should have been called by now.
      */
     start: function () {
-        /* calls this.init */
-        WindowListener.start.apply(this, arguments);
+        XPUtil.DEBUG('[XP] START');
+        this.init();
         /* FIXME: call with lower priority (say GLib.PRIORITY_HIGH_IDLE or 
          * DEFAULT_IDLE)? 
          * http://developer.gnome.org/glib/2.31/glib-The-Main-Event-Loop.html#G-PRIORITY-DEFAULT:CAPS 
@@ -443,11 +451,8 @@ XPenguinsLoop.prototype = {
     pause: function (hide, owner, eventName, cb) {
         /* pauses the window tracker */
         WindowListener.pause.call(this, hide, owner, eventName, cb); 
-        if (this._playing) {
-            this._playing = 0;
-            if (hide) {
-                this._hideToons();
-            }
+        if (hide) {
+            this._hideToons();
         }
     },
 
@@ -468,7 +473,7 @@ XPenguinsLoop.prototype = {
 
         /* tell the loop to start the exit sequence */
         this._exiting = true;
-        this._setTotalNumber(0, true); // don't emit signal. (?? FIXME)
+        this._setTotalNumber(0, true); // don't emit signal or sliders go to 0.
     },
 
 
@@ -779,7 +784,11 @@ XPenguinsLoop.prototype = {
 
     _showToons: function () {
         for (let i = 0; i < this._toons.length; ++i) {
-            this._toons[i].show();
+            if (this._toons[i].active) {
+                /* sometimes the last frame of the exploded toon is left on
+                 * screen */
+                this._toons[i].show();
+            }
         }
     },
 
@@ -808,7 +817,6 @@ XPenguinsLoop.prototype = {
 
         /* Check if events were received & we need to update toonWindows */
         if (this._dirty) {
-            // BIG TODO: faster to do _deadToons or _activeToons ?
             i = this._toons.length;
             /* calculate for squashed toons */
             while (i--) {
@@ -1183,12 +1191,13 @@ XPenguinsLoop.prototype = {
             this._sleepID = Mainloop.timeout_add(o.load_check_interval,
                 Lang.bind(this, function () {
                     this.resume();
+                    this._sleepID = null;
                     return false;  // return false to call just once.
                 }));
         }
         ++this._cycle;
 
-        return this._playing;
+        return this._playing && !this._sleepID;
     }, // _frame
 
     /*********************
@@ -1208,6 +1217,6 @@ XPenguinsLoop.prototype = {
 
 };
 /* so we can emit 'ntoons-changed' and extension will update accordingly.
- * FIXME: what about the other toggles?
+ * FIXME: what about the other toggles? (currently handled in changeOption).
  */
 Signals.addSignalMethods(XPenguinsLoop.prototype);

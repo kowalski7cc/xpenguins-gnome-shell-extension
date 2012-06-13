@@ -5,10 +5,18 @@
 .xpenguins-about-title {
     font-weight: bold;
     font-size: 1.5em;
+    padding-left: 0.4em;
+    padding-right: 0.4em;
+}
+
+.xpenguins-about-icon {
+    icon-size: 1.5em;
 }
 
 .xpenguins-about-text {
+    font-size: 1.2em;
 }
+
 
 /* Theme slider items */
 .theme-slider-menu-item-top-box {

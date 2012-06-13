@@ -173,7 +173,6 @@ WindowListener.prototype = {
      */
     pause: function (hide, owner, eventName, cb) {
         XPUtil.DEBUG('[WL] pause');
-        this._playing = false;
 
         /* recalculate toon windows on resume */
         this._dirtyToonWindows('pause');
@@ -200,7 +199,6 @@ WindowListener.prototype = {
     /* resumes timeline, connects up events */
     resume: function () {
         XPUtil.DEBUG('[WL] resume');
-        this._playing = true;
 
         if (this._drawingArea && !this._drawingArea.visible) {
             this._drawingArea.show();
@@ -555,12 +553,12 @@ WindowListener.prototype = {
              * or once you hit a fully-maximised window (if ignoreMaximised) 
              * or once you hit a half-maximised window (if ignoreMax & halfMax)
              */ 
-            let max = winList.get_maximized();
+            let max = winList[i].get_maximized();
             if ((!this.options.onDesktop && winList[i] === 
                     this._XPenguinsWindow.meta_window) ||
                     (this.options.ignoreMaximised && 
                         ((this.options.ignoreHalfMaximised && max) ||
-                         (max === (Meta.MaximizeFlags.HORIZONTAL | meta.MaximizeFlags.VERTICAL))
+                         (max === (Meta.MaximizeFlags.HORIZONTAL | Meta.MaximizeFlags.VERTICAL))
                         )
                     )) {
                 break;

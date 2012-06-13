@@ -1,3 +1,8 @@
+/* Notes:
+ * - fps slider to speed them up?
+ * - load averaging sliders
+ */
+
 /* *** CODE *** */
 const Gio      = imports.gi.Gio;
 const GLib     = imports.gi.GLib;
@@ -51,7 +56,9 @@ function disable() {
 
 /* Popup dialog with scrollable text.
  * See InstallExtensionDialog in extensionSystem.js for an example.
- * FIXME:  styles for title, icon, ...
+ *
+ * Future icing: make on toon of each type in the theme and have them run
+ * in the about dialog.
  */
 function AboutDialog() {
     this._init.apply(this, arguments);
@@ -60,7 +67,7 @@ function AboutDialog() {
 AboutDialog.prototype = {
     __proto__: ModalDialog.ModalDialog.prototype,
 
-    _init: function (title, text) {
+    _init: function (title, text, icon_path) {
         ModalDialog.ModalDialog.prototype._init.call(this, 
             {styleClass: 'modal-dialog'});
 
@@ -68,11 +75,22 @@ AboutDialog.prototype = {
             width   = Math.max(250, Math.round(monitor.width / 4)),
             height  = Math.max(400, Math.round(monitor.height / 2.5));
 
-        /* title */
+        /* title + icon */
+        this.titleBox = new St.BoxLayout({vertical: false});
+        this.contentLayout.add(this.titleBox, 
+            {x_fill: false, x_align: St.Align.MIDDLE});
+
+        this.icon = new St.Icon({
+            icon_name: 'image-missing',
+            icon_type: St.IconType.FULLCOLOR,
+            style_class: 'xpenguins-about-icon'
+        });
+        this.setIcon(icon_path);
+        this.titleBox.add(this.icon);
+
         this.title = new St.Label({text: title || '', 
             style_class: 'xpenguins-about-title'});
-        this.contentLayout.add(this.title, 
-            {x_fill: false, x_align: St.Align.MIDDLE});
+        this.titleBox.add(this.title,  {x_fill: true});
 
         /* scroll box */
         this.scrollBox = new St.ScrollView({
@@ -118,6 +136,13 @@ AboutDialog.prototype = {
 
     appendText: function (text, sep) {
         this.text.text += (sep || '\n') + text;
+    },
+
+    setIcon: function (icon_path) {
+        let path = icon_path ? Gio.file_new_for_path(icon_path) : null;
+        if (path && path.query_exists(null)) {
+            this.icon.set_gicon(new Gio.FileIcon({file: path}));
+        }
     }
 };
 
@@ -159,7 +184,6 @@ ThemeSliderMenuItem.prototype = {
             icon_type: St.IconType.FULLCOLOR,
             style_class: 'popup-menu-icon'
         });
-        //this.icon.set_style('icon-size: 1.14em; background-color: #333333');
         this.setIcon(icon_path);
 
         /* text */
@@ -242,11 +266,8 @@ ThemeSliderMenuItem.prototype = {
     get state() { return this.toggle.state; },
 
     /* sets the icon from a path */
-    setIcon: function (icon_path) {
-        let path = icon_path ? Gio.file_new_for_path(icon_path) : null;
-        if (path && path.query_exists(null)) {
-            this.icon.set_gicon(new Gio.FileIcon({file: path}));
-        }
+    setIcon: function () {
+        AboutDialog.prototype.setIcon.apply(this, arguments);
     }
 };
 
@@ -279,7 +300,7 @@ XPenguinsMenu.prototype = {
         this._toggles = {
             ignorePopups       : _("Ignore popups"),
             ignoreMaximised    : _("Ignore maximised windows"),
-            ignoreHalfMaximised: _("..and half-maximised too"),
+            ignoreHalfMaximised: _(".. and half-maximised too"),
             onAllWorkspaces    : _("Always on visible workspace"),
             onDesktop          : _("Run on desktop"), // not fully implemented
             blood              : _("Show blood"),
@@ -288,7 +309,7 @@ XPenguinsMenu.prototype = {
             windowPreview      : _("Window Preview"),
         };
         this._ABOUT_ORDER = ['name', 'date', 'artist', 'copyright',
-            'license', 'maintainer', 'location', 'icon', 'comment'];
+            'license', 'maintainer', 'location', 'comment'];
         this._THEME_STRING_LENGTH_MAX = 15;
 
         /* Create menus */
@@ -381,15 +402,17 @@ XPenguinsMenu.prototype = {
             }
         }
 
-        /* ignore half maximised should be greyed out/unusble if
+        /* ignore half maximised should be greyed out/unusable if
          * 'ignoreMaximised' is false, and usable if it's true.
          * reactive: false?
          */
         if (this._items.ignoreHalfMaximised && this._items.ignoreMaximised) {
             this._items.ignoreMaximised.connect('toggled', Lang.bind(this,
-                this._onIgnoreMaximisedToggled));
-            this._onIgnoreMaximisedToggled(this._items.ignoreMaximised, 
-                this._items.ignoreMaximised.state);
+                function (item, state) {
+                    this._items.ignoreHalfMaximised.setSensitive(state);
+                }));
+            this._items.ignoreHalfMaximised.setSensitive(this._items.ignoreMaximised.state);
+            // FIXME: would be nice for the toggle to look disabled too.
         }
 
         /* RecalcMode combo box: only if global.display has grab-op- events. */
@@ -454,6 +477,7 @@ XPenguinsMenu.prototype = {
                 ));
             }
         }
+        dialog.setIcon(this._themeInfo[name].icon);
         dialog.open(global.get_current_time());
     },
 
@@ -486,15 +510,6 @@ XPenguinsMenu.prototype = {
             sanitised_name, n);
         if (n != this._items.themes[sanitised_name].getValue()) {
             this._items.themes[sanitised_name].setValue(n);
-        }
-    },
-    
-    // UPTO
-    _onIgnoreMaximisedToggled: function (item, state) {
-        if (state) {
-            this._items.ignoreHalfMaximised.enable();
-        } else {
-            this._items.ignoreHalfMaximised.disable();
         }
     },
 
