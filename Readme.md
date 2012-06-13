@@ -5,10 +5,9 @@ This extension is a port of the [original XPenguins](http://xpenguins.seul.org/)
 If you have Linux but not GNOME-shell, just use the original XPenguins.
 Even if you have GNOME-shell you can run the original XPenguins, but you have to set Nautilus to handle the desktop, and the toons will think that the windows are bigger than they actually are so it can look weird.
 
-<table><tr>
-<td>![Screenshot of XPenguins extension](http://cdn.bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension/downloads/xpenguins-screenshot.png)</td>
-<td>![Configure XPenguins](http://cdn.bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension/downloads/xpenguins-menu.png)</td>
-</tr></table>
+| Penguins walk all over your windows | Configure via menu |
+|:-----:|:-----:|
+| ![Screenshot of XPenguins extension](http://cdn.bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension/downloads/xpenguins-screenshot.png) | ![Configure XPenguins](http://cdn.bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension/downloads/xpenguins-menu.png) |
 
 Extension written 2012 by mathematical.coffee [mathematical.coffee@gmail.com](mailto:mathematical.coffee@gmail.com?subject=xpenguins%20question).  
 The original XPenguins was written by Robin Hogan ([http://xpenguins.seul.org/](http://xpenguins.seul.org/)).  
