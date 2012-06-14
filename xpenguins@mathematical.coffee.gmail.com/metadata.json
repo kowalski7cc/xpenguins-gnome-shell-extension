@@ -5,8 +5,6 @@
  "name": "xpenguins",
  "description": "A port of XPenguins to gnome-shell. See extension home page for explanation of configuration options",
  "shell-version": [ 
-     "3.2" ,
-     "3.2.2.1",
      "3.4",
      "3.4.1"
  ],
