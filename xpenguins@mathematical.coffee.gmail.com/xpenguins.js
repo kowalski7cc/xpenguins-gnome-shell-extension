@@ -96,6 +96,7 @@ XPenguinsLoop.prototype = {
          */ 
         this._playing = 0; 
         this._numbers = {};
+        this._relaunch = false;
     },
 
     _initToons: function () {
@@ -540,6 +541,7 @@ XPenguinsLoop.prototype = {
         /* signals */
         this._sleepID = null;
         this._playing = 0;
+        this._relaunch = false;
         this._resumeSignal = {}; // holds the signal we listen to to resume
 
         /* variables */
@@ -644,6 +646,12 @@ XPenguinsLoop.prototype = {
                 if (propName === 'squish') {
                 /* enable god mode */
                     this.toggleGodMode(propVal);
+                } else if (propName === 'sleep_msec') {
+                    /* have to remove the _frame & re-add. */
+                    this._playing = 0; // UPTO: how to remove frame?
+                    // How to make doubly sure that _frame() has stopped before
+                    // re-adding it?
+                    this._relaunch = true;
                 }
                 /* Otherwise, things like angels, blood: these things can just
                  * be set and no recalculating of signals etc or extra action
@@ -1197,7 +1205,17 @@ XPenguinsLoop.prototype = {
         }
         ++this._cycle;
 
-        return this._playing && !this._sleepID;
+        /* requested to exit and re-add the timeout
+         * (for example when the sleep_msec changes)
+         */
+        let play = this._playing && !this._sleepID;
+        if (!this._playing && this._relaunch) {
+            this._relaunch = false;
+            this._playing = Clutter.threads_add_timeout(GLib.PRIORITY_DEFAULT, 
+                this.options.sleep_msec, Lang.bind(this, this._frame));
+        }
+
+        return play;
     }, // _frame
 
     /*********************

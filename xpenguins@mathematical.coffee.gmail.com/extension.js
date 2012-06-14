@@ -1,5 +1,4 @@
 /* Notes:
- * - fps slider to speed them up?
  * - load averaging sliders
  */
 
@@ -146,14 +145,20 @@ AboutDialog.prototype = {
     }
 };
 
-function ThemeSliderMenuItem() {
+/* A slider with a label + number that updates with the slider
+ * text: the text for the item
+ * defaultVal: the intial value for the item (on the min -> max scale)
+ * min, max: the min and max values for the slider
+ * round: whether to round the value to the nearest integer
+ * params: other params for PopupBaseMenuItem
+ */
+function SliderMenuItem() {
     this._init.apply(this, arguments);
 }
-
-ThemeSliderMenuItem.prototype = {
+SliderMenuItem.prototype = {
     __proto__: PopupMenu.PopupBaseMenuItem.prototype,
 
-    _init: function (text, defaultVal, min, max, round, icon_path, params) {
+    _init: function (text, defaultVal, min, max, round, params) {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
 
         /* set up properties */
@@ -166,47 +171,27 @@ ThemeSliderMenuItem.prototype = {
         } 
 
         /* set up item */
-        this.box = new St.BoxLayout({vertical: true, name: 'xpenguins'});
+        this.box = new St.BoxLayout({vertical: true});
         this.addActor(this.box, {expand: true, span: -1});
 
         this.topBox = new St.BoxLayout({vertical: false, 
-            style_class: 'theme-slider-menu-item-top-box'});
-        this.topBox.add_style_class_name('theme-slider-menu-item-top-box');
+            style_class: 'slider-menu-item-top-box'});
         this.box.add(this.topBox, {x_fill: true});
 
         this.bottomBox = new St.BoxLayout({vertical: false, 
-            style_class: 'theme-slider-menu-item-bottom-box'});
+            style_class: 'slider-menu-item-bottom-box'});
         this.box.add(this.bottomBox, {x_fill: true});
-
-        /* Icon (default no icon) */
-        this.icon = new St.Icon({
-            icon_name: 'image-missing', // placeholder icon
-            icon_type: St.IconType.FULLCOLOR,
-            style_class: 'popup-menu-icon'
-        });
-        this.setIcon(icon_path);
 
         /* text */
         this.label = new St.Label({text: text, reactive: false});
-        this.label.set_style('padding-left: 0.5em');
 
         /* number */
         this.numberLabel = new St.Label({text: this._value.toString(), 
             reactive: false});
 
-        /* Info button */
-        this.button = new St.Button();
-        let icon = new St.Icon({
-            icon_name: 'help-contents',
-            style_class: 'popup-menu-icon',
-            icon_type: St.IconType.FULLCOLOR
-        });
-        this.button.set_child(icon);
-
         /* slider */
         this.slider = new PopupMenu.PopupSliderMenuItem((defaultVal - min) / 
             (max - min)); // between 0 and 1
-        this.slider.actor.set_style('padding-left: 0.5em; padding-right: 0em');
        
         /* connect up signals */
         this.slider.connect('value-changed', Lang.bind(this, this._updateValue));
@@ -214,32 +199,24 @@ ThemeSliderMenuItem.prototype = {
         this.slider.connect('drag-end', Lang.bind(this, function () { 
             this.emit('drag-end', this._value); 
         }));
-        this.button.connect('clicked', Lang.bind(this, function () { 
-            this.emit('button-clicked'); 
-        }));
+        // Note: if I set the padding in the css it gets overridden
+        this.slider.actor.set_style('padding-left: 0em; padding-right: 0em;');
 
         /* assemble the item */
-        this.topBox.add(this.icon);
         this.topBox.add(this.label, {expand: true});
         this.topBox.add(this.numberLabel, {align: St.Align.END});
-        this.bottomBox.add(this.button);
         this.bottomBox.add(this.slider.actor, {expand: true, span: -1});
 
-        /* debugging. */
+        /* Debugging */
         /*
-        this.label.set_style('border:1px solid #00ffff');
-        this.numberLabel.set_style('border:1px solid #ffff00');
-        this.icon.set_style('border: 1px solid #ffffff');
-        this.button.set_style('border: 1px solid #ffffff');
-        this.slider.actor.set_style('border: 1px solid #ffffff;');
-        this.box.set_style('border: 1px solid #ffff00');
-        this.topBox.set_style('border: 1px solid #00ff00;');
-        this.bottomBox.set_style('border: 1px solid #0000ff;');
-        this.actor.set_style('border: 1px solid #ff0000;');
+        this.box.set_style('border: 1px solid red;');
+        this.topBox.set_style('border: 1px solid green;');
+        this.bottomBox.set_style('border: 1px solid blue;');
         */
     },
 
-    /* hope that this.slider.value and this._value remain in sync... */
+    /* returns the value of the slider, either the raw (0-1) value or the
+     * value on the min->max scale. */
     getValue: function (raw) {
         if (raw) {
             return this.slider.value;
@@ -248,6 +225,8 @@ ThemeSliderMenuItem.prototype = {
         }
     },
 
+    /* sets the value of the slider, either the raw (0-1) value or the
+     * value on the min->max scale */
     setValue: function (value, raw) {
         value = (raw ? value : (value - this.min) / (this.max - this.min));
         this._updateValue(this.slider, value);
@@ -262,8 +241,49 @@ ThemeSliderMenuItem.prototype = {
         this._value = val;
         this.numberLabel.set_text(val.toString());
     },
+};
 
-    get state() { return this.toggle.state; },
+function ThemeSliderMenuItem() {
+    this._init.apply(this, arguments);
+}
+
+ThemeSliderMenuItem.prototype = {
+    __proto__: SliderMenuItem.prototype,
+
+    _init: function (text, defaultVal, min, max, round, icon_path, params) {
+        SliderMenuItem.prototype._init.call(this, text, defaultVal, min, max,
+            round, params);
+
+        /* Icon (default no icon) */
+        this.icon = new St.Icon({
+            icon_name: 'image-missing', // placeholder icon
+            icon_type: St.IconType.FULLCOLOR,
+            style_class: 'popup-menu-icon'
+        });
+        this.setIcon(icon_path);
+
+        /* Info button */
+        this.button = new St.Button();
+        let icon = new St.Icon({
+            icon_name: 'help-contents',
+            style_class: 'popup-menu-icon',
+            icon_type: St.IconType.FULLCOLOR
+        });
+        this.button.set_child(icon);
+
+        this.label.add_style_class_name('theme-slider-menu-item-label');
+        // Note: if I set the padding in the css it gets overridden
+        this.slider.actor.set_style('padding-left: 0.5em; padding-right: 0em;');
+
+        /* connect up signals */
+        this.button.connect('clicked', Lang.bind(this, function () { 
+            this.emit('button-clicked'); 
+        }));
+
+        /* assemble the item */
+        this.topBox.insert_before(this.icon, this.label);
+        this.bottomBox.insert_before(this.button, this.slider.actor);
+    },
 
     /* sets the icon from a path */
     setIcon: function () {
@@ -412,8 +432,14 @@ XPenguinsMenu.prototype = {
                     this._items.ignoreHalfMaximised.setSensitive(state);
                 }));
             this._items.ignoreHalfMaximised.setSensitive(this._items.ignoreMaximised.state);
-            // FIXME: would be nice for the toggle to look disabled too.
         }
+
+        /* animation speed */
+        this._items.delay = new SliderMenuItem(_("Time between frames (ms)"),
+                60, 10, 200, true);
+        this._optionsMenu.menu.addMenuItem(this._items.delay);
+        this._items.delay.connect('drag-end', Lang.bind(this, this.changeOption,
+            'sleep_msec'));
 
         /* RecalcMode combo box: only if global.display has grab-op- events. */
         if (!blacklist.recalcMode) {
