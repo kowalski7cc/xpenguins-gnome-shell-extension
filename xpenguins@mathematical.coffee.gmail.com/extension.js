@@ -67,7 +67,7 @@ AboutDialog.prototype = {
     __proto__: ModalDialog.ModalDialog.prototype,
 
     _init: function (title, text, icon_path) {
-        ModalDialog.ModalDialog.prototype._init.call(this, 
+        ModalDialog.ModalDialog.prototype._init.call(this,
             {styleClass: 'modal-dialog'});
 
         let monitor = global.screen.get_monitor_geometry(global.screen.get_primary_monitor()),
@@ -76,7 +76,7 @@ AboutDialog.prototype = {
 
         /* title + icon */
         this.titleBox = new St.BoxLayout({vertical: false});
-        this.contentLayout.add(this.titleBox, 
+        this.contentLayout.add(this.titleBox,
             {x_fill: false, x_align: St.Align.MIDDLE});
 
         this.icon = new St.Icon({
@@ -87,7 +87,7 @@ AboutDialog.prototype = {
         this.setIcon(icon_path);
         this.titleBox.add(this.icon);
 
-        this.title = new St.Label({text: title || '', 
+        this.title = new St.Label({text: title || '',
             style_class: 'xpenguins-about-title'});
         this.titleBox.add(this.title,  {x_fill: true});
 
@@ -99,28 +99,28 @@ AboutDialog.prototype = {
             height: height
         });
         // automatic horizontal scrolling, automatic vertical scrolling
-        this.scrollBox.set_policy(Gtk.PolicyType.AUTOMATIC, 
+        this.scrollBox.set_policy(Gtk.PolicyType.AUTOMATIC,
             Gtk.PolicyType.AUTOMATIC);
 
-        /* text in scrollbox. 
+        /* text in scrollbox.
          * For some reason it won't display unless in a St.BoxLayout. */
-        this.text = new St.Label({text: (text || ''), 
+        this.text = new St.Label({text: (text || ''),
             style_class: 'xpenguins-about-text'});
         this.text.clutter_text.ellipsize = Pango.EllipsizeMode.NONE; // allows scrolling
         //this.text.clutter_text.line_wrap = true;
 
         this.box = new St.BoxLayout();
         this.box.add(this.text, { expand: true });
-        this.scrollBox.add_actor(this.box, 
+        this.scrollBox.add_actor(this.box,
             {expand: true, x_fill: true, y_fill: true});
-        this.contentLayout.add(this.scrollBox, 
+        this.contentLayout.add(this.scrollBox,
             {expand: true, x_fill: true, y_fill: true});
 
         /* OK button */
-        this.setButtons([{ 
+        this.setButtons([{
             label: _("OK"),
             action: Lang.bind(this, function () {
-                this.close(global.get_current_time()); 
+                this.close(global.get_current_time());
             })
         }]);
 	},
@@ -167,18 +167,18 @@ SliderMenuItem.prototype = {
         this.round = round || false;
         this._value = defaultVal;
         if (round) {
-           this._value = Math.round(this._value);
-        } 
+            this._value = Math.round(this._value);
+        }
 
         /* set up item */
         this.box = new St.BoxLayout({vertical: true});
         this.addActor(this.box, {expand: true, span: -1});
 
-        this.topBox = new St.BoxLayout({vertical: false, 
+        this.topBox = new St.BoxLayout({vertical: false,
             style_class: 'slider-menu-item-top-box'});
         this.box.add(this.topBox, {x_fill: true});
 
-        this.bottomBox = new St.BoxLayout({vertical: false, 
+        this.bottomBox = new St.BoxLayout({vertical: false,
             style_class: 'slider-menu-item-bottom-box'});
         this.box.add(this.bottomBox, {x_fill: true});
 
@@ -186,18 +186,18 @@ SliderMenuItem.prototype = {
         this.label = new St.Label({text: text, reactive: false});
 
         /* number */
-        this.numberLabel = new St.Label({text: this._value.toString(), 
+        this.numberLabel = new St.Label({text: this._value.toString(),
             reactive: false});
 
         /* slider */
-        this.slider = new PopupMenu.PopupSliderMenuItem((defaultVal - min) / 
+        this.slider = new PopupMenu.PopupSliderMenuItem((defaultVal - min) /
             (max - min)); // between 0 and 1
-       
+
         /* connect up signals */
         this.slider.connect('value-changed', Lang.bind(this, this._updateValue));
         /* pass through the drag-end, clicked signal */
-        this.slider.connect('drag-end', Lang.bind(this, function () { 
-            this.emit('drag-end', this._value); 
+        this.slider.connect('drag-end', Lang.bind(this, function () {
+            this.emit('drag-end', this._value);
         }));
         // Note: if I set the padding in the css it gets overridden
         this.slider.actor.set_style('padding-left: 0em; padding-right: 0em;');
@@ -220,9 +220,8 @@ SliderMenuItem.prototype = {
     getValue: function (raw) {
         if (raw) {
             return this.slider.value;
-        } else {
-            return this._value;
         }
+        return this._value;
     },
 
     /* sets the value of the slider, either the raw (0-1) value or the
@@ -276,8 +275,8 @@ ThemeSliderMenuItem.prototype = {
         this.slider.actor.set_style('padding-left: 0.5em; padding-right: 0em;');
 
         /* connect up signals */
-        this.button.connect('clicked', Lang.bind(this, function () { 
-            this.emit('button-clicked'); 
+        this.button.connect('clicked', Lang.bind(this, function () {
+            this.emit('button-clicked');
         }));
 
         /* assemble the item */
@@ -304,11 +303,11 @@ XPenguinsMenu.prototype = {
     _init: function (extensionPath) {
         XPUtil.DEBUG('_init');
         /* Initialise */
-        PanelMenu.SystemStatusButton.prototype._init.call(this, 
+        PanelMenu.SystemStatusButton.prototype._init.call(this,
             'emblem-favorite', 'xpenguins');
         this.actor.add_style_class_name('xpenguins-icon');
         this.setGIcon(new Gio.FileIcon({
-            file: Gio.file_new_for_path(GLib.build_filenamev([extensionPath, 
+            file: Gio.file_new_for_path(GLib.build_filenamev([extensionPath,
                       'penguin.png']))
         }));
 
@@ -332,24 +331,18 @@ XPenguinsMenu.prototype = {
             'license', 'maintainer', 'location', 'comment'];
         this._THEME_STRING_LENGTH_MAX = 15;
 
-        /* Create menus */
-        this._createMenu();
-
         /* create an Xpenguin Loop object which stores the XPenguins program */
         this._XPenguinsLoop = new XPenguins.XPenguinsLoop(this.getConf());
         /* Listen to 'ntoons-changed' and adjust slider accordingly */
-        this._XPenguinsLoop.connect('ntoons-changed', Lang.bind(this, 
+        this._XPenguinsLoop.connect('ntoons-changed', Lang.bind(this,
             this._onChangeThemeNumber));
+
+        /* Create menus */
+        this._createMenu();
 
         /* @@ debugging windowListener */
         this._windowListener = new WindowListener.WindowListener();
 
-        /* initialise as 'Penguins' */
-        /* by default, just Penguins is set */
-        if (this._items.themes['Penguins']) {
-            this._onChangeTheme(this._items.themes['Penguins'], -1, 'Penguins', 
-                false);
-        }
     },
 
     getConf: function () {
@@ -388,9 +381,9 @@ XPenguinsMenu.prototype = {
         this.menu.removeAll();
 
         /* toggle to start xpenguins */
-        this._items.start = new PopupMenu.PopupSwitchMenuItem(_("Start"), 
+        this._items.start = new PopupMenu.PopupSwitchMenuItem(_("Start"),
             false);
-        this._items.start.connect('toggled', Lang.bind(this, 
+        this._items.start.connect('toggled', Lang.bind(this,
             this._startXPenguins));
         this.menu.addMenuItem(this._items.start);
 
@@ -416,7 +409,7 @@ XPenguinsMenu.prototype = {
             if (this._toggles.hasOwnProperty(propName) && !blacklist[propName]) {
                 this._items[propName] = new PopupMenu.PopupSwitchMenuItem(
                     this._toggles[propName], defaults[propName] || false);
-                this._items[propName].connect('toggled', 
+                this._items[propName].connect('toggled',
                     Lang.bind(this, this.changeOption, propName));
                 this._optionsMenu.menu.addMenuItem(this._items[propName]);
             }
@@ -453,8 +446,8 @@ XPenguinsMenu.prototype = {
             }
             this._items.recalc.setActiveItem(XPenguins.RECALC.ALWAYS);
             this._items.recalc.connect('active-item-changed',
-                Lang.bind(this, function (item, id) { 
-                    this.changeOption(null, id, 'recalcMode'); 
+                Lang.bind(this, function (item, id) {
+                    this.changeOption(null, id, 'recalcMode');
                 }));
         }
     },
@@ -465,11 +458,9 @@ XPenguinsMenu.prototype = {
         this._items.themes = {};
         let themeList = ThemeManager.listThemes();
 
-        
         if (themeList.length === 0) {
             this._themeMenu.label.set_text(_("No themes found, click to reload!"));
-            // FIXME: test
-            this._themeMenu.connect('open', 
+            this._reloadThemesID = this._themeMenu.menu.connect('open-state-changed',
                 Lang.bind(this, this._populateThemeMenu));
         } else {
             this._themeInfo = ThemeManager.describeThemes(themeList, false);
@@ -478,11 +469,21 @@ XPenguinsMenu.prototype = {
                 this._items.themes[sanitised_name] = new ThemeSliderMenuItem(
                     _(themeList[i]), 0, 0, XPenguins.PENGUIN_MAX, true,
                     this._themeInfo[sanitised_name].icon);
-                this._items.themes[sanitised_name].connect('drag-end', 
+                this._items.themes[sanitised_name].connect('drag-end',
                     Lang.bind(this, this._onChangeTheme, sanitised_name, true));
-                this._items.themes[sanitised_name].connect('button-clicked', 
+                this._items.themes[sanitised_name].connect('button-clicked',
                     Lang.bind(this, this._onShowHelp, sanitised_name));
                 this._themeMenu.menu.addMenuItem(this._items.themes[sanitised_name]);
+            }
+            if (this._reloadThemesID) {
+                this._themeMenu.menu.disconnect(this._reloadThemesID);
+                delete this._reloadThemesID;
+            }
+            if (this._items.themes['Penguins']) {
+                this._onChangeTheme(this._items.themes['Penguins'], -1, 'Penguins',
+                    false);
+            } else {
+                this._themeMenu.label.set_text(_("Theme"));
             }
         }
     },
@@ -515,15 +516,14 @@ XPenguinsMenu.prototype = {
 
         let themeListFlat = this._XPenguinsLoop.getThemes();
         if (themeListFlat.length) {
-            themeListFlat = themeListFlat.map(
-                function (name) {
-                    return ThemeManager.prettyThemeName(name);
-                }).reduce(function (x, y) {
-                    return x + ',' + y;
-                });
+            themeListFlat = themeListFlat.map(function (name) {
+                return ThemeManager.prettyThemeName(name);
+            }).reduce(function (x, y) {
+                return x + ',' + y;
+            });
             if (themeListFlat.length > this._THEME_STRING_LENGTH_MAX) {
-                themeListFlat = themeListFlat.substr(0, 
-                    this._THEME_STRING_LENGTH_MAX-3) + '...';
+                themeListFlat = themeListFlat.substr(0,
+                    this._THEME_STRING_LENGTH_MAX - 3) + '...';
             }
         } else {
             themeListFlat = 'none';
@@ -534,7 +534,7 @@ XPenguinsMenu.prototype = {
     _onChangeThemeNumber: function (loop, sanitised_name, n) {
         XPUtil.DEBUG('[ext] _onChangeThemeNumber[%s] to %d; updating slider',
             sanitised_name, n);
-        if (n != this._items.themes[sanitised_name].getValue()) {
+        if (n !== this._items.themes[sanitised_name].getValue()) {
             this._items.themes[sanitised_name].setValue(n);
         }
     },

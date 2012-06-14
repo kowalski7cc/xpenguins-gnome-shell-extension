@@ -30,7 +30,7 @@ const _ = Gettext.gettext;
  */
 function Theme() {
     this._init.apply(this, arguments);
-};
+}
 
 Theme.prototype = {
     _init: function (themeList) {
@@ -43,10 +43,10 @@ Theme.prototype = {
         /* per genus in each theme */
         this.toonData = {}; // [genus][type], where genus == <Theme_Genus||1>.
         this.nactions = {};
-        this.number   = {};
+        this.number   = {}; // default number of toons for that genus
         /* per theme */
         this._themeGenusMap = {}; // theme => [genus1, genus2]
-        this.totalsPerTheme = {}; //per THEME.
+        this.totalsPerTheme = {}; // default number of toons for that theme.
 
         /* global across all themes/genii */
         this.delay = 60;
@@ -97,8 +97,7 @@ Theme.prototype = {
         if (!this._themeGenusMap[name]) {
             return;
         }
-        this.total -= this.number[genus];
-        this.number[genus] = 0;
+        this.total -= this.totalsPerTheme[name];
     },
 
     /* Append the theme named "name" to this theme. */
@@ -111,7 +110,7 @@ Theme.prototype = {
         }
         /* if theme has already been parsed, do not re-parse */
         if (this._themeGenusMap[name]) {
-            XPUtil.warn("Warning: theme %s already exists, not re-parsing", 
+            XPUtil.warn("Warning: theme %s already exists, not re-parsing",
                 iname);
             return;
         }
@@ -218,16 +217,16 @@ Theme.prototype = {
                             }
                         }
 
-                        /* Check if the file has been used before, but only 
+                        /* Check if the file has been used before, but only
                          * look in the genii for the current theme */
                         let new_pixmap = true;
                         for (igenus = 0; igenus < added_genii.length && new_pixmap; ++igenus) {
                             gdata = this.toonData[added_genii[igenus]];
                             for (itype in gdata) {
                                 /* data already exists in theme, set master */
-                                if (gdata.hasOwnProperty(itype) && 
+                                if (gdata.hasOwnProperty(itype) &&
                                         gdata[itype].filename &&
-                                        !gdata[itype].master && 
+                                        !gdata[itype].master &&
                                         gdata[itype].filename === pixmap) {
                                          // set .master & .texture (& hence .filename)
                                     current.setMaster(gdata[itype]);
@@ -255,7 +254,9 @@ Theme.prototype = {
         } catch (err) {
             XPUtil.error(
                 _("Error reading config file: config file ended unexpectedly: Line %d: %s"),
-                err.lineNumber, err.message); // throws error
+                err.lineNumber,
+                err.message
+            ); // throws error
             return;
         } /* end config file parsing */
 
@@ -278,8 +279,7 @@ Theme.prototype = {
                             throw new Error(_("Width of xpm image too small for even a single frame"));
                         } else {
                             XPUtil.warn(_("Warning: width of %s is too small to display all frames"),
-                                current.filename
-                            );
+                                current.filename);
                         }
                     }
                     if (imheight < current.height * current.ndirections) {
@@ -287,8 +287,7 @@ Theme.prototype = {
                             throw new Error(_("Height of xpm image too small for even a single frame"));
                         } else {
                             XPUtil.warn(_("Warning: height of %s is too small to display all frames"),
-                                current.filename
-                            );
+                                current.filename);
                         }
                     }
                 }

@@ -2,7 +2,7 @@
  * xpenguins_core.c : __xpenguins_init_penguin, __xpenguins_make_climber,
  *                    __xpenguins_make_walker, __xpenguins_make_faller
  * xpenguins_theme.c: __xpenguins_copy_properties
- * toon_associate.c : ToonSetAssociation, ToonCalculateAssociations, 
+ * toon_associate.c : ToonSetAssociation, ToonCalculateAssociations,
  *                    ToonSetMaximumRelocate, ToonRelocateAssociated
  * toon_set.c       : ToonSetType, ToonSetGenusAndType, ToonSetVelocity,
  *                    ToonSetPosition, ToonMove
@@ -67,7 +67,7 @@ const NOBLOCK = (1 << 2);
  ********************************************************************/
 function Toon() {
     this._init.apply(this, arguments);
-};
+}
 
 Toon.prototype = {
     _init: function (globalvars, props, params) {
@@ -82,7 +82,7 @@ Toon.prototype = {
         this.theme = null;
 
         /* toon is associated with a window */
-        this.associate = UNASSOCIATED; 
+        this.associate = UNASSOCIATED;
         this.wid = null;  /* window toon is associated with */
         this.xoffset = 0; /* location relative to window origin */
         this.yoffset = 0;
@@ -155,7 +155,8 @@ Toon.prototype = {
         this.setType('faller', this.direction, UNASSOCIATED);
         this.actor.set_position(
             XPUtil.RandInt(this._globals.XPenguinsWindow.get_width() - this.data.width),
-            1 - this.data.height);
+            1 - this.data.height
+        );
         this.setAssociation(UNASSOCIATED);
         this.setVelocity(this.direction * 2 - 1, this.data.speed);
         this.terminating = false;
@@ -182,7 +183,7 @@ Toon.prototype = {
         this.frame = 0;
         this.active = true;
         /* precache .data rather than having a getter */
-        this.data = this._globals.toonData[this.genus][this.type]; 
+        this.data = this._globals.toonData[this.genus][this.type];
         this.actor.set_source(this.data.texture);
     },
 
@@ -286,16 +287,16 @@ Toon.prototype = {
     offsetBlocked: function (xoffset, yoffset) {
         if (this._globals.edge_block) {
             if ((this.x + xoffset <= 0) ||
-                    (this.x + this.data.width + xoffset >= 
+                    (this.x + this.data.width + xoffset >=
                         this._globals.XPenguinsWindow.get_width()) ||
-                    ((this.y + yoffset <= 0) && this._globals.edge_block 
+                    ((this.y + yoffset <= 0) && this._globals.edge_block
                         !== SIDEBOTTOMBLOCK) ||
-                    (this.y + this.data.height + yoffset 
+                    (this.y + this.data.height + yoffset
                         >= this._globals.XPenguinsWindow.get_height())) {
                 return true;
             }
         }
-        return this._globals.toon_windows.overlaps(this.x + xoffset, 
+        return this._globals.toon_windows.overlaps(this.x + xoffset,
             this.y + yoffset, this.data.width, this.data.height);
     },
 
@@ -307,7 +308,7 @@ Toon.prototype = {
     checkBlocked: function (type, gravity) {
         let newpos = this.calculateNewPosition(this.genus, type, gravity),
             newdata = this._globals.toonData[this.genus][type];
-        return this._globals.toon_windows.overlaps(newpos[0], newpos[1], 
+        return this._globals.toon_windows.overlaps(newpos[0], newpos[1],
             newdata.width, newdata.height);
     },
 
@@ -459,8 +460,8 @@ Toon.prototype = {
             if (newx < 0) {
                 newx = 0;
                 result = PARTIALMOVE;
-            } else if (newx + this.data.width > 
-                this._globals.XPenguinsWindow.get_width()) {
+            } else if (newx + this.data.width >
+                    this._globals.XPenguinsWindow.get_width()) {
                 newx = this._globals.XPenguinsWindow.get_width() - this.data.width;
                 result = PARTIALMOVE;
             }
@@ -472,7 +473,7 @@ Toon.prototype = {
                     newy = 0;
                     result = PARTIALMOVE;
                 } else if (newy + this.data.height >
-                    this._globals.XPenguinsWindow.get_height()) {
+                        this._globals.XPenguinsWindow.get_height()) {
                     newy = this._globals.XPenguinsWindow.get_height() - this.data.height;
                     result = PARTIALMOVE;
                 }
@@ -549,7 +550,7 @@ Toon.prototype = {
     draw: function () {
         /* Draw the toon on */
         if (this.active) {
-            let direction = (this.direction >= this.data.ndirections ? 0 : 
+            let direction = (this.direction >= this.data.ndirections ? 0 :
                     this.direction),
                 anchor_x = this.data.width * this.frame,
                 anchor_y = this.data.height * direction;
@@ -573,27 +574,28 @@ Toon.prototype = {
 
 /********************************************************************
  * The ToonData structure describes the properties of a type of toon,
- * such as walker, climber etc. 
+ * such as walker, climber etc.
  * It contains a Clutter.Texture holding the pixmap.
  ********************************************************************/
 function ToonData() {
     this._init.apply(this, arguments);
-};
+}
+
 ToonData.prototype = {
 
     /* __xpenguins_copy_properties */
     _init: function (otherToonData) {
         /* Properties: set default values */
-        this.conf = DEFAULTS;// bitmask of toon properties such as cycling etc 
+        this.conf = DEFAULTS;// bitmask of toon properties such as cycling etc
         this.texture = null; // Clutter.Texture
-        this.master = null;  // If pixmap data is duplicated from another toon, 
+        this.master = null;  // If pixmap data is duplicated from another toon,
                              //  this is it .
-        this.nframes = 0;    // number of frames in image 
-        this.ndirections = 1;           // number directions in image (1 or 2) 
+        this.nframes = 0;    // number of frames in image
+        this.ndirections = 1;           // number directions in image (1 or 2)
         this.width = this.height = 30;  // width & height of individual frame
         this.acceleration = this.terminal_velocity = 0;
         this.speed = 4;
-        this.loop = 0;                  // Number of times to repeat cycle 
+        this.loop = 0;                  // Number of times to repeat cycle
 
         /* Copy select properties from otherToonData to here. */
         let propListToCopy = ['nframes', 'ndirections', 'width', 'height',
