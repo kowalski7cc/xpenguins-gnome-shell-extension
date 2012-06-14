@@ -103,13 +103,11 @@ Here are some known issues/limitations of the program (if you think you can fix 
 * Toons don't treat the message tray or gnome-shell menus/popups as solid. This is because XPenguins can only make toons interact with objects that the window manager knows about, and things created with GNOME-shell such as the message tray/notifications are not handled by the window manager.
 
 # Wish list
-Patches welcome!
+Patches welcome! (add wish list stuff as an 'enhancement' on the [Issues page](https://bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension/issues?status=new&status=open).
 
 - toons talk to each other with little speech bubbles
 - toons jump up and down when you get new mail
 - run xpenguins in a specified window instead of on the desktop (need some sort of window selector and listeners to signals for when the window moves)
-- when themes are added/removed whilst xpenguins is running, just remove/add the relevant toons to the already-running animation rather than restarting from the beginning.
-- instead of one '# penguins' slider, have one for each theme.
 - toons try to get to your cursor (???) --> climb up windows/turn into superman/etc in order to get there?
 
 ---
@@ -122,5 +120,5 @@ Patches welcome!
   This is just helpful for me to do testing.
   It is also a lot more verbose than the release branches.
   Default branch is not guaranteed to be stable at *any* commit.
-* Bookmark 'themes' is an attempt to get on-the-fly theme loading and removing working such that the animation doesn't have to be restarted every time these change.
 * Bookmark 'windowed-mode' is an attempt to get windowed mode working, i.e. toons run around in a specified window.
+* I attempt to make new features with bookmarks instead of branches.
