@@ -592,10 +592,9 @@ XPenguinsLoop.prototype = {
                 XPUtil.DEBUG(_("Warning: cannot detect load averages on this system"));
                 opt.load1 = -1;
                 opt.load2 = -1;
-            } else {
-                opt.load_cycles = opt.load_check_interval / opt.sleep_msec;
             }
         }
+        opt.load_cycles = opt.load_check_interval / opt.sleep_msec;
 
         /* Set up the window we're drawing on.
          * (has not been implemented yet besides global.stage).
@@ -648,10 +647,11 @@ XPenguinsLoop.prototype = {
                     this.toggleGodMode(propVal);
                 } else if (propName === 'sleep_msec') {
                     /* have to remove the _frame & re-add. */
-                    this._playing = 0; // UPTO: how to remove frame?
-                    // How to make doubly sure that _frame() has stopped before
+                    this._playing = 0;
                     // re-adding it?
                     this._relaunch = true;
+                } else if (propName === 'load1' && this.options.load1 < 0) {
+                    this.emit('load-averaging-end');
                 }
                 /* Otherwise, things like angels, blood: these things can just
                  * be set and no recalculating of signals etc or extra action
@@ -815,8 +815,10 @@ XPenguinsLoop.prototype = {
      */
     _frame: function () {
         ++this._tempFRAMENUMBER;
+        /*
         XPUtil.DEBUG('FRAME %d _toonNumber: %d', this._tempFRAMENUMBER, 
             this._toons.length - this._deadToons.length);
+            */
 
         /* xpenguins_frame() */
         let i,
@@ -1170,24 +1172,28 @@ XPenguinsLoop.prototype = {
         }
 
         /* check the CPU loading */
-        if (!this._exiting && this._cycle > o.load_cycles &&
-                o.load1 >= 0) {
+        if (o.load1 >= 0 && !this._exiting && this._cycle > o.load_cycles) {
             let newp,
+                signal,
                 load = XPUtil.loadAverage();
 
             if (o.load2 > o.load1) {
                 newp = Math.round(((o.load2 - load) * this._originalNumber) / 
                     (o.load2 - o.load1));
                 newp = Math.min(this._originalNumber, Math.max(0, newp));
+                signal = newp === 0 ? 'load-averaging-kill' : 'load-averaging-start';
             } else if (load < o.load1) {
                 newp = this._originalNumber;
+                signal = 'load-averaging-end';
             } else {
                 newp = 0;
+                signal = 'load-averaging-kill';
             }
-            if (this._originalNumber !== newp) {
-                this._setTotalNumber(newp);
+            if (this._toons.length - this._deadToons.length !== newp) {
                 XPUtil.DEBUG(_("Adjusting number according to load: %d -> %d"),
                         this._toons.length - this._deadToons.length, newp);
+                this._setTotalNumber(newp);
+                this.emit(signal);
             }
             this._cycle = 0;
         } else if (!numActive) {

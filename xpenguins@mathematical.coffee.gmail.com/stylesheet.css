@@ -37,3 +37,10 @@
 .theme-slider-menu-item-label {
     padding-left: 0.5em;
 }
+
+/* Load averaging */
+.xpenguins-load-averaging {
+}
+.xpenguins-load-averaging:loadAveragingActive {
+    color: red;
+}

@@ -3,6 +3,7 @@
  */
 
 /* *** CODE *** */
+const Clutter  = imports.gi.Clutter;
 const Gio      = imports.gi.Gio;
 const GLib     = imports.gi.GLib;
 const Gtk      = imports.gi.Gtk;
@@ -145,11 +146,215 @@ AboutDialog.prototype = {
     }
 };
 
+/* A SliderMenuItem with two slidable things, for
+ * selecting a range. Basically a modified PopupSliderMenuItem.
+ * It has no scroll or key-press event as it's hard to tell which
+ *  blob the user meant to scroll.
+ */
+function DoubleSliderMenuItem() {
+    this._init.apply(this, arguments);
+}
+DoubleSliderMenuItem.prototype = {
+    __proto__: PopupMenu.PopupBaseMenuItem.prototype,
+
+    _init: function (val1, val2) {
+        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, 
+            { activate: false });
+
+        if (isNaN(val1) || isNaN(val2))
+            // Avoid spreading NaNs around
+            throw TypeError('The slider value must be a number');
+
+        this._values = [Math.max(Math.min(val1, 1), 0),
+            Math.max(Math.min(val2, 1), 0)];
+
+        this._slider = new St.DrawingArea({ style_class: 'popup-slider-menu-item', reactive: true });
+        this.addActor(this._slider, { span: -1, expand: true });
+        this._slider.connect('repaint', Lang.bind(this, this._sliderRepaint));
+        this.actor.connect('button-press-event', Lang.bind(this, this._startDragging));
+
+        this._releaseId = this._motionId = 0;
+        this._dragging = false;
+    },
+
+    _setValue: function (i, value) {
+        if (isNaN(value))
+            throw TypeError('The slider value must be a number');
+
+        this._value[i] = Math.max(Math.min(value, 1), 0);
+        this._slider.queue_repaint();
+    },
+
+    setValue1: function(value) {
+        this._setValue(0, value);
+    },
+
+    setValue2: function(value) {
+        this._setValue(1, value);
+    },
+
+    _sliderRepaint: function(area) {
+        let cr = area.get_context();
+        let themeNode = area.get_theme_node();
+        let [width, height] = area.get_surface_size();
+
+        let handleRadius = themeNode.get_length('-slider-handle-radius');
+
+        let sliderWidth = width - 2 * handleRadius;
+        let sliderHeight = themeNode.get_length('-slider-height');
+
+        let sliderBorderWidth = themeNode.get_length('-slider-border-width');
+
+        let sliderBorderColor = themeNode.get_color('-slider-border-color');
+        let sliderColor = themeNode.get_color('-slider-background-color');
+
+        let sliderActiveBorderColor = themeNode.get_color('-slider-active-border-color');
+        let sliderActiveColor = themeNode.get_color('-slider-active-background-color');
+
+        /* slider active colour from val0 to val1 */
+        cr.setSourceRGBA (
+            sliderActiveColor.red / 255,
+            sliderActiveColor.green / 255,
+            sliderActiveColor.blue / 255,
+            sliderActiveColor.alpha / 255);
+        cr.rectangle(handleRadius + sliderWidth * this._values[0], (height - sliderHeight) / 2,
+            sliderWidth * this._values[1], sliderHeight);
+        cr.fillPreserve();
+        cr.setSourceRGBA (
+            sliderActiveBorderColor.red / 255,
+            sliderActiveBorderColor.green / 255,
+            sliderActiveBorderColor.blue / 255,
+            sliderActiveBorderColor.alpha / 255);
+        cr.setLineWidth(sliderBorderWidth);
+        cr.stroke();
+
+        /* slider from 0 to val0 */
+        cr.setSourceRGBA (
+            sliderColor.red / 255,
+            sliderColor.green / 255,
+            sliderColor.blue / 255,
+            sliderColor.alpha / 255);
+        cr.rectangle(handleRadius, (height - sliderHeight) / 2,
+            sliderWidth * this._values[0], sliderHeight);
+        cr.fillPreserve();
+        cr.setSourceRGBA (
+            sliderBorderColor.red / 255,
+            sliderBorderColor.green / 255,
+            sliderBorderColor.blue / 255,
+            sliderBorderColor.alpha / 255);
+        cr.setLineWidth(sliderBorderWidth);
+        cr.stroke();
+
+        /* slider from val1 to 1 */
+        cr.setSourceRGBA (
+            sliderColor.red / 255,
+            sliderColor.green / 255,
+            sliderColor.blue / 255,
+            sliderColor.alpha / 255);
+        cr.rectangle(handleRadius + sliderWidth * this._values[1], 
+            (height - sliderHeight) / 2,
+            sliderWidth, sliderHeight);
+        cr.fillPreserve();
+        cr.setSourceRGBA (
+            sliderBorderColor.red / 255,
+            sliderBorderColor.green / 255,
+            sliderBorderColor.blue / 255,
+            sliderBorderColor.alpha / 255);
+        cr.setLineWidth(sliderBorderWidth);
+        cr.stroke();
+
+        /* dots */
+        let i = this._values.length;
+        while (i--) {
+            let val = this._values[i];
+            let handleY = height / 2;
+            let handleX = handleRadius + (width - 2 * handleRadius) * val;
+
+            let color = themeNode.get_foreground_color();
+            cr.setSourceRGBA (
+                color.red / 255,
+                color.green / 255,
+                color.blue / 255,
+                color.alpha / 255);
+            cr.arc(handleX, handleY, handleRadius, 0, 2 * Math.PI);
+            cr.fill();
+        }
+    },
+
+    /* returns the index of the dot to move */
+    _whichDotToMove: function(absX, absY) {
+        let relX, relY, sliderX, sliderY;
+        [sliderX, sliderY] = this._slider.get_transformed_position();
+        relX = absX - sliderX;
+        let width = this._slider.width,
+            handleRadius = this._slider.get_theme_node().get_length('-slider-handle-radius'),
+            newvalue;
+        if (relX < handleRadius)
+            newvalue = 0;
+        else if (relX > width - handleRadius)
+            newvalue = 1;
+        else
+            newvalue = (relX - handleRadius) / (width - 2 * handleRadius);
+
+        return (Math.abs(newvalue - this._values[0]) < 
+                Math.abs(newvalue - this._values[1]) ? 0 : 1);
+    },
+
+    _endDragging: function () {
+        PopupMenu.PopupSliderMenuItem.prototype._endDragging.apply(this, arguments);
+    },
+
+    _startDragging: function(actor, event) {
+        if (this._dragging) // don't allow two drags at the same time
+            return;
+
+        this._dragging = true;
+        let absX, absY;
+        [absX, absY] = event.get_coords();
+        let dot = this._whichDotToMove(absX, absY);
+
+        // FIXME: we should only grab the specific device that originated
+        // the event, but for some weird reason events are still delivered
+        // outside the slider if using clutter_grab_pointer_for_device
+        Clutter.grab_pointer(this._slider);
+        this._releaseId = this._slider.connect('button-release-event', Lang.bind(this, this._endDragging));
+        this._motionId = this._slider.connect('motion-event', Lang.bind(this, this._motionEvent, dot));
+        this._moveHandle(absX, absY, dot);
+    },
+
+    _motionEvent: function(actor, event, dot) {
+        let absX, absY;
+        [absX, absY] = event.get_coords();
+        this._moveHandle(absX, absY, dot);
+        return true;
+    },
+
+    /* Don't let the bottom slider cross over the top slider
+     * and vice versa */
+    _moveHandle: function(absX, absY, which) {
+        let relX, relY, sliderX, sliderY;
+        [sliderX, sliderY] = this._slider.get_transformed_position();
+        relX = absX - sliderX;
+        relY = absY - sliderY;
+
+        let width = this._slider.width,
+            handleRadius = this._slider.get_theme_node().get_length('-slider-handle-radius'),
+            newvalue = (relX - handleRadius) / (width - 2 * handleRadius);
+
+        newvalue = Math.max(which == 0 ? 0 : this._values[0], 
+            Math.min(newvalue, which == 0 ? this._values[1] : 1));
+        this._values[which] = newvalue;
+        this._slider.queue_repaint();
+        this.emit('value-changed', this._values[which], which);
+    }
+};
+
 /* A slider with a label + number that updates with the slider
  * text: the text for the item
  * defaultVal: the intial value for the item (on the min -> max scale)
  * min, max: the min and max values for the slider
  * round: whether to round the value to the nearest integer
+ * ndec: number of decimal places to round to
  * params: other params for PopupBaseMenuItem
  */
 function SliderMenuItem() {
@@ -158,7 +363,7 @@ function SliderMenuItem() {
 SliderMenuItem.prototype = {
     __proto__: PopupMenu.PopupBaseMenuItem.prototype,
 
-    _init: function (text, defaultVal, min, max, round, params) {
+    _init: function (text, defaultVal, min, max, round, ndec, params) {
         PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
 
         /* set up properties */
@@ -169,6 +374,7 @@ SliderMenuItem.prototype = {
         if (round) {
            this._value = Math.round(this._value);
         } 
+        this.ndec = this.ndec || (round ? 0 : 2);
 
         /* set up item */
         this.box = new St.BoxLayout({vertical: true});
@@ -186,7 +392,7 @@ SliderMenuItem.prototype = {
         this.label = new St.Label({text: text, reactive: false});
 
         /* number */
-        this.numberLabel = new St.Label({text: this._value.toString(), 
+        this.numberLabel = new St.Label({text: this._value.toFixed(this.ndec), 
             reactive: false});
 
         /* slider */
@@ -239,7 +445,7 @@ SliderMenuItem.prototype = {
             val = Math.round(val);
         }
         this._value = val;
-        this.numberLabel.set_text(val.toString());
+        this.numberLabel.set_text(val.toFixed(this.ndec));
     },
 };
 
@@ -250,9 +456,8 @@ function ThemeSliderMenuItem() {
 ThemeSliderMenuItem.prototype = {
     __proto__: SliderMenuItem.prototype,
 
-    _init: function (text, defaultVal, min, max, round, icon_path, params) {
-        SliderMenuItem.prototype._init.call(this, text, defaultVal, min, max,
-            round, params);
+    _init: function () {
+        SliderMenuItem.prototype._init.apply(this, arguments);
 
         /* Icon (default no icon) */
         this.icon = new St.Icon({
@@ -260,7 +465,6 @@ ThemeSliderMenuItem.prototype = {
             icon_type: St.IconType.FULLCOLOR,
             style_class: 'popup-menu-icon'
         });
-        this.setIcon(icon_path);
 
         /* Info button */
         this.button = new St.Button();
@@ -290,6 +494,30 @@ ThemeSliderMenuItem.prototype = {
         AboutDialog.prototype.setIcon.apply(this, arguments);
     }
 };
+
+// FIXME: this should really be one item with two slidy things on it.
+function LoadAverageSliderMenuItem() {
+    this._init.apply(this, arguments);
+}
+
+LoadAverageSliderMenuItem.prototype = {
+    __proto__: SliderMenuItem.prototype,
+
+    _init: function () {
+        SliderMenuItem.prototype._init.apply(this, arguments);
+
+        /* set styles */
+        this.numberLabel.add_style_class_name('xpenguins-load-averaging');
+    },
+
+    setBeingUsed: function(used) {
+        if (used) {
+            this.numberLabel.add_style_pseudo_class('loadAveragingActive');
+        } else {
+            this.numberLabel.remove_style_pseudo_class('loadAveragingActive');
+        }
+    }
+}
 
 /*
  * XPenguinsMenu Object
@@ -340,6 +568,27 @@ XPenguinsMenu.prototype = {
         /* Listen to 'ntoons-changed' and adjust slider accordingly */
         this._XPenguinsLoop.connect('ntoons-changed', Lang.bind(this, 
             this._onChangeThemeNumber));
+        this._XPenguinsLoop.connect('load-averaging-start', Lang.bind(this,
+            function () {
+                log(' ... LOAD AVERAGING START');
+                this._items.load1.setBeingUsed(true);
+                this._items.load2.setBeingUsed(false);
+            })
+        );
+        this._XPenguinsLoop.connect('load-averaging-end', Lang.bind(this,
+            function () {
+                log(' ... LOAD AVERAGING END');
+                this._items.load1.setBeingUsed(false);
+                this._items.load2.setBeingUsed(false);
+            })
+        );
+        this._XPenguinsLoop.connect('load-averaging-kill', Lang.bind(this,
+            function () {
+                log(' ... LOAD AVERAGING KILL');
+                this._items.load1.setBeingUsed(true);
+                this._items.load2.setBeingUsed(true);
+            })
+        );
 
         /* @@ debugging windowListener */
         this._windowListener = new WindowListener.WindowListener();
@@ -386,6 +635,10 @@ XPenguinsMenu.prototype = {
 
         /* clear the menu */
         this.menu.removeAll();
+
+        dummy = new DoubleSliderMenuItem(0, 0.4);
+        this.menu.addMenuItem(dummy);
+
 
         /* toggle to start xpenguins */
         this._items.start = new PopupMenu.PopupSwitchMenuItem(_("Start"), 
@@ -441,6 +694,30 @@ XPenguinsMenu.prototype = {
         this._items.delay.connect('drag-end', Lang.bind(this, this.changeOption,
             'sleep_msec'));
 
+        /* Load averaging. */
+        // TODO: what is reasonable? look at # CPUs and times by fudge factor?
+        // What about a slider with two dots on it? enforces the min/max r'ship.
+        // Also, highlight the number in red if we're doing load averaging.
+        this._items.load1 = new LoadAverageSliderMenuItem(_("Load average reduce threshold"),
+                -0.01, -0.01, 2, false);
+        this._optionsMenu.menu.addMenuItem(this._items.load1);
+        this._items.load1.connect('drag-end', Lang.bind(this, function (slider, val) {
+            /* set load2 first to avoid problems with it being unset */
+            this.changeOption(this._items.load2, this._items.load2.getValue(), 'load2');
+            this.changeOption(this._items.load1, val, 'load1');
+        }));
+
+        this._items.load2 = new LoadAverageSliderMenuItem(_("Load average kill-all threshold"),
+                2, 0, 2, false);
+        this._optionsMenu.menu.addMenuItem(this._items.load2);
+        this._items.load2.connect('drag-end', Lang.bind(this, function (slider, val) {
+            let load1 = this._items.load1.getValue();
+            if (val <= load1) {
+                this._items.load2.setValue(load1);
+            }
+            this.changeOption(this._items.load2, val, 'load2');
+        }));
+
         /* RecalcMode combo box: only if global.display has grab-op- events. */
         if (!blacklist.recalcMode) {
             this._items.recalc = new PopupMenu.PopupComboBoxMenuItem({});
@@ -476,8 +753,8 @@ XPenguinsMenu.prototype = {
             for (let i = 0; i < themeList.length; ++i) {
                 let sanitised_name = ThemeManager.sanitiseThemeName(themeList[i]);
                 this._items.themes[sanitised_name] = new ThemeSliderMenuItem(
-                    _(themeList[i]), 0, 0, XPenguins.PENGUIN_MAX, true,
-                    this._themeInfo[sanitised_name].icon);
+                    _(themeList[i]), 0, 0, XPenguins.PENGUIN_MAX, true);
+                this._items.themes[sanitised_name].setIcon(this._themeInfo[sanitised_name].icon);
                 this._items.themes[sanitised_name].connect('drag-end', 
                     Lang.bind(this, this._onChangeTheme, sanitised_name, true));
                 this._items.themes[sanitised_name].connect('button-clicked', 
@@ -553,6 +830,8 @@ XPenguinsMenu.prototype = {
             if (this._items.windowPreview && this._items.windowPreview.state) {
                 this._windowListener.stop();
             }
+            this._items.load1.numberLabel.remove_style_pseudo_class('loadAveragingActive');
+            this._items.load2.numberLabel.remove_style_pseudo_class('loadAveragingActive');
         }
     }
 };
