@@ -58,6 +58,13 @@ function getCompatibleOptions(blacklist) {
     }
     list.onDesktop = blacklist || false; // for now we can't do windowed mode.
     list.rectangularWindows = blacklist || false; // for now no shaped windows
+    /* see if we can do load averaging */
+    list.loadAveraging = XPUtil.loadAverage() >= 0;
+    if (blacklist) {
+        list.loadAveraging = !list.loadAveraging;
+    }
+    let load = XPUtil.loadAverage();
+    list.loadAveraging = blacklist ? load < 0 : load >= 0;
     return list;
 }
 
@@ -658,7 +665,11 @@ XPenguinsLoop.prototype = {
                     this._playing = 0;
                     this._relaunch = true;
                 } else if (propName === 'load1' && propVal < 0) {
+                    /* restore original toons */
                     this.emit('load-averaging-end');
+                    if (this._toons.length - this._deadToons.length !== this._originalNumber) {
+                        this._setTotalNumber(this._originalNumber);
+                    }
                 }
                 /* Otherwise, things like angels, blood: these things can just
                  * be set and no recalculating of signals etc or extra action

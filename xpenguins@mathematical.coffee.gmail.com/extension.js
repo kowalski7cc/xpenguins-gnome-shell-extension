@@ -68,7 +68,7 @@ AboutDialog.prototype = {
             {styleClass: 'modal-dialog'});
 
         let monitor = global.screen.get_monitor_geometry(global.screen.get_primary_monitor()),
-            width   = Math.max(250, Math.round(monitor.width / 4)),
+            width   = Math.max(400, Math.round(monitor.width / 3)),
             height  = Math.max(400, Math.round(monitor.height / 2.5));
 
         /* title + icon */
@@ -604,8 +604,14 @@ ThemeSliderMenuItem.prototype = {
         }));
 
         /* assemble the item */
-        this.topBox.insert_before(this.icon, this.label);
-        this.bottomBox.insert_before(this.button, this.slider.actor);
+        // polyglot insert_before/insert_child_at_index
+        if (this.topBox.insert_before) {
+            this.topBox.insert_before(this.icon, this.label);
+            this.bottomBox.insert_before(this.button, this.slider.actor);
+        } else {
+            this.topBox.insert_child_at_index(this.icon, 0);
+            this.bottomBox.insert_child_at_index(this.button, 0);
+        }
     },
 
     /* sets the icon from a path */
@@ -696,12 +702,14 @@ XPenguinsMenu.prototype = {
         // Listen to 'ntoons-changed' and adjust slider accordingly
         this._XPenguinsLoop.connect('ntoons-changed', Lang.bind(this,
             this._onChangeThemeNumber));
-        this._XPenguinsLoop.connect('load-averaging-start', Lang.bind(this,
-            function () { this._items.load.setBeingUsed(true, false); }));
-        this._XPenguinsLoop.connect('load-averaging-end', Lang.bind(this,
-            function () { this._items.load.setBeingUsed(false, false); }));
-        this._XPenguinsLoop.connect('load-averaging-kill', Lang.bind(this,
-            function () { this._items.load.setBeingUsed(true, true); }));
+        if (this._items.loadAveraging) {
+            this._XPenguinsLoop.connect('load-averaging-start', Lang.bind(this,
+                function () { this._items.loadAveraging.setBeingUsed(true, false); }));
+            this._XPenguinsLoop.connect('load-averaging-end', Lang.bind(this,
+                function () { this._items.loadAveraging.setBeingUsed(false, false); }));
+            this._XPenguinsLoop.connect('load-averaging-kill', Lang.bind(this,
+                function () { this._items.loadAveraging.setBeingUsed(true, true); }));
+        }
 
         /* @@ debugging windowListener */
         this._windowListener = new WindowListener.WindowListener();
@@ -796,16 +804,18 @@ XPenguinsMenu.prototype = {
 
         /* Load averaging. */
         // TODO: what is reasonable? look at # CPUs and times by fudge factor?
-        this._items.load = new LoadAverageSliderMenuItem(_("Load average reduce threshold"),
-                -0.01, 2, -0.01, 2, false, 2);
-        this._optionsMenu.menu.addMenuItem(this._items.load);
-        this._items.load.connect('drag-end', Lang.bind(this, function (slider, which, val) {
-            if (which === 0) {
-                /* set load2 first to avoid problems with it being unset */
-                this.changeOption(this._items.load, this._items.load.getUpperValue(), 'load2');
-            }
-            this.changeOption(this._items.load, val, 'load' + (which+1));
-        }));
+        if (!blacklist.loadAveraging) {
+            this._items.loadAveraging = new LoadAverageSliderMenuItem(_("Load average reduce threshold"),
+                    -0.01, 2, -0.01, 2, false, 2);
+            this._optionsMenu.menu.addMenuItem(this._items.loadAveraging);
+            this._items.loadAveraging.connect('drag-end', Lang.bind(this, function (slider, which, val) {
+                if (which === 0) {
+                    /* set load2 first to avoid problems with it being unset */
+                    this.changeOption(this._items.loadAveraging, this._items.loadAveraging.getUpperValue(), 'load2');
+                }
+                this.changeOption(this._items.loadAveraging, val, 'load' + (which+1));
+            }));
+        }
 
         /* RecalcMode combo box: only if global.display has grab-op- events. */
         if (!blacklist.recalcMode) {
@@ -926,7 +936,9 @@ XPenguinsMenu.prototype = {
             if (this._items.windowPreview && this._items.windowPreview.state) {
                 this._windowListener.stop();
             }
-            this._items.load.setBeingUsed(false, false);
+            if (this._items.loadAveraging) {
+                this._items.loadAveraging.setBeingUsed(false, false);
+            }
         }
     }
 };
