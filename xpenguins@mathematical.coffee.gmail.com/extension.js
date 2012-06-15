@@ -1,7 +1,3 @@
-/* Notes:
- * - load averaging sliders
- */
-
 /* *** CODE *** */
 const Gio      = imports.gi.Gio;
 const GLib     = imports.gi.GLib;
@@ -56,7 +52,7 @@ function disable() {
 /* Popup dialog with scrollable text.
  * See InstallExtensionDialog in extensionSystem.js for an example.
  *
- * Future icing: make on toon of each type in the theme and have them run
+ * Future icing: make one toon of each type in the theme and have them run
  * in the about dialog.
  */
 function AboutDialog() {

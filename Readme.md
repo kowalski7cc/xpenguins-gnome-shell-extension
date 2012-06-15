@@ -19,25 +19,25 @@ To start/stop XPenguins, use the toggle.
 
 ### Theme
 XPenguins is themable, and you can have multiple themes running simultaneously. 
-Use the on/off toggle to toggle themes. 
-Clicking the 'help' button to the left of the theme will give you some more info on the theme and its creators.
-### Max Penguins
-This is the number of penguins running around on your screen. 
-By default, the number recommended by each theme is used.
-If you increase it to 999999999, don't complain to me if your computer crashes.
-### Ignore Popups
+Use the sliders to add or remove toons from each theme.
+Clicking the 'help' button to the left of the slider will give you some more info on the theme and its creators.
+### Ignore popups
 Whether popup windows (right click menu, tooltips) are considered solid to the toons.
-### Ignore Maximised
+### Ignore maximised windows
 Whether maximised windows (and windows underneath these) are ignored.
 Toons only run around on the region of your desktop not covered by windows, so if windows are maximised you won't get any toons. Ignoring maximised windows means you can enjoy toons even with maximised windows. They will only bump into windows that are visible and non-maximised.
-### Always on Visible Workspace
+### Ignore half-maximised windows
+If ignoring maximised windows is true, should we also ignore half-maximised windows (those that are maximised vertically or horizontally but not both)? This can be handy for people with big monitors who just use half-maximised windows all the time. **Only used if 'Ignore Maximised' is true.**
+### Always on visible workspace
 Whether toons stay on the workspace you started XPenguins on, or follow you around all your workspaces.
 ### Blood
 Whether to show animations with blood (for example in the original Penguin theme the 'splat' animation has blood).
 ### Angels
 Whether to show penguin angels floating up to heaven after dying.
-### God Mode
+### God mode
 Enabling "God mode" lets you squash (smite) toons by clicking on them.
+### Time between frames
+The time (in milliseconds) between each frame of the animation. By default the number specified by the theme is used (probably 60ms).
 ### Recalc Mode
 Ignore this. If you are suffering from severe performance issues AND you resize/move your windows really really often you can try switching this to "PAUSE" which will pause toons while you drag windows around. It probably won't make much difference at all.
 

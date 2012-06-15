@@ -293,6 +293,12 @@ XPenguinsLoop.prototype = {
             /* for load averaging: store a copy of the originals */
             this._originalNumber += this._numbers[name];
         }
+        /* if it's currently sleeping, wake it up to process the change */
+        if (this._sleepID) {
+            Mainloop.source_remove(this._sleepID);
+            this._sleepID = null;
+            this.resume();
+        }
     },
 
     /* sets the total number of penguins in the entire animation to n,
@@ -471,6 +477,12 @@ XPenguinsLoop.prototype = {
         /* tell the loop to start the exit sequence */
         this._exiting = true;
         this._setTotalNumber(0, true); // don't emit signal or sliders go to 0.
+        /* If we're sleeping then just quit immediately. */
+        if (this._sleepID) {
+            Mainloop.source_remove(this._sleepID);
+            this._sleepID = null;
+            this.exit();
+        }
     },
 
 
@@ -653,6 +665,12 @@ XPenguinsLoop.prototype = {
                  * be set and no recalculating of signals etc or extra action
                  * need be done.
                  */
+                /* if it's currently sleeping, wake it up to process the change */
+                if (this._sleepID) {
+                    Mainloop.source_remove(this._sleepID);
+                    this._sleepID = null;
+                    this.resume();
+                }
             }
         } // whether xpenguins or window-listener option
     },
