@@ -40,6 +40,10 @@ Whether to show penguin angels floating up to heaven after dying.
 Enabling "God mode" lets you squash (smite) toons by clicking on them.
 ### Recalc Mode
 Ignore this. If you are suffering from severe performance issues AND you resize/move your windows really really often you can try switching this to "PAUSE" which will pause toons while you drag windows around. It probably won't make much difference at all.
+### Load Averaging
+This defines two thresholds; when the computer's load average (for example given by `uptime` or `top`) exceeds the lower threshold, toons will start to be killed. 
+When the load average exceeds the upper threshold, all toons will be killed.
+This checks the load average every 5 seconds.
 
 ---
 

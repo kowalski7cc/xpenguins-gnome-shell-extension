@@ -650,14 +650,13 @@ XPenguinsLoop.prototype = {
                     this._playing = 0;
                     // re-adding it?
                     this._relaunch = true;
-                } else if (propName === 'load1' && this.options.load1 < 0) {
+                } else if (propName === 'load1' && propVal < 0) {
                     this.emit('load-averaging-end');
                 }
                 /* Otherwise, things like angels, blood: these things can just
                  * be set and no recalculating of signals etc or extra action
                  * need be done.
                  */
-            }
         } // whether xpenguins or window-listener option
     },
 
@@ -1181,7 +1180,8 @@ XPenguinsLoop.prototype = {
                 newp = Math.round(((o.load2 - load) * this._originalNumber) / 
                     (o.load2 - o.load1));
                 newp = Math.min(this._originalNumber, Math.max(0, newp));
-                signal = newp === 0 ? 'load-averaging-kill' : 'load-averaging-start';
+                signal = (newp === this._originalNumber ? 'load-averaging-end' :
+                    (newp === 0 ? 'load-averaging-kill' : 'load-averaging-start'));
             } else if (load < o.load1) {
                 newp = this._originalNumber;
                 signal = 'load-averaging-end';

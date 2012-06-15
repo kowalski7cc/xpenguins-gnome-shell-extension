@@ -38,6 +38,20 @@
     padding-left: 0.5em;
 }
 
+.double-slider-menu-item-top-box {
+}
+
+.double-slider-menu-item-bottom-box {
+}
+
+.double-slider-menu-item-number-label {
+    color: #999;
+}
+
+.double-slider-menu-item-label {
+    text-align: center;
+}
+
 /* Load averaging */
 .xpenguins-load-averaging {
 }

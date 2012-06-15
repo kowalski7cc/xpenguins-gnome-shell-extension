@@ -1,7 +1,3 @@
-/* Notes:
- * - load averaging sliders
- */
-
 /* *** CODE *** */
 const Clutter  = imports.gi.Clutter;
 const Gio      = imports.gi.Gio;
@@ -146,15 +142,132 @@ AboutDialog.prototype = {
     }
 };
 
+/* A DoubleSliderPopupMenuItem paired with a text label & two number labels */
+function DoubleSliderMenuItem() {
+    this._init.apply(this, arguments);
+}
+
+DoubleSliderMenuItem.prototype = {
+    __proto__: PopupMenu.PopupBaseMenuItem.prototype,
+
+    _init: function (text, valLower, valUpper, min, max, round, ndec, params) {
+        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
+
+        /* set up properties */
+        this.min = min || 0;
+        this.max = max || 1;
+        this.round = round || false;
+        this._values = [valLower, valUpper];
+        this._numVals = this._values.length; // pre-cache
+        if (round) {
+            this._values = this._values.map(function (v) {
+                return Math.round(v);
+            });
+        }
+        this.ndec = this.ndec || (round ? 0 : 2);
+
+        /* set up item */
+        this.box = new St.BoxLayout({vertical: true});
+        this.addActor(this.box, {expand: true, span: -1});
+
+        this.topBox = new St.BoxLayout({vertical: false, 
+            style_class: 'double-slider-menu-item-top-box'});
+        this.box.add(this.topBox, {x_fill: true});
+
+        this.bottomBox = new St.BoxLayout({vertical: false, 
+            style_class: 'double-slider-menu-item-bottom-box'});
+        this.box.add(this.bottomBox, {x_fill: true});
+
+        /* text */
+        this.label = new St.Label({text: text, reactive: false,
+            style_class: 'double-slider-menu-item-label'});
+
+        /* numbers */
+        this.numberLabelLower = new St.Label({text: this._values[0].toFixed(this.ndec), 
+            reactive: false});
+        this.numberLabelUpper = new St.Label({text: this._values[1].toFixed(this.ndec), 
+            reactive: false});
+        this.numberLabelLower.add_style_class_name('double-slider-menu-item-number-label');
+        this.numberLabelUpper.add_style_class_name('double-slider-menu-item-number-label');
+
+        /* slider */
+        this.slider = new DoubleSliderPopupMenuItem(
+            (valLower - min) / (max - min),
+            (valUpper - min) / (max - min)
+        );
+       
+        /* connect up signals */
+        this.slider.connect('value-changed', Lang.bind(this, this._updateValue));
+        /* pass through the drag-end, clicked signal. */
+        this.slider.connect('drag-end', Lang.bind(this, function (actor, which, value) { 
+            this.emit('drag-end', which, this._values[which]);
+        }));
+        // Note: if I set the padding in the css it gets overridden
+        this.slider.actor.set_style('padding-left: 0em; padding-right: 0em;');
+
+        /* assemble the item */
+        this.topBox.add(this.numberLabelLower, {x_align: St.Align.START});
+        this.topBox.add(this.label, {expand: true, x_align: St.Align.MIDDLE});
+        this.topBox.add(this.numberLabelUpper, {x_align: St.Align.END});
+        this.bottomBox.add(this.slider.actor, {expand: true, span: -1});
+    },
+
+    /* returns the value of the slider, either the raw (0-1) value or the
+     * value on the min->max scale. */
+    getValue: function (which, raw) {
+        if (raw) {
+            return this.slider.getValue(which);
+        } else {
+            return this._values[which];
+        }
+    },
+
+    getLowerValue: function (raw) {
+        return this.getValue(0, raw);
+    },
+
+    getUpperValue: function (raw) {
+        return this.getValue(1, raw);
+    },
+
+    setLowerValue: function (value, raw) {
+        this.setValue(0, value, raw);
+    },
+
+    setUpperValue: function (value, raw) {
+        this.setValue(1, value, raw);
+    },
+
+    /* sets the value of the slider, either the raw (0-1) value or the
+     * value on the min->max scale */
+    setValue: function (which, value, raw) {
+        value = (raw ? value : (value - this.min) / (this.max - this.min));
+        this._updateValue(this.slider, which, value);
+        this.slider.setValue(which, value);
+    },
+
+    _updateValue: function (slider, which, value) {
+        let val = value * (this.max - this.min) + this.min;
+        if (this.round) {
+            val = Math.round(val);
+        }
+        this._values[which] = val;
+        if (which === 0) {
+            this.numberLabelLower.set_text(val.toFixed(this.ndec));
+        } else {
+            this.numberLabelUpper.set_text(val.toFixed(this.ndec));
+        }
+    }
+};
 /* A SliderMenuItem with two slidable things, for
  * selecting a range. Basically a modified PopupSliderMenuItem.
  * It has no scroll or key-press event as it's hard to tell which
  *  blob the user meant to scroll.
  */
-function DoubleSliderMenuItem() {
+function DoubleSliderPopupMenuItem() {
     this._init.apply(this, arguments);
 }
-DoubleSliderMenuItem.prototype = {
+DoubleSliderPopupMenuItem.prototype = {
     __proto__: PopupMenu.PopupBaseMenuItem.prototype,
 
     _init: function (val1, val2) {
@@ -177,7 +290,7 @@ DoubleSliderMenuItem.prototype = {
         this._dragging = false;
     },
 
-    _setValue: function (i, value) {
+    setValue: function (i, value) {
         if (isNaN(value))
             throw TypeError('The slider value must be a number');
 
@@ -185,12 +298,8 @@ DoubleSliderMenuItem.prototype = {
         this._slider.queue_repaint();
     },
 
-    setValue1: function(value) {
-        this._setValue(0, value);
-    },
-
-    setValue2: function(value) {
-        this._setValue(1, value);
+    getValue: function (which) {
+        return this._values[which];
     },
 
     _sliderRepaint: function(area) {
@@ -300,9 +409,19 @@ DoubleSliderMenuItem.prototype = {
                 Math.abs(newvalue - this._values[1]) ? 0 : 1);
     },
 
-    _endDragging: function () {
-        PopupMenu.PopupSliderMenuItem.prototype._endDragging.apply(this, arguments);
+    _endDragging: function(actor, event, which) {
+        if (this._dragging) {
+            this._slider.disconnect(this._releaseId);
+            this._slider.disconnect(this._motionId);
+
+            Clutter.ungrab_pointer();
+            this._dragging = false;
+
+            this.emit('drag-end', which, this._values[which]);
+        }
+        return true;
     },
+
 
     _startDragging: function(actor, event) {
         if (this._dragging) // don't allow two drags at the same time
@@ -317,7 +436,8 @@ DoubleSliderMenuItem.prototype = {
         // the event, but for some weird reason events are still delivered
         // outside the slider if using clutter_grab_pointer_for_device
         Clutter.grab_pointer(this._slider);
-        this._releaseId = this._slider.connect('button-release-event', Lang.bind(this, this._endDragging));
+        // DOT
+        this._releaseId = this._slider.connect('button-release-event', Lang.bind(this, this._endDragging, dot));
         this._motionId = this._slider.connect('motion-event', Lang.bind(this, this._motionEvent, dot));
         this._moveHandle(absX, absY, dot);
     },
@@ -345,7 +465,7 @@ DoubleSliderMenuItem.prototype = {
             Math.min(newvalue, which == 0 ? this._values[1] : 1));
         this._values[which] = newvalue;
         this._slider.queue_repaint();
-        this.emit('value-changed', this._values[which], which);
+        this.emit('value-changed', which, this._values[which]);
     }
 };
 
@@ -495,26 +615,31 @@ ThemeSliderMenuItem.prototype = {
     }
 };
 
-// FIXME: this should really be one item with two slidy things on it.
 function LoadAverageSliderMenuItem() {
     this._init.apply(this, arguments);
 }
 
 LoadAverageSliderMenuItem.prototype = {
-    __proto__: SliderMenuItem.prototype,
+    __proto__: DoubleSliderMenuItem.prototype,
 
     _init: function () {
-        SliderMenuItem.prototype._init.apply(this, arguments);
+        DoubleSliderMenuItem.prototype._init.apply(this, arguments);
 
         /* set styles */
-        this.numberLabel.add_style_class_name('xpenguins-load-averaging');
+        this.numberLabelLower.add_style_class_name('xpenguins-load-averaging');
+        this.numberLabelUpper.add_style_class_name('xpenguins-load-averaging');
     },
 
-    setBeingUsed: function(used) {
-        if (used) {
-            this.numberLabel.add_style_pseudo_class('loadAveragingActive');
+    setBeingUsed: function(usedLower, usedUpper) {
+        if (usedLower) {
+            this.numberLabelLower.add_style_pseudo_class('loadAveragingActive');
         } else {
-            this.numberLabel.remove_style_pseudo_class('loadAveragingActive');
+            this.numberLabelLower.remove_style_pseudo_class('loadAveragingActive');
+        }
+        if (usedUpper) {
+            this.numberLabelUpper.add_style_pseudo_class('loadAveragingActive');
+        } else {
+            this.numberLabelUpper.remove_style_pseudo_class('loadAveragingActive');
         }
     }
 }
@@ -569,26 +694,11 @@ XPenguinsMenu.prototype = {
         this._XPenguinsLoop.connect('ntoons-changed', Lang.bind(this, 
             this._onChangeThemeNumber));
         this._XPenguinsLoop.connect('load-averaging-start', Lang.bind(this,
-            function () {
-                log(' ... LOAD AVERAGING START');
-                this._items.load1.setBeingUsed(true);
-                this._items.load2.setBeingUsed(false);
-            })
-        );
+            function () { this._items.load.setBeingUsed(true, false); }));
         this._XPenguinsLoop.connect('load-averaging-end', Lang.bind(this,
-            function () {
-                log(' ... LOAD AVERAGING END');
-                this._items.load1.setBeingUsed(false);
-                this._items.load2.setBeingUsed(false);
-            })
-        );
+            function () { this._items.load.setBeingUsed(false, false); }));
         this._XPenguinsLoop.connect('load-averaging-kill', Lang.bind(this,
-            function () {
-                log(' ... LOAD AVERAGING KILL');
-                this._items.load1.setBeingUsed(true);
-                this._items.load2.setBeingUsed(true);
-            })
-        );
+            function () { this._items.load.setBeingUsed(true, true); }));
 
         /* @@ debugging windowListener */
         this._windowListener = new WindowListener.WindowListener();
@@ -628,16 +738,12 @@ XPenguinsMenu.prototype = {
         }
     },
 
-
     _createMenu: function () {
         XPUtil.DEBUG('_createMenu');
         let dummy;
 
         /* clear the menu */
         this.menu.removeAll();
-
-        dummy = new DoubleSliderMenuItem(0, 0.4);
-        this.menu.addMenuItem(dummy);
 
 
         /* toggle to start xpenguins */
@@ -696,26 +802,15 @@ XPenguinsMenu.prototype = {
 
         /* Load averaging. */
         // TODO: what is reasonable? look at # CPUs and times by fudge factor?
-        // What about a slider with two dots on it? enforces the min/max r'ship.
-        // Also, highlight the number in red if we're doing load averaging.
-        this._items.load1 = new LoadAverageSliderMenuItem(_("Load average reduce threshold"),
-                -0.01, -0.01, 2, false);
-        this._optionsMenu.menu.addMenuItem(this._items.load1);
-        this._items.load1.connect('drag-end', Lang.bind(this, function (slider, val) {
-            /* set load2 first to avoid problems with it being unset */
-            this.changeOption(this._items.load2, this._items.load2.getValue(), 'load2');
-            this.changeOption(this._items.load1, val, 'load1');
-        }));
-
-        this._items.load2 = new LoadAverageSliderMenuItem(_("Load average kill-all threshold"),
-                2, 0, 2, false);
-        this._optionsMenu.menu.addMenuItem(this._items.load2);
-        this._items.load2.connect('drag-end', Lang.bind(this, function (slider, val) {
-            let load1 = this._items.load1.getValue();
-            if (val <= load1) {
-                this._items.load2.setValue(load1);
+        this._items.load = new LoadAverageSliderMenuItem(_("Load average reduce threshold"),
+                -0.01, 2, -0.01, 2, false, 2);
+        this._optionsMenu.menu.addMenuItem(this._items.load);
+        this._items.load.connect('drag-end', Lang.bind(this, function (slider, which, val) {
+            if (which === 0) {
+                /* set load2 first to avoid problems with it being unset */
+                this.changeOption(this._items.load, this._items.load.getUpperValue(), 'load2');
             }
-            this.changeOption(this._items.load2, val, 'load2');
+            this.changeOption(this._items.load, val, 'load' + (which+1));
         }));
 
         /* RecalcMode combo box: only if global.display has grab-op- events. */
@@ -830,8 +925,7 @@ XPenguinsMenu.prototype = {
             if (this._items.windowPreview && this._items.windowPreview.state) {
                 this._windowListener.stop();
             }
-            this._items.load1.numberLabel.remove_style_pseudo_class('loadAveragingActive');
-            this._items.load2.numberLabel.remove_style_pseudo_class('loadAveragingActive');
+            this._items.load.setBeingUsed(false, false);
         }
     }
 };
