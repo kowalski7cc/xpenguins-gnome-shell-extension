@@ -25,7 +25,7 @@ const _userDirectory = '.xpenguins';
 const _configFile = 'config';
 
 function sanitiseThemeName(name) {
-    return name.replace(/ /g,'_');
+    return name.replace(/ /g, '_');
 }
 
 function prettyThemeName(name) {
@@ -46,13 +46,9 @@ function listThemes() {
     let themes_dir, info, fileEnum, i,
         themeList = [],
         paths = [
-            GLib.build_filenamev([
-                GLib.get_home_dir(), 
-                this._userDirectory, 
-                this._themeDirectory]),
-            GLib.build_filenamev([
-                this._systemDirectory,
-                this._themeDirectory]) 
+            GLib.build_filenamev([GLib.get_home_dir(), _userDirectory,
+                _themeDirectory]),
+            GLib.build_filenamev([ _systemDirectory, _themeDirectory])
         ];
     for (i = 0; i < paths.length; ++i) {
         themes_dir = Gio.file_new_for_path(paths[i]);
@@ -65,7 +61,7 @@ function listThemes() {
         while ((info = fileEnum.next_file(null)) !== null) {
             let configFile = GLib.build_filenamev([themes_dir.get_path(),
                                                     info.get_name(),
-                                                    this._configFile]);
+                                                    _configFile]);
             if (GLib.file_test(configFile, GLib.FileTest.EXISTS)) {
                 themeList.push(info.get_name());
             }
@@ -94,7 +90,7 @@ function describeThemes(themes) {
         infos = {};
     while (th--) {
         theme = sanitiseThemeName(themes[th]);
-        loc = this.getThemePath(theme, 'about');
+        loc = getThemePath(theme, 'about');
         infos[theme] = {};
         if (!loc || !GLib.file_test(loc, GLib.FileTest.EXISTS)) {
             XPUtil.warn('Theme %s not found', theme);
@@ -153,18 +149,12 @@ function getThemeDir(iname) {
      * then in [xpenguins_dir]/themes
      */
     let name = sanitiseThemeName(iname),
-        dirs = [GLib.build_filenamev([
-                    GLib.get_home_dir(), 
-                    this._userDirectory, 
-                    this._themeDirectory, 
-                    name]),
-                GLib.build_filenamev([
-                      this._systemDirectory, 
-                      this._themeDirectory, 
-                      name])
+        dirs = [GLib.build_filenamev([GLib.get_home_dir(), _userDirectory,
+                    _themeDirectory, name]),
+                GLib.build_filenamev([_systemDirectory, _themeDirectory, name])
                ];
     for (let i = 0; i < dirs.length; ++i) {
-        if (GLib.file_test(GLib.build_filenamev([dirs[i], this._configFile]),
+        if (GLib.file_test(GLib.build_filenamev([dirs[i], _configFile]),
                             GLib.FileTest.EXISTS)) {
             return dirs[i];
         }
@@ -175,7 +165,7 @@ function getThemeDir(iname) {
 }
 
 function getThemePath(iname, fName) {
-    let dir = this.getThemeDir(iname);
-    return GLib.build_filenamev([dir, fName || this._configFile]);
+    let dir = getThemeDir(iname);
+    return GLib.build_filenamev([dir, fName || _configFile]);
 }
 

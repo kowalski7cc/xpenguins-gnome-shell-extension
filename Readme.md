@@ -19,27 +19,31 @@ To start/stop XPenguins, use the toggle.
 
 ### Theme
 XPenguins is themable, and you can have multiple themes running simultaneously. 
-Use the on/off toggle to toggle themes. 
-Clicking the 'help' button to the left of the theme will give you some more info on the theme and its creators.
-### Max Penguins
-This is the number of penguins running around on your screen. 
-By default, the number recommended by each theme is used.
-If you increase it to 999999999, don't complain to me if your computer crashes.
-### Ignore Popups
+Use the sliders to add or remove toons from each theme.
+Clicking the 'help' button to the left of the slider will give you some more info on the theme and its creators.
+### Ignore popups
 Whether popup windows (right click menu, tooltips) are considered solid to the toons.
-### Ignore Maximised
+### Ignore maximised windows
 Whether maximised windows (and windows underneath these) are ignored.
 Toons only run around on the region of your desktop not covered by windows, so if windows are maximised you won't get any toons. Ignoring maximised windows means you can enjoy toons even with maximised windows. They will only bump into windows that are visible and non-maximised.
-### Always on Visible Workspace
+### Ignore half-maximised windows
+If ignoring maximised windows is true, should we also ignore half-maximised windows (those that are maximised vertically or horizontally but not both)? This can be handy for people with big monitors who just use half-maximised windows all the time. **Only used if 'Ignore Maximised' is true.**
+### Always on visible workspace
 Whether toons stay on the workspace you started XPenguins on, or follow you around all your workspaces.
 ### Blood
 Whether to show animations with blood (for example in the original Penguin theme the 'splat' animation has blood).
 ### Angels
 Whether to show penguin angels floating up to heaven after dying.
-### God Mode
+### God mode
 Enabling "God mode" lets you squash (smite) toons by clicking on them.
+### Time between frames
+The time (in milliseconds) between each frame of the animation. By default the number specified by the theme is used (probably 60ms).
 ### Recalc Mode
 Ignore this. If you are suffering from severe performance issues AND you resize/move your windows really really often you can try switching this to "PAUSE" which will pause toons while you drag windows around. It probably won't make much difference at all.
+### Load Averaging
+This defines two thresholds; when the computer's load average (for example given by `uptime` or `top`) exceeds the lower threshold, toons will start to be killed. 
+When the load average exceeds the upper threshold, all toons will be killed.
+This checks the load average every 5 seconds.
 
 ---
 
@@ -103,14 +107,20 @@ Here are some known issues/limitations of the program (if you think you can fix 
 * Toons don't treat the message tray or gnome-shell menus/popups as solid. This is because XPenguins can only make toons interact with objects that the window manager knows about, and things created with GNOME-shell such as the message tray/notifications are not handled by the window manager.
 
 # Wish list
-Patches welcome!
+Patches welcome! (add wish list stuff as an 'enhancement' on the [Issues page](https://bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension/issues?status=new&status=open).
 
 - toons talk to each other with little speech bubbles
 - toons jump up and down when you get new mail
 - run xpenguins in a specified window instead of on the desktop (need some sort of window selector and listeners to signals for when the window moves)
-- when themes are added/removed whilst xpenguins is running, just remove/add the relevant toons to the already-running animation rather than restarting from the beginning.
-- instead of one '# penguins' slider, have one for each theme.
 - toons try to get to your cursor (???) --> climb up windows/turn into superman/etc in order to get there?
+
+---
+# Changelog
+
+v1.1:
+* added a slider to control load averaging: the lower limit is when toons start to be killed, and the upper is when all are killed.
+* added a slider to control animation speed
+* when changing options while XPenguins is sleeping, it will wake up to re-process them straight away.
 
 ---
 
@@ -122,5 +132,5 @@ Patches welcome!
   This is just helpful for me to do testing.
   It is also a lot more verbose than the release branches.
   Default branch is not guaranteed to be stable at *any* commit.
-* Bookmark 'themes' is an attempt to get on-the-fly theme loading and removing working such that the animation doesn't have to be restarted every time these change.
 * Bookmark 'windowed-mode' is an attempt to get windowed mode working, i.e. toons run around in a specified window.
+* I attempt to make new features with bookmarks instead of branches.

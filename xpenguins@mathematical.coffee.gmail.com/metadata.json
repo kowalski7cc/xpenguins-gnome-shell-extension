@@ -1,12 +1,11 @@
 {
  "extension-id": "xpenguins",
  "uuid": "xpenguins@mathematical.coffee.gmail.com",
- "settings-schema": "org.gnome.shell.extensions.xpenguins",
  "name": "xpenguins",
- "description": "A port of XPenguins to gnome-shell. See extension home page for explanation of configuration options",
+ "description": "A port of XPenguins to gnome-shell. See extension home page for explanation of configuration options.",
  "shell-version": [ 
      "3.2"
  ],
  "url": "https://bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension",
- "dev-version": "1.0"
+ "dev-version": "1.1"
 }
