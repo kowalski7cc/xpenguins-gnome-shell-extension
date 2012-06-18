@@ -5,9 +5,11 @@ const GLib     = imports.gi.GLib;
 const Gtk      = imports.gi.Gtk;
 const Lang     = imports.lang;
 const Mainloop = imports.mainloop;
+const Meta      = imports.gi.Meta;
 const Pango    = imports.gi.Pango;
 const St       = imports.gi.St;
 
+const AltTab    = imports.ui.altTab;
 const Main      = imports.ui.main;
 const ModalDialog = imports.ui.modalDialog;
 const PanelMenu = imports.ui.panelMenu;
@@ -49,6 +51,88 @@ function disable() {
 }
 
 //// Classes ////
+
+function WindowPickerDialog() {
+    this._init.apply(this, arguments);
+}
+
+WindowPickerDialog.prototype = {
+    __proto__: ModalDialog.ModalDialog.prototype,
+
+    _init: function () {
+        ModalDialog.ModalDialog.prototype._init.call(this,
+            {styleClass: 'modal-dialog'});
+
+        let monitor = global.screen.get_monitor_geometry(global.screen.get_primary_monitor()),
+            width   = Math.round(monitor.width * .6),
+            height  = Math.min(300, Math.round(monitor.height * .3));
+
+        /* title + icon */
+        let box = new St.BoxLayout();
+        box.add(new St.Label({text: _("Select which window to run XPenguins in, or 'Cancel' to use the Desktop:")}),
+                    {x_fill: true});
+        this.contentLayout.add(box, {x_fill: true});
+
+        /* scroll box */
+        this.scrollBox = new St.ScrollView({
+            x_fill: true,
+            y_fill: true,
+            width: width,
+            height: height
+        });
+        // automatic horizontal scrolling, no vertical scrolling
+        this.scrollBox.set_policy(Gtk.PolicyType.AUTOMATIC,
+            Gtk.PolicyType.NEVER);
+
+        /* thumbnails in scroll box (put in BoxLayout or else cannot see) */
+        let box = new St.BoxLayout();
+        // TODO: add 'desktop' window.
+        this._windows = global.get_window_actors().map(function (w) {
+            return w.meta_window;
+        });
+        /* filter out Nautilus desktop window */
+        this._windows = this._windows.filter(function (w) {
+            return w.window_type != Meta.WindowType.DESKTOP;
+        });
+        // TODO: add a desktop clone here but redirect to global.stage.
+        this._thumbnails = new AltTab.ThumbnailList(this._windows);
+        this._thumbnails.actor.get_allocation_box();
+        box.add(this._thumbnails.actor, {expand: true, x_fill: true, y_fill: true});
+        this.scrollBox.add_actor(box,
+            {expand: true, x_fill: true, y_fill: true});
+        this.contentLayout.add(this.scrollBox, {expand: true, x_fill: true, y_fill: true});
+        // need to call addClones at some point. it was called in _allocate ...
+
+        /* Cancel button */
+        this.setButtons([{
+            label: _("Cancel"),
+            action: Lang.bind(this, function () {
+                this._windowActivated(this._thumbnails, -1);
+            })
+        }]);
+	},
+
+    open: function() {
+        ModalDialog.ModalDialog.prototype.open.apply(this, arguments);
+        this._thumbnails.addClones(this.scrollBox.height);
+        this._thumbnails.connect('item-activated', Lang.bind(this, this._windowActivated));
+        this._thumbnails.connect('item-entered', Lang.bind(this, this._windowEntered));
+    },
+
+    _windowActivated: function (thumbnails, n) {
+        this.emit('window-selected', this._windows[n]);
+        this.close(global.get_current_time());
+    },
+
+    _windowEntered: function (thumbnails, n) {
+        this._thumbnails.highlight(n);
+    },
+
+     /* In case it is somehow destroyed without close() being called */
+    _onDestroy: function () {
+        this.emit('window-selected', null);
+    }
+};
 
 /* Popup dialog with scrollable text.
  * See InstallExtensionDialog in extensionSystem.js for an example.
@@ -710,6 +794,13 @@ XPenguinsMenu.prototype = {
             this._XPenguinsLoop.connect('load-averaging-kill', Lang.bind(this,
                 function () { this._items.loadAveraging.setBeingUsed(true, true); }));
         }
+        this._XPenguinsLoop.connect('xpenguins-stopped', Lang.bind(this,
+            function () {
+                this._items.start.setToggleState(false);
+                if (this._items.loadAveraging) {
+                    this._items.loadAveraging.setBeingUsed(false, false);
+                }
+            }));
 
         /* @@ debugging windowListener */
         this._windowListener = new WindowListener.WindowListener();
@@ -745,7 +836,9 @@ XPenguinsMenu.prototype = {
 
     _createMenu: function () {
         XPUtil.DEBUG('_createMenu');
-        let dummy;
+        let dummy,
+            defaults = XPenguins.XPenguinsLoop.prototype.defaultOptions(),
+            blacklist = XPenguins.getCompatibleOptions(true);
 
         /* clear the menu */
         this.menu.removeAll();
@@ -761,6 +854,13 @@ XPenguinsMenu.prototype = {
         this._themeMenu = new PopupMenu.PopupSubMenuMenuItem(_("Theme"));
         this.menu.addMenuItem(this._themeMenu);
 
+        /* choice of window */
+        if (!blacklist.onDesktop) {
+            this._items.onDesktop = new PopupMenu.PopupMenuItem(_("Running in: ") + _("Desktop"));
+            this._items.onDesktop.connect('activate', Lang.bind(this,
+                this._onChooseWindow));
+            this.menu.addMenuItem(this._items.onDesktop);
+        }
 
         /* options submenu */
         this._optionsMenu = new PopupMenu.PopupSubMenuMenuItem(_("Options"));
@@ -768,8 +868,6 @@ XPenguinsMenu.prototype = {
 
         /* ignore maximised, ignore popups, ignore half maximised, god mode,
          * always on visible workspace, angels, blood, verbose toggles */
-        let defaults = XPenguins.XPenguinsLoop.prototype.defaultOptions();
-        let blacklist = XPenguins.getCompatibleOptions(true);
         // remove windowPreview code in release branches
         blacklist.windowPreview = true;
         defaults.windowPreview = false;
@@ -920,6 +1018,26 @@ XPenguinsMenu.prototype = {
         if (n !== this._items.themes[sanitised_name].getValue()) {
             this._items.themes[sanitised_name].setValue(n);
         }
+    },
+
+    _onChooseWindow: function () {
+        XPUtil.DEBUG('[ext] _onChooseWindow');
+        let dialog = new WindowPickerDialog();
+        dialog.open(global.get_current_time());
+        dialog._windowSelectedID = dialog.connect('window-selected', Lang.bind(this, this._onWindowChosen));
+    },
+
+    _onWindowChosen: function (dialog, metaWindow) {
+        dialog.disconnect(dialog._windowSelectedID);
+        /* if meta window is null or has been destroyed in the meantime, use
+         * the desktop. */
+        this._items.onDesktop.set_text(_("Running in: ") +
+            (metaWindow ? metaWindow.get_title() : _("Desktop")));
+        // TODO: translate or not?
+        
+        this.XPenguinsLoop.onDesktop = (!metaWindow);
+        this.XPenguinsLoop.setWindow(metaWindow ? 
+            metaWindow.get_compositor_private() : global.stage);
     },
 
     _startXPenguins: function (item, state) {

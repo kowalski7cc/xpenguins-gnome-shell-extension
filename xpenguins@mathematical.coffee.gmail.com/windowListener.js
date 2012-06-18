@@ -46,9 +46,6 @@ function getCompatibleOptions(blacklist) {
         }
     }
 
-    /* disable windowed mode, not working yet */
-    list.onDesktop = blacklist || false;
-
     /* recalcMode needs grab-op-begin and grab-op-end for global.display,
      * not in GNOME 3.2 */
     list.recalcMode = !(GObject.signal_lookup('grab-op-begin', GObject.type_from_name('MetaDisplay')));
@@ -71,7 +68,6 @@ WindowListener.prototype = {
         ignoreMaximised: true,
         ignoreHalfMaximised: true,
         recalcMode: XPenguins.RECALC.ALWAYS,
-        onDesktop: true,
         onAllWorkspaces: false
     },
 
@@ -346,7 +342,7 @@ WindowListener.prototype = {
          * Just listen to notify::raise on all windows
          * (notify::focus-app fires twice so not that one.).
          */
-        if (!this.options.onDesktop || this.options.ignoreMaximised) {
+        if (this.options.ignoreMaximised) {
             this._listeningPerWindow = true;
             /* done in _onWindowAdded */
         }
@@ -485,6 +481,7 @@ WindowListener.prototype = {
             }
         } else {
             /* hide the toons & pause if we've switched to another workspace */
+            // TODO: toI or get_active_workspace_by_index() ?
             if (global.screen.get_workspace_by_index(toI) !==
                     this._XPenguinsWindow.get_workspace()) {
                 this.pause(true, global.window_manager, 'switch-workspace',
@@ -534,9 +531,7 @@ WindowListener.prototype = {
          * but sometimes it needs a Mainloop.idle_add before it works properly.
          * If I re-sort them it all seems to go fine.
          */
-        if (!this.options.onDesktop || this.options.ignoreMaximised) {
-            winList = global.display.sort_windows_by_stacking(winList);
-        }
+        winList = global.display.sort_windows_by_stacking(winList);
 
         /* iterate through backwards: every window up to winList[i] == winActor
          * has a chance of being on top of you. Once you hit winList[i] ==
@@ -556,8 +551,7 @@ WindowListener.prototype = {
              * or once you hit a half-maximised window (if ignoreMax & halfMax)
              */
             let max = winList[i].get_maximized();
-            if ((!this.options.onDesktop && winList[i] ===
-                    this._XPenguinsWindow.meta_window) ||
+            if ((winList[i] === this._XPenguinsWindow.meta_window) ||
                     (this.options.ignoreMaximised &&
                         ((this.options.ignoreHalfMaximised && max) ||
                          (max === (Meta.MaximizeFlags.HORIZONTAL | Meta.MaximizeFlags.VERTICAL))

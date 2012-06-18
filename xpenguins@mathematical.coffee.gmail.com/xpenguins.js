@@ -56,7 +56,6 @@ function getCompatibleOptions(blacklist) {
             list[opt] = !blacklist;
         }
     }
-    list.onDesktop = blacklist || false; // for now we can't do windowed mode.
     list.rectangularWindows = blacklist || false; // for now no shaped windows
     /* see if we can do load averaging */
     list.loadAveraging = XPUtil.loadAverage() >= 0;
@@ -202,7 +201,6 @@ XPenguinsLoop.prototype = {
                                   // but not 'window-added'.
             squish : false, // squish toons with the mouse.
             onAllWorkspaces: false, // what happens when we switch workspaces.
-            onDesktop: true, // whether we're running in windowed mode.
 
             /* possible efficiency gain (really, don't bother changing it).
              * Technically in order of most efficient to least:
@@ -425,13 +423,72 @@ XPenguinsLoop.prototype = {
         } // whether to add or delete toons
     },
 
+    /******
+     * onDesktop
+     *******/
+    setWindow: function(metaWindow) {
+        let playing = this._playing;
+        if (playing) {
+            this.stop(true);
+        }
+        this._XPenguinsWindow = metaWindow;
+
+        /* get_workspace if it's global.stage */
+        let tmp = this.options.onAllWorkspaces;
+        this.options.onAllWorkspaces = null;
+        this.changeOption('onAllWorkspaces', tmp);
+
+        this._onDesktop = (metaWindow instanceof Meta.Window);
+
+        /* disable 'on all workspaces' */
+        this.options.onAllWorkspaces = false;
+
+        if (playing) {
+            this.start();
+        }
+    },
+
+    //BIG UPTO: windowListener has no use for onDesktop. that should be handled
+    //in XPenguins Loop !!!!!!!!!!!!
+    _onXPenguinsWindowMinimized: function () {
+        // UPTO: minimized && !paused already!
+        if (this._XPenguinsWindow.minimized) {
+            this._disconnectTrackedSignals(this._resumeSignal);
+            this.pause(false, this._XPenguinsWindow, 'notify::minimized',
+                    Lang.bind(this, this._onXPenguinsWindowMinimized));
+            return false;
+        }
+        return true; // resume.
+    },
+
+    /* hide if it's not the active workspace, and reassign get_workspace? */
+    _onXPenguinsWindowWorkspaceChanged: function (metaWin, oldWorkspace) {
+        // reassign get_workspace and fire this._onWorkspaceChanged
+        // Hmm - get_workspace is guaranteed to be current anyhow since
+        // this is only fired if we are using XPenguinsWindow as a window.
+        WindowListener._onWorkspaceChanged.call(this, null,
+            global.screen.get_active_workspace_index());
+        // but pretend we're switching *to* the current?
+        this._onWorkspaceChanged(null, global.screen.get_active_workspace_index(),
+            global.screen.get_active_workspace_index());
+    },
+    // UPTO: maybe we should inherit from windowListener?
+    // if we handle onAllWorkspaces here we're going to mix up all the window signals
+    // with the xpenguins loop which is not nice conceptually.
+
+    /* stop and send a signal */
+    _onXPenguinsWindowDestroyed: function () {
+        this.stop(true);
+        this.emit('xpenguins-stopped');
+    },
+
     /******************
      * START STOP ETC *
      * ****************/
     /* when you send the stop signal to xpenguins (through the toggle) */
-    stop: function () {
+    stop: function (immediately) {
         XPUtil.DEBUG('[XP] STOP');
-        this._onInterrupt();
+        this._onInterrupt(immediately);
     },
 
     /* when you really want to kill xpenguins
@@ -478,16 +535,19 @@ XPenguinsLoop.prototype = {
     },
 
     /* stop xpenguins, but play the exit sequence */
-    _onInterrupt: function () {
+    _onInterrupt: function (justExit) {
         XPUtil.DEBUG(_("Interrupt received: Exiting."));
 
         /* tell the loop to start the exit sequence */
         this._exiting = true;
         this._setTotalNumber(0, true); // don't emit signal or sliders go to 0.
-        /* If we're sleeping then just quit immediately. */
+        /* If we're sleeping then quit immediately */
         if (this._sleepID) {
             Mainloop.source_remove(this._sleepID);
             this._sleepID = null;
+            this.exit();
+        } else if (justExit) {
+        /* If emergency exit requested then quit immediately */
             this.exit();
         }
     },
@@ -581,8 +641,8 @@ XPenguinsLoop.prototype = {
         /* If they set onAllWorkspaces but are running in a window,
          * unset onAllWorkspaces
          */
-        if (opt.onAllWorkspaces && !opt.onDesktop) {
-            XPUtil.DEBUG(_("Warning: onAllWorkspaces is TRUE but running in a window, setting onAllWorkspaces to FALSE"));
+        if (opt.onAllWorkspaces && !this._onDesktop) {
+            XPUtil.warn(_("Warning: onAllWorkspaces is TRUE but running in a window, setting onAllWorkspaces to FALSE"));
             opt.onAllWorkspaces = false;
         }
 
@@ -615,15 +675,13 @@ XPenguinsLoop.prototype = {
          * (has not been implemented yet besides global.stage).
          * _XPenguinsWindow is the *actor*.
          */
-        if (!opt.onDesktop) {
-            XPUtil.DEBUG('WINDOWED MODE: not yet implemented, running on desktop');
-            opt.onDesktop = true;
-        }
-        this._XPenguinsWindow = global.stage;
-        let tmp = this.options.onAllWorkspaces;
-        this.options.onAllWorkspaces = null;
-        /* do appropriate config for onAllWorkspaces */
-        this.changeOption('onAllWorkspaces', tmp);
+        if (this._onDesktop) {
+            this._XPenguinsWindow = global.stage;
+            let tmp = this.options.onAllWorkspaces;
+            this.options.onAllWorkspaces = null;
+            /* do appropriate config for onAllWorkspaces */
+            this.changeOption('onAllWorkspaces', tmp);
+        } // otherwise, we assume setWindow has been called.
 
         /* set up god mode */
         if (opt.squish) {
@@ -643,6 +701,11 @@ XPenguinsLoop.prototype = {
     },
 
     changeOption: function (propName, propVal) {
+        /* disallowed options changes */
+        if (propName === 'onAllWorkspaces' && this._onDesktop) {
+            XPUtil.warn(_("Cannot use the on all workspaces option if running in a window"));
+            return;
+        }
         /* Window tracking-specific options */
         if (WindowListener.options.hasOwnProperty(propName)) {
             WindowListener.changeOption.call(this, propName, propVal);
@@ -690,20 +753,40 @@ XPenguinsLoop.prototype = {
      * snapshot of what the windows on the workspace look like
      */
     _connectSignals: function () {
+        /* Extra signals to add if we're running XPenguins in a window:
+         * window changes workspace
+         * window is closed (stop window listener)
+         * window is minimized (pause) or unminimized (resume)
+         */
+        if (!this._onDesktop) {
+            this._listeningPerWindow = true;
+            this._connectAndTrack(this._XPenguinsWindow, this._XPenguinsWindow,
+                'notify::minimized', Lang.bind(this, this._onXPenguinsWindowMinimized));
+            this._connectAndTrack(this._XPenguinsWindow, this._XPenguinsWindow,
+                'workspace-changed', Lang.bind(this, this._onXPenguinsWindowWorkspaceChanged));
+            this._connectAndTrack(this._XPenguinsWindow, this._XPenguinsWindow,
+                'destroy', Lang.bind(this, this._onXPenguinsWindowDestroyed));
+        }
         WindowListener._connectSignals.apply(this, arguments);
     },
+
     _disconnectSignals: function () {
         WindowListener._disconnectSignals.apply(this, arguments);
+        this._disconnectTrackedSignals(this._XPenguinsWindow);
     },
+
     _updateSignals: function () {
         WindowListener._updateSignals.apply(this, arguments);
     },
+
     _onWindowAdded: function () {
         WindowListener._onWindowAdded.apply(this, arguments);
     },
+
     _onWindowRemoved: function () {
         WindowListener._onWindowRemoved.apply(this, arguments);
     },
+
     _onWorkspaceChanged: function () {
         WindowListener._onWorkspaceChanged.apply(this, arguments);
     },
