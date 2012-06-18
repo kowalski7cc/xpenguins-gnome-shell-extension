@@ -9,12 +9,12 @@ const Shell = imports.gi.Shell;
 const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
 
-const Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-const ThemeManager = Me.themeManager;
-const Toon   = Me.toon;
-const WindowListener = Me.windowListener;
-const XPenguins = Me.xpenguins;
-const XPUtil = Me.util;
+const Me = imports.misc.extensionUtils.getCurrentExtension();
+const ThemeManager = Me.imports.themeManager;
+const Toon   = Me.imports.toon;
+const WindowListener = Me.imports.windowListener;
+const XPenguins = Me.imports.xpenguins;
+const XPUtil = Me.imports.util;
 
 /***********************
  *    Theme Object     *

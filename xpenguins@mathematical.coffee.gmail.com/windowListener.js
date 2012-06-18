@@ -5,9 +5,9 @@ const Mainloop = imports.mainloop;
 const Meta    = imports.gi.Meta;
 const Shell   = imports.gi.Shell;
 
-const Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-const Region = Me.region;
-const XPUtil = Me.util;
+const Me = imports.misc.extensionUtils.getCurrentExtension();
+const Region = Me.imports.region;
+const XPUtil = Me.imports.util;
 
 /* Handy */
 const WINDOW_COLOR = new Clutter.Color({blue: 255, red: 255, green: 255, alpha: 100});

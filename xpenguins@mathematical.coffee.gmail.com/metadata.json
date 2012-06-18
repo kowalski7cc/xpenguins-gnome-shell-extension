@@ -4,7 +4,7 @@
  "name": "xpenguins",
  "description": "A port of XPenguins to gnome-shell. See extension home page for explanation of configuration options.",
  "shell-version": [ 
-     "3.2"
+     "3.4"
  ],
  "url": "https://bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension",
  "dev-version": "1.1"

@@ -18,8 +18,8 @@ const Lang = imports.lang;
 const Gettext = imports.gettext.domain('gnome-shell-extensions');
 const _ = Gettext.gettext;
 
-const Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-const XPUtil = Me.util;
+const Me = imports.misc.extensionUtils.getCurrentExtension();
+const XPUtil = Me.imports.util;
 
 /* Constants (toon.h) */
 const UNASSOCIATED = -2;
