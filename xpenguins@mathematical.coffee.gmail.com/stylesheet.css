@@ -1,7 +1,60 @@
+.xpenguins-icon {
+}
+
+/* About dialog */
 .xpenguins-about-title {
     font-weight: bold;
     font-size: 1.5em;
+    padding-left: 0.4em;
+    padding-right: 0.4em;
+}
+
+.xpenguins-about-icon {
+    icon-size: 1.5em;
 }
 
 .xpenguins-about-text {
+    font-size: 1.2em;
+}
+
+
+/* Slider items */
+.slider-menu-item-top-box {
+    padding-left: 0em;
+    padding-right: 1.75em;
+}
+
+.slider-menu-item-bottom-box {
+    padding-left: 0em;
+    padding-right: 0em;
+}
+
+.theme-slider-menu-item-slider {
+    padding-left: 0.5em;
+    padding-right: 0em;
+}
+
+.theme-slider-menu-item-label {
+    padding-left: 0.5em;
+}
+
+.double-slider-menu-item-top-box {
+}
+
+.double-slider-menu-item-bottom-box {
+}
+
+.double-slider-menu-item-number-label {
+    color: #999;
+}
+
+.double-slider-menu-item-label {
+    text-align: center;
+}
+
+/* Load averaging */
+.xpenguins-load-averaging {
+}
+.xpenguins-load-averaging:loadAveragingActive {
+    color: red;
 }
