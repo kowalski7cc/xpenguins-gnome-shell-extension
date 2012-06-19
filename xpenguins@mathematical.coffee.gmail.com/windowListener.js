@@ -227,7 +227,8 @@ WindowListener.prototype = {
         if (propName === 'onAllWorkspaces') {
             if (this._XPenguinsWindow instanceof Meta.WindowActor) {
                 this._XPenguinsWindow.get_workspace =
-                    this._XPenguinsWindow.meta_window.get_workspace;
+                    Lang.bind(this._XPenguinsWindow.meta_window,
+                        this._XPenguinsWindow.meta_window.get_workspace);
             } else {
                 /* just to initially connect the window's workspace to listen
                  * to window-added & window-removed events

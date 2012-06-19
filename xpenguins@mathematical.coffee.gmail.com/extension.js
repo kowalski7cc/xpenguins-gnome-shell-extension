@@ -764,7 +764,6 @@ XPenguinsMenu.prototype = {
             ignoreMaximised    : _("Ignore maximised windows"),
             ignoreHalfMaximised: _(".. and half-maximised too"),
             onAllWorkspaces    : _("Always on visible workspace"),
-            onDesktop          : _("Run on desktop"), // not fully implemented
             blood              : _("Show blood"),
             angels             : _("Show angels"),
             squish             : _("God Mode"),
@@ -772,7 +771,7 @@ XPenguinsMenu.prototype = {
         };
         this._ABOUT_ORDER = ['name', 'date', 'artist', 'copyright',
             'license', 'maintainer', 'location', 'comment'];
-        this._THEME_STRING_LENGTH_MAX = 15;
+        this._THEME_STRING_LENGTH_MAX = 30;
 
         /* Create menus */
         this._createMenu();
@@ -1028,15 +1027,18 @@ XPenguinsMenu.prototype = {
     },
 
     _onWindowChosen: function (dialog, metaWindow) {
+        XPUtil.DEBUG('window chosen: ' + metaWindow);
         dialog.disconnect(dialog._windowSelectedID);
         /* if meta window is null or has been destroyed in the meantime, use
          * the desktop. */
-        this._items.onDesktop.set_text(_("Running in: ") +
-            (metaWindow ? metaWindow.get_title() : _("Desktop")));
-        // TODO: translate or not?
+        let string = _("Running in: ") + (metaWindow ? metaWindow.get_title() :
+            _("Desktop"));
+        if (string.length > this._THEME_STRING_LENGTH_MAX) {
+            string = string.substr(0, this._THEME_STRING_LENGTH_MAX - 3) + '...';
+        }
+        this._items.onDesktop.label.set_text(string);
         
-        this.XPenguinsLoop.onDesktop = (!metaWindow);
-        this.XPenguinsLoop.setWindow(metaWindow ? 
+        this._XPenguinsLoop.setWindow(metaWindow ? 
             metaWindow.get_compositor_private() : global.stage);
     },
 

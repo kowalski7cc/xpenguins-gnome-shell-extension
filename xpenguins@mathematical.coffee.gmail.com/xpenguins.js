@@ -2,6 +2,7 @@ const Clutter  = imports.gi.Clutter;
 const GLib     = imports.gi.GLib;
 const Lang     = imports.lang;
 const Mainloop = imports.mainloop;
+const Meta     = imports.gi.Meta;
 const Shell    = imports.gi.Shell;
 const Signals  = imports.signals;
 
@@ -21,6 +22,7 @@ const Theme  = Me.theme;
 const ThemeManager = Me.themeManager;
 const Toon   = Me.toon;
 // this is how we'll keep in sync with this functionality for now.
+const WindowClone = Me.windowClone;
 const WindowListener = Me.windowListener.WindowListener.prototype;
 const XPUtil = Me.util;
 
@@ -143,6 +145,7 @@ XPenguinsLoop.prototype = {
 
     /* add ToonDatas to the stage so clones can be added properly */
     _addToonDataToStage: function (theme) {
+        XPUtil.DEBUG('Add toon data to stage');
         let genii = [];
         if (theme === ALL) {
             /* do all */
@@ -163,7 +166,7 @@ XPenguinsLoop.prototype = {
                      * container of type '...', but the actor already has
                      * a parent of type '...'.
                      */
-                    Main.uiGroup.add_actor(gdata[type].texture);
+                    this._XPenguinsWindow.add_actor(gdata[type].texture);
                     gdata[type].texture.hide();
                 }
             }
@@ -378,7 +381,7 @@ XPenguinsLoop.prototype = {
                     /* make a new toon */
                     idx = this._toons.push(new Toon.Toon(this._toonGlobals,
                         {genus: genii[genus]})) - 1;
-                    Main.layoutManager.addChrome(this._toons[idx].actor);
+                    this._XPenguinsWindow.add_actor(this._toons[idx].actor);
                 }
                 this._toons[idx].theme = name;
                 if (this.options.squish) {
@@ -426,22 +429,34 @@ XPenguinsLoop.prototype = {
     /******
      * onDesktop
      *******/
-    setWindow: function(metaWindow) {
+    setWindow: function(winActor) {
         let playing = this._playing;
         if (playing) {
             this.stop(true);
         }
-        this._XPenguinsWindow = metaWindow;
+        this._oldXPenguinsWindow = winActor;
 
-        /* get_workspace if it's global.stage */
+        this._onDesktop = !(winActor instanceof Meta.WindowActor);
+
+        /* make a clone */
+        this.options.onAllWorkspaces = this.options.onAllWorkspaces && this._onDesktop;
+        this._XPenguinsWindow = new WindowClone.XPenguinsWindow(winActor,
+            this.options.onAllWorkspaces);
+        
+        //Main.layoutManager.addChrome(this._XPenguinsWindow.actor);
+        global.stage.add_actor(this._XPenguinsWindow.actor);
+        // For some reason I can't addChrome this. I think it's because it might
+        // change size depending on where the children are?
+        // Also, need clip to allocation box.
+
+        /* if !onDesktop, set onAllWorkspaces to false.
+         * if  onDesktop, set onAllWorkspaces to whatever it used to be */
+        /*
         let tmp = this.options.onAllWorkspaces;
         this.options.onAllWorkspaces = null;
-        this.changeOption('onAllWorkspaces', tmp);
-
-        this._onDesktop = (metaWindow instanceof Meta.Window);
-
-        /* disable 'on all workspaces' */
-        this.options.onAllWorkspaces = false;
+        this.changeOption('onAllWorkspaces', tmp && this._onDesktop);
+        */
+        // TODO: update toggle.
 
         if (playing) {
             this.start();
@@ -452,9 +467,9 @@ XPenguinsLoop.prototype = {
     //in XPenguins Loop !!!!!!!!!!!!
     _onXPenguinsWindowMinimized: function () {
         // UPTO: minimized && !paused already!
-        if (this._XPenguinsWindow.minimized) {
+        if (this._XPenguinsWindow.meta_window.minimized) {
             this._disconnectTrackedSignals(this._resumeSignal);
-            this.pause(false, this._XPenguinsWindow, 'notify::minimized',
+            this.pause(false, this._XPenguinsWindow.meta_window, 'notify::minimized',
                     Lang.bind(this, this._onXPenguinsWindowMinimized));
             return false;
         }
@@ -577,7 +592,7 @@ XPenguinsLoop.prototype = {
         /* remove toons from stage & destroy */
         i = this._toons.length;
         while (i--) {
-            Main.layoutManager.removeChrome(this._toons[i].actor);
+            this._XPenguinsWindow.remove_actor(this._toons[i].actor);
             this._toons[i].destroy();
         }
 
@@ -588,11 +603,16 @@ XPenguinsLoop.prototype = {
                 for (let type in gdata) {
                     if (gdata.hasOwnProperty(type) &&
                             !this._theme.toonData[i][type].master) {
-                        Main.uiGroup.remove_actor(gdata[type].texture);
+                        this._XPenguinsWindow.remove_actor(gdata[type].texture);
                     }
                 }
             }
         }
+
+        //Main.layoutManager.removeChrome(this._XPenguinsWindow.actor);
+        global.stage.remove_actor(this._XPenguinsWindow.actor);
+        /* destroy the window clone */
+        this._XPenguinsWindow.destroy();
 
         /* destroy theme */
         if (this._theme) {
@@ -631,7 +651,6 @@ XPenguinsLoop.prototype = {
         this._cycle = 0;
         this._tempFRAMENUMBER = 0;
         this._exiting = false;
-        this._XPenguinsWindow = null;
 
         this._dirty = true;
         this._listeningPerWindow = false;
@@ -675,13 +694,7 @@ XPenguinsLoop.prototype = {
          * (has not been implemented yet besides global.stage).
          * _XPenguinsWindow is the *actor*.
          */
-        if (this._onDesktop) {
-            this._XPenguinsWindow = global.stage;
-            let tmp = this.options.onAllWorkspaces;
-            this.options.onAllWorkspaces = null;
-            /* do appropriate config for onAllWorkspaces */
-            this.changeOption('onAllWorkspaces', tmp);
-        } // otherwise, we assume setWindow has been called.
+        this.setWindow(this._XPenguinsWindow || global.stage);
 
         /* set up god mode */
         if (opt.squish) {
@@ -706,6 +719,7 @@ XPenguinsLoop.prototype = {
             XPUtil.warn(_("Cannot use the on all workspaces option if running in a window"));
             return;
         }
+        // TODO: phase out windowListener
         /* Window tracking-specific options */
         if (WindowListener.options.hasOwnProperty(propName)) {
             WindowListener.changeOption.call(this, propName, propVal);
@@ -760,11 +774,11 @@ XPenguinsLoop.prototype = {
          */
         if (!this._onDesktop) {
             this._listeningPerWindow = true;
-            this._connectAndTrack(this._XPenguinsWindow, this._XPenguinsWindow,
+            this._connectAndTrack(this._XPenguinsWindow, this._XPenguinsWindow.meta_window,
                 'notify::minimized', Lang.bind(this, this._onXPenguinsWindowMinimized));
-            this._connectAndTrack(this._XPenguinsWindow, this._XPenguinsWindow,
+            this._connectAndTrack(this._XPenguinsWindow, this._XPenguinsWindow.meta_window,
                 'workspace-changed', Lang.bind(this, this._onXPenguinsWindowWorkspaceChanged));
-            this._connectAndTrack(this._XPenguinsWindow, this._XPenguinsWindow,
+            this._connectAndTrack(this._XPenguinsWindow, this._XPenguinsWindow.meta_window,
                 'destroy', Lang.bind(this, this._onXPenguinsWindowDestroyed));
         }
         WindowListener._connectSignals.apply(this, arguments);
@@ -959,6 +973,7 @@ XPenguinsLoop.prototype = {
          * \sum{this._numbers} <-> npenguins
          * this._toons.length - this._deadToons.length <-> penguin_number
          */
+        XPUtil.DEBUG("toon 0: %d, %d", this._toons[0].x, this._toons[0].y);
         i = this._toons.length;
         while (i--) {
             /* skip dead toons */
