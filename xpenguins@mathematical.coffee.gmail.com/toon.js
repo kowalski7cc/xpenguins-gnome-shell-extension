@@ -153,9 +153,10 @@ Toon.prototype = {
         this.data = this._globals.toonData[this.genus][this.type];
         this.direction = XPUtil.RandInt(2);
         this.setType('faller', this.direction, UNASSOCIATED);
+        let geom = this._globals.XPenguinsWindow.get_box();
         this.actor.set_position(
-            XPUtil.RandInt(this._globals.XPenguinsWindow.get_width() - this.data.width),
-            1 - this.data.height
+            XPUtil.RandInt(geom.width - this.data.width) + geom.left,
+            1 - this.data.height + geom.top
         );
         this.setAssociation(UNASSOCIATED);
         this.setVelocity(this.direction * 2 - 1, this.data.speed);
@@ -237,23 +238,26 @@ Toon.prototype = {
     /* Returns 1 if the toon is blocked in the specified direction,
      * 0 if not blocked and -1 if the direction argument was out of bounds
      * ToonBlocked
+     * I.e. cannot move any further in that direction.
      */
     blocked: function (direction) {
+        let box = this._globals.XPenguinsWindow.get_box();
+        // NOTE: right and bottom are inclusive of the last pixel.
         if (this._globals.edge_block) {
             if (direction === LEFT) {
-                if (this.x <= 0) {
+                if (this.x <= box.left) {
                     return 1;
                 }
             } else if (direction === RIGHT) {
-                if (this.x + this.data.width >= this._globals.XPenguinsWindow.get_width()) {
+                if (this.x + this.data.width >= box.right) {
                     return 1;
                 }
             } else if (direction === UP) {
-                if (this.y <= 0) {
+                if (this.y <= box.top) {
                     return 1;
                 }
             } else if (direction === DOWN) {
-                if (this.y + this.data.height >= this._globals.XPenguinsWindow.get_height()) {
+                if (this.y + this.data.height >= box.bottom) {
                     return 1;
                 }
             } // switch(direction)
@@ -283,16 +287,16 @@ Toon.prototype = {
     /* Returns true the toon would be in an occupied area
      * if moved by xoffset and yoffset, false otherwise.
      * ToonOffsetBlocked
+     * TODO: <= vs < !!
      */
     offsetBlocked: function (xoffset, yoffset) {
+        let box = this._globals.XPenguinsWindow.get_box();
         if (this._globals.edge_block) {
-            if ((this.x + xoffset <= 0) ||
-                    (this.x + this.data.width + xoffset >=
-                        this._globals.XPenguinsWindow.get_width()) ||
-                    ((this.y + yoffset <= 0) && this._globals.edge_block
-                        !== SIDEBOTTOMBLOCK) ||
-                    (this.y + this.data.height + yoffset
-                        >= this._globals.XPenguinsWindow.get_height())) {
+            if ((this.x + xoffset < box.left) ||
+                    (this.x + this.data.width + xoffset > box.right) ||
+                    ((this.y + yoffset < box.top) &&
+                         this._globals.edge_block !== SIDEBOTTOMBLOCK) ||
+                    (this.y + this.data.height + yoffset > box.bottom)) {
                 return true;
             }
         }
@@ -454,27 +458,27 @@ Toon.prototype = {
             newx = this.x + this.u,
             newy = this.y + this.v,
             stationary = (this.u === 0 && this.v === 0),
-            result = OK;
+            result = OK,
+            box = this._globals.XPenguinsWindow.get_box();
 
         if (this._globals.edge_block) {
-            if (newx < 0) {
-                newx = 0;
+            if (newx < box.left) {
+                newx = box.left;
                 result = PARTIALMOVE;
-            } else if (newx + this.data.width >
-                    this._globals.XPenguinsWindow.get_width()) {
-                newx = this._globals.XPenguinsWindow.get_width() - this.data.width;
+            } else if (newx + this.data.width > box.right) {
+                newx = box.right - this.data.width;
                 result = PARTIALMOVE;
             }
         }
         if (!(this.data.conf & NOBLOCK)) {
             /* Consider all blocking: additionally y */
             if (this._globals.edge_block) {
-                if (newy < 0 && this._globals.edge_block !== SIDEBOTTOMBLOCK) {
-                    newy = 0;
+                if (newy < box.top && 
+                        this._globals.edge_block !== SIDEBOTTOMBLOCK) {
+                    newy = box.top;
                     result = PARTIALMOVE;
-                } else if (newy + this.data.height >
-                        this._globals.XPenguinsWindow.get_height()) {
-                    newy = this._globals.XPenguinsWindow.get_height() - this.data.height;
+                } else if (newy + this.data.height > box.bottom) {
+                    newy = box.bottom - this.data.height;
                     result = PARTIALMOVE;
                 }
                 if (newx === this.x && newy === this.y && !stationary) {

@@ -4,45 +4,49 @@ const Meta    = imports.gi.Meta;
 const Signals = imports.signals;
 
 /* XPenguinsWindow.
- * Makes a Clutter.Group that shadows the window it is meant to clone, moving
- * and resizing with it.
- *
- * You add the Clutter.Group via Main.layoutManager.addChrome, and you add the
- * toons to the Clutter.Group.
- *
- * It's a bit of a polyglot depending on whether the window we clone is a
- * Meta.Window or a Clutter.Stage.
+ * all it is is a wrapper around the polyglot bits:
+ * get_workspace and retrieving the proper x/y/width/height
+ * (recall that MetaWindowActors have a slightly off x/y/width/height)
  */
-// FIXME: cannot interact with window while the group is on top.
-// And, the toons don't seem to be positioned relative to it?
 function XPenguinsWindow() {
     this._init.apply(this, arguments);
 }
 
 XPenguinsWindow.prototype = {
     _init: function (baseWindow, onAllWorkspaces) {
-        this._realWindowSignals = [];
-        this.realWindow = null;
-        this.meta_window = null;
-
-        this.actor = new Clutter.Group();
-        this.realWindow = baseWindow;
-        this.meta_window = baseWindow.meta_window;
-        this.actor._delegate = this;
+        this.actor = baseWindow;
+        this._destroyID = this.actor.connect('destroy', Lang.bind(this, this._onDestroy));
 
         if (baseWindow instanceof Meta.WindowActor) {
-            /* connect signals */
-            this._realWindowSignals.push(this.realWindow.connect('position-changed',
-                Lang.bind(this, this._onPositionChanged)));
-            this._realWindowSignals.push(this.realWindow.connect('size-changed',
-                Lang.bind(this, this._onSizeChanged)));
-            this._onPositionChanged();
-            this._onSizeChanged();
+            this.meta_window = this.actor.meta_window;
             this.get_workspace = Lang.bind(this.meta_window,
                 this.meta_window.get_workspace);
+
+            // NOTE: right and bottom are inclusive of the last pixel.
+            /* position, width, height must come from the meta window */
+            this.get_box = Lang.bind(this, function () {
+                let rect = this.meta_window.get_outer_rect();
+                return { 
+                    left: rect.x,
+                    right: rect.x + rect.width - 1,
+                    top: rect.y,
+                    bottom: rect.y + rect.height - 1,
+                    width: rect.width,
+                    height: rect.height,
+                };
+            });
         } else {
-            this.actor.set_position(baseWindow.x, baseWindow.y);
-            this.actor.set_size(baseWindow.width, baseWindow.height);
+            /* position, width, height come from the actor */
+            this.get_box = Lang.bind(this, function () {
+                return { 
+                    left: this.actor.x,
+                    right: this.actor.x + this.actor.width - 1,
+                    top: this.actor.y,
+                    bottom: this.actor.y + this.actor.height - 1,
+                    width: this.actor.width,
+                    height: this.actor.height,
+                };
+            });
             if (onAllWorkspaces) {
                 // always return the 'current' workspace
                 this.get_workspace = Lang.bind(global.screen,
@@ -55,64 +59,19 @@ XPenguinsWindow.prototype = {
                 }
             }
         }
-        this._realWindowSignals.push(this.realWindow.connect('destroy',
-            Lang.bind(this, this._onDestroy)));
-        this.actor.connect('destroy', Lang.bind(this, this._onDestroy));
-        // TODO: raise to top?
-    },
-
-    // TODO: connect up *all* window signals.
-
-    // TODO: only update every frame to make things quicker?
-    /* have to use get_outer_rect() because WindowActors have padding */
-    _onPositionChanged: function () {
-        let rect = this.meta_window.get_outer_rect();
-        this.actor.set_position(rect.x, rect.y);
-    },
-
-    _onSizeChanged: function () {
-        let rect = this.meta_window.get_outer_rect();
-        this.actor.set_size(rect.width, rect.height);
-    },
-
-    _disconnectRealWindowSignals: function () {
-        let i = this._realWindowSignals.length;
-        while (i--) {
-            this.realWindow.disconnect(this._realWindowSignals[i]);
-        }
-        this._realWindowSignals = [];
+        this.actor._delegate = this;
     },
 
     _onDestroy: function () {
-        /* disconnect signals, remove references */
-        this._disconnectRealWindowSignals();
+        /* remove references */
+        this.meta_window = null;
+        this.actor.disconnect(this._destroyID);
+        this._destroyID = null;
         this.actor._delegate = null;
-        this.disconnectAll(); // <-- ???
+        this.actor = null;
     },
    
-    // TODO: destroy clone on stopping xpenguins 
     destroy: function () {
-        this.actor.destroy();
-    },
-
-    get_width: function () {
-        return this.actor.get_width();
-    },
-
-    get_height: function () {
-        return this.actor.get_height();
-    },
-
-    get_position: function () {
-        return this.actor.get_position();
-    },
-
-    add_actor: function (act) {
-        this.actor.add_actor(act);
-    },
-
-    remove_actor: function (act) {
-        this.actor.remove_actor(act);
+        this._onDestroy();
     }
 };
-Signals.addSignalMethods(XPenguinsWindow.prototype);

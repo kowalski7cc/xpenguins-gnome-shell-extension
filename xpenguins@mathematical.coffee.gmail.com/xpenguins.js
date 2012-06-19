@@ -166,7 +166,7 @@ XPenguinsLoop.prototype = {
                      * container of type '...', but the actor already has
                      * a parent of type '...'.
                      */
-                    this._XPenguinsWindow.add_actor(gdata[type].texture);
+                    Main.uiGroup.add_actor(gdata[type].texture);
                     gdata[type].texture.hide();
                 }
             }
@@ -381,7 +381,7 @@ XPenguinsLoop.prototype = {
                     /* make a new toon */
                     idx = this._toons.push(new Toon.Toon(this._toonGlobals,
                         {genus: genii[genus]})) - 1;
-                    this._XPenguinsWindow.add_actor(this._toons[idx].actor);
+                    Main.layoutManager.addChrome(this._toons[idx].actor);
                 }
                 this._toons[idx].theme = name;
                 if (this.options.squish) {
@@ -443,12 +443,6 @@ XPenguinsLoop.prototype = {
         this._XPenguinsWindow = new WindowClone.XPenguinsWindow(winActor,
             this.options.onAllWorkspaces);
         
-        //Main.layoutManager.addChrome(this._XPenguinsWindow.actor);
-        global.stage.add_actor(this._XPenguinsWindow.actor);
-        // For some reason I can't addChrome this. I think it's because it might
-        // change size depending on where the children are?
-        // Also, need clip to allocation box.
-
         /* if !onDesktop, set onAllWorkspaces to false.
          * if  onDesktop, set onAllWorkspaces to whatever it used to be */
         /*
@@ -592,7 +586,7 @@ XPenguinsLoop.prototype = {
         /* remove toons from stage & destroy */
         i = this._toons.length;
         while (i--) {
-            this._XPenguinsWindow.remove_actor(this._toons[i].actor);
+            Main.layoutManager.removeChrome(this._toons[i].actor);
             this._toons[i].destroy();
         }
 
@@ -603,14 +597,12 @@ XPenguinsLoop.prototype = {
                 for (let type in gdata) {
                     if (gdata.hasOwnProperty(type) &&
                             !this._theme.toonData[i][type].master) {
-                        this._XPenguinsWindow.remove_actor(gdata[type].texture);
+                        Main.uiGroup.remove_actor(gdata[type].texture);
                     }
                 }
             }
         }
 
-        //Main.layoutManager.removeChrome(this._XPenguinsWindow.actor);
-        global.stage.remove_actor(this._XPenguinsWindow.actor);
         /* destroy the window clone */
         this._XPenguinsWindow.destroy();
 
@@ -694,7 +686,8 @@ XPenguinsLoop.prototype = {
          * (has not been implemented yet besides global.stage).
          * _XPenguinsWindow is the *actor*.
          */
-        this.setWindow(this._XPenguinsWindow || global.stage);
+        this.setWindow(this._XPenguinsWindow ? this._XPenguinsWindow.actor :
+            global.stage);
 
         /* set up god mode */
         if (opt.squish) {
@@ -778,7 +771,7 @@ XPenguinsLoop.prototype = {
                 'notify::minimized', Lang.bind(this, this._onXPenguinsWindowMinimized));
             this._connectAndTrack(this._XPenguinsWindow, this._XPenguinsWindow.meta_window,
                 'workspace-changed', Lang.bind(this, this._onXPenguinsWindowWorkspaceChanged));
-            this._connectAndTrack(this._XPenguinsWindow, this._XPenguinsWindow.meta_window,
+            this._connectAndTrack(this._XPenguinsWindow, this._XPenguinsWindow.actor,
                 'destroy', Lang.bind(this, this._onXPenguinsWindowDestroyed));
         }
         WindowListener._connectSignals.apply(this, arguments);
@@ -973,7 +966,6 @@ XPenguinsLoop.prototype = {
          * \sum{this._numbers} <-> npenguins
          * this._toons.length - this._deadToons.length <-> penguin_number
          */
-        XPUtil.DEBUG("toon 0: %d, %d", this._toons[0].x, this._toons[0].y);
         i = this._toons.length;
         while (i--) {
             /* skip dead toons */
