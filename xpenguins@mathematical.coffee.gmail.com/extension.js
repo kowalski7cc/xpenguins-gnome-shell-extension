@@ -767,43 +767,16 @@ XPenguinsMenu.prototype = {
             blood              : _("Show blood"),
             angels             : _("Show angels"),
             squish             : _("God Mode"),
-            windowPreview      : _("Window Preview"),
         };
         this._ABOUT_ORDER = ['name', 'date', 'artist', 'copyright',
             'license', 'maintainer', 'location', 'comment'];
         this._THEME_STRING_LENGTH_MAX = 30;
 
+        /* create an Xpenguin Loop object which stores the XPenguins program */
+        this._XPenguinsLoop = new XPenguins.XPenguinsLoop();
+
         /* Create menus */
         this._createMenu();
-
-        /* create an Xpenguin Loop object which stores the XPenguins program */
-        this._XPenguinsLoop = new XPenguins.XPenguinsLoop(this.getConf());
-
-        /* Stuff that needs _XPenguinsLoop to be initialised */
-        // populate themes
-        this._populateThemeMenu();
-        // Listen to 'ntoons-changed' and adjust slider accordingly
-        this._XPenguinsLoop.connect('ntoons-changed', Lang.bind(this,
-            this._onChangeThemeNumber));
-        if (this._items.loadAveraging) {
-            this._XPenguinsLoop.connect('load-averaging-start', Lang.bind(this,
-                function () { this._items.loadAveraging.setBeingUsed(true, false); }));
-            this._XPenguinsLoop.connect('load-averaging-end', Lang.bind(this,
-                function () { this._items.loadAveraging.setBeingUsed(false, false); }));
-            this._XPenguinsLoop.connect('load-averaging-kill', Lang.bind(this,
-                function () { this._items.loadAveraging.setBeingUsed(true, true); }));
-        }
-        this._XPenguinsLoop.connect('xpenguins-stopped', Lang.bind(this,
-            function () {
-                this._items.start.setToggleState(false);
-                if (this._items.loadAveraging) {
-                    this._items.loadAveraging.setBeingUsed(false, false);
-                }
-            }));
-
-        /* @@ debugging windowListener */
-        this._windowListener = new WindowListener.WindowListener();
-
     },
 
     getConf: function () {
@@ -818,25 +791,13 @@ XPenguinsMenu.prototype = {
 
     changeOption: function (item, propVal, whatChanged) {
         XPUtil.DEBUG(('changeOption[ext]:' + whatChanged + ' -> ' + propVal));
-        if (this._windowListener) {
-            this._windowListener.changeOption(whatChanged, propVal);
-        }
         this._XPenguinsLoop.changeOption(whatChanged, propVal);
-
-        /* start/stop the windowListener */
-        if (whatChanged === 'windowPreview' && this._XPenguinsLoop.is_playing()) {
-            if (propVal) {
-                this._windowListener.start();
-            } else {
-                this._windowListener.stop();
-            }
-        }
     },
 
     _createMenu: function () {
         XPUtil.DEBUG('_createMenu');
         let dummy,
-            defaults = XPenguins.XPenguinsLoop.prototype.defaultOptions(),
+            opts = this._XPenguinsLoop.options,
             blacklist = XPenguins.getCompatibleOptions(true);
 
         /* clear the menu */
@@ -849,17 +810,19 @@ XPenguinsMenu.prototype = {
             this._startXPenguins));
         this.menu.addMenuItem(this._items.start);
 
-        /* theme submenu */
-        this._themeMenu = new PopupMenu.PopupSubMenuMenuItem(_("Theme"));
-        this.menu.addMenuItem(this._themeMenu);
-
         /* choice of window */
         if (!blacklist.onDesktop) {
-            this._items.onDesktop = new PopupMenu.PopupMenuItem(_("Running in: ") + _("Desktop"));
+            this._items.onDesktop = new PopupMenu.PopupMenuItem(_("Running in: ") 
+                + _("Desktop"));
             this._items.onDesktop.connect('activate', Lang.bind(this,
                 this._onChooseWindow));
             this.menu.addMenuItem(this._items.onDesktop);
         }
+
+        /* theme submenu */
+        this._themeMenu = new PopupMenu.PopupSubMenuMenuItem(_("Theme"));
+        this.menu.addMenuItem(this._themeMenu);
+        this._populateThemeMenu();
 
         /* options submenu */
         this._optionsMenu = new PopupMenu.PopupSubMenuMenuItem(_("Options"));
@@ -867,13 +830,10 @@ XPenguinsMenu.prototype = {
 
         /* ignore maximised, ignore popups, ignore half maximised, god mode,
          * always on visible workspace, angels, blood, verbose toggles */
-        // remove windowPreview code in release branches
-        blacklist.windowPreview = true;
-        defaults.windowPreview = false;
         for (let propName in this._toggles) {
             if (this._toggles.hasOwnProperty(propName) && !blacklist[propName]) {
                 this._items[propName] = new PopupMenu.PopupSwitchMenuItem(
-                    this._toggles[propName], defaults[propName] || false);
+                    this._toggles[propName], opts[propName] || false);
                 this._items[propName].connect('toggled',
                     Lang.bind(this, this.changeOption, propName));
                 this._optionsMenu.menu.addMenuItem(this._items[propName]);
@@ -930,6 +890,33 @@ XPenguinsMenu.prototype = {
                     this.changeOption(null, id, 'recalcMode');
                 }));
         }
+
+        /* Listen to various signals from XPenguinsLoop to update the sliders
+         * accordingly */
+        this._XPenguinsLoop.connect('ntoons-changed', Lang.bind(this,
+            this._onChangeThemeNumber));
+        if (this._items.loadAveraging) {
+            this._XPenguinsLoop.connect('load-averaging-start', Lang.bind(this,
+                function () { this._items.loadAveraging.setBeingUsed(true, false);
+                })
+            );
+            this._XPenguinsLoop.connect('load-averaging-end', Lang.bind(this,
+                function () { this._items.loadAveraging.setBeingUsed(false, false);
+                })
+            );
+            this._XPenguinsLoop.connect('load-averaging-kill', Lang.bind(this,
+                function () { this._items.loadAveraging.setBeingUsed(true, true);
+                })
+            );
+        }
+        this._XPenguinsLoop.connect('xpenguins-stopped', Lang.bind(this,
+            function () {
+                this._items.start.setToggleState(false);
+                if (this._items.loadAveraging) {
+                    this._items.loadAveraging.setBeingUsed(false, false);
+                }
+            })
+        );
     },
 
     _populateThemeMenu: function () {
@@ -1048,17 +1035,8 @@ XPenguinsMenu.prototype = {
         // may not be in sync with XPenguinsLoop._number)
         if (state) {
             this._XPenguinsLoop.start();
-            if (this._items.windowPreview && this._items.windowPreview.state) {
-                this._windowListener.start();
-            }
         } else {
             this._XPenguinsLoop.stop();
-            if (this._items.windowPreview && this._items.windowPreview.state) {
-                this._windowListener.stop();
-            }
-            if (this._items.loadAveraging) {
-                this._items.loadAveraging.setBeingUsed(false, false);
-            }
         }
     }
 };

@@ -63,6 +63,7 @@ XPenguinsWindow.prototype = {
     },
 
     _onDestroy: function () {
+        this.clear();
         /* remove references */
         this.meta_window = null;
         this.actor.disconnect(this._destroyID);

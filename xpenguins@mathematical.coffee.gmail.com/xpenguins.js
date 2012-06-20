@@ -17,13 +17,11 @@ try {
 } catch (err) {
     Me = imports.misc.extensionUtils.getCurrentExtension().imports;
 }
-const Region = Me.region;
 const Theme  = Me.theme;
 const ThemeManager = Me.themeManager;
 const Toon   = Me.toon;
-// this is how we'll keep in sync with this functionality for now.
 const WindowClone = Me.windowClone;
-const WindowListener = Me.windowListener.WindowListener.prototype;
+const WindowListener = Me.windowListener;
 const XPUtil = Me.util;
 
 /* constants */
@@ -85,10 +83,22 @@ function XPenguinsLoop() {
 }
 
 XPenguinsLoop.prototype = {
+    __proto__: WindowListener.WindowListener.prototype,
 
     _init: function (i_options) {
+        WindowListener.WindowListener.prototype._init.apply(this);
+
         /* set options */
-        let options = this.defaultOptions();
+        let options = this.defaultOptions(),
+            WLopt  = WindowListener.WindowListener.prototype.options;
+        /* copy over window-listener options */
+        for (let opt in WLopt) {
+            if (WLopt.hasOwnProperty(opt)) {
+                options[opt] = WLopt[opt];
+            }
+        }
+        options.onAllWorkspaces = false;
+        options.verbose = true;
         /* copy over custom options */
         for (let opt in i_options) {
             if (i_options.hasOwnProperty(opt) && options.hasOwnProperty(opt)) {
@@ -107,13 +117,360 @@ XPenguinsLoop.prototype = {
         this._relaunch = false;
     },
 
+    /***************************************
+     * OVERRIDDEN WINDOWLISTENER FUNCTIONS *
+     ***************************************/
+
+    /* Note: we don't update the winow region here, we do it in _frame. */
+    _onWindowEvent: function (eventName) {
+        this.LOG('[XP] _onWindowEvent %s', eventName);
+        this._dirty = true;
+    },
+
+    /* Initialise all variables & load themes & initialise toons.
+     * Stuff that has to get reset whenever the timeline restarts.
+     * xpenguins_start, main.c
+     */
+    start: function () {
+        this.LOG('[XP] START');
+
+        /* signals */
+        this._sleepID = null;
+        //@@ this._playing = 0;
+        this._relaunch = false;
+
+        /* variables */
+        this._toons = [];
+        this._deadToons = [];
+        /* The number of penguins that are active or not terminating.
+         * When 0, we can call xpenguins_exit() */
+        this._numbers = this._numbers || {};
+        this._originalNumber = 0; // store original requested nPenguins for
+                                  // load averaging.
+
+        this._cycle = 0;
+        this._tempFRAMENUMBER = 0;
+        this._exiting = false;
+
+        this._dirty = true;
+        
+        /* Laziness */
+        let opt = this.options;
+        /* If they set onAllWorkspaces but are running in a window,
+         * unset onAllWorkspaces
+         */
+        if (opt.onAllWorkspaces && !this._onDesktop) {
+            XPUtil.warn(_("Warning: onAllWorkspaces is TRUE but running in a window, setting onAllWorkspaces to FALSE"));
+            opt.onAllWorkspaces = false;
+        }
+        opt.stackingOrder = (!this._onDesktop || opt.ignoreMaximised);
+
+        /* Load theme into this._theme, if not already done */
+        if (!this.themeList) {
+            this.themeList = [];
+        }
+
+        if (!this._theme) {
+            this.setThemes(this.themeList);
+        }
+
+        /* theme-specific options */
+        if (!opt.sleep_msec) {
+            opt.sleep_msec = this._theme.delay;
+        }
+
+        /* See if load averaging will work */
+        if (opt.load1 >= 0) {
+            let load = XPUtil.loadAverage();
+            if (load < 0) {
+                this.LOG(_("Warning: cannot detect load averages on this system"));
+                opt.load1 = -1;
+                opt.load2 = -1;
+            }
+        }
+        opt.load_cycles = opt.load_check_interval / opt.sleep_msec;
+
+        /* Set up the window we're drawing on, if it hasn't been set already
+         * via setWindow.
+         * _XPenguinsWindow is the *actor*.
+         */
+        if (!this._XPenguinsWindow) {
+            this.setWindow(global.stage);
+        }
+
+        /* set up god mode */
+        if (opt.squish) {
+            this.toggleGodMode(true);
+        }
+
+        /* set up toons */
+        this._initToons();
+
+        /* Call parent's start */
+        WindowListener.WindowListener.prototype.start.apply(this);
+
+        /* actually start */
+        this._playing = Clutter.threads_add_timeout(GLib.PRIORITY_DEFAULT,
+            this.options.sleep_msec, Lang.bind(this, this._frame));
+    },
+
+    /* when you send the stop signal to xpenguins (through the toggle)
+     * Note we do not call parent's stop here because that stops
+     * immediately and we do not wish to stop immediately.
+     * (although, we no longer care about listening to events at this point?)
+     */
+    stop: function (immediately) {
+        this.LOG('[XP] STOP');
+        this._onInterrupt(immediately);
+    },
+
+    /* when you really want to kill xpenguins
+     * (ie exit sequence has finished)
+     * xpenguins_exit() and ToonFinishUp in toon_end.c
+     */
+    exit: function () {
+        this.LOG('[XP] exit');
+        WindowListener.WindowListener.prototype.stop.apply(this);
+        let i;
+
+        if (this._sleepID) {
+            Mainloop.source_remove(this._sleepID);
+        }
+        if (this._XPenguinsWindowDestroyedID && this._XPenguinsWindow.actor) {
+            this._XPenguinsWindow.actor.disconnect(this._XPenguinsWindowDestroyedID);
+            this._XPenguinsWindowDestroyedID = null;
+        }
+
+        /* remove god mode */
+        if (this.options.squish) {
+            this.toggleGodMode(false);
+        }
+
+        /* remove toons from stage & destroy */
+        i = this._toons.length;
+        while (i--) {
+            Main.layoutManager.removeChrome(this._toons[i].actor);
+            this._toons[i].destroy();
+        }
+
+        /* remove toonDatas from the stage */
+        for (i in this._theme.toonData) {
+            if (this._theme.toonData.hasOwnProperty(i)) {
+                let gdata = this._theme.toonData[i];
+                for (let type in gdata) {
+                    if (gdata.hasOwnProperty(type) &&
+                            !this._theme.toonData[i][type].master) {
+                        Main.uiGroup.remove_actor(gdata[type].texture);
+                    }
+                }
+            }
+        }
+
+        /* Note: we *don't* destroy the window clone so that it may be
+         * re-used for the next run without having to re-assign the window
+         * we want to run in. 
+         */
+        //this._XPenguinsWindow.destroy();
+
+        /* destroy theme */
+        if (this._theme) {
+            this._theme.destroy();
+        }
+
+        /* delete references to big objects to help free up memory */
+        delete this._toonGlobals;
+        delete this._theme;
+        this._toons = [];
+    },
+
+    /* pauses the timeline & temporarily stops listening for events,
+     * *except* for owner.connect(eventName) which sends the resume signal.
+     */
+    pause: function (hide, owner, eventName, cb) {
+        /* pauses the window tracker */
+        WindowListener.WindowListener.prototype.pause.call(this, owner, eventName, cb);
+        if (hide) {
+            this._hideToons();
+        }
+    },
+
+    /* resumes timeline, connects up events */
+    resume: function () {
+        /* resume window tracker */
+        WindowListener.WindowListener.prototype.resume.apply(this);
+        if (this._toons[0] && !this._toons[0].visible) {
+            this._showToons();
+        }
+        this._playing = Clutter.threads_add_timeout(GLib.PRIORITY_DEFAULT,
+            this.options.sleep_msec, Lang.bind(this, this._frame));
+    },
+
+    /* called when configuration is changed, handles on-the-fly changes */
+    changeOption: function (propName, propVal) {
+        /* disallowed options changes */
+        if (propName === 'onAllWorkspaces' && this._onDesktop) {
+            XPUtil.warn(_("Cannot use the on all workspaces option if running in a window"));
+            return;
+        }
+        if (propName === 'ignoreMaximised' && propVal) {
+            this.options.ignoreMaximised = propVal;
+            let oldStack = this.options.stackingOrder;
+            this.options.stackingOrder = (!this._onDesktop || opt.ignoreMaximised);
+            if (this.options.stackingOrder !== oldStack) {
+                this.changeOption('stackingOrder', this.options.stackingOrder);
+            }
+        /* Window tracking-specific options */
+        } else if (WindowListener.WindowListener.prototype.options.hasOwnProperty(propName)) {
+            WindowListener.WindowListener.prototype.changeOption.call(this, propName, propVal);
+            this._onWindowEvent('changeOption');
+        } else {
+        /* XPENGUIN-specific options. */
+            this.LOG('changeOption[XP]: %s = %s', propName, propVal);
+            if (!this.options.hasOwnProperty(propName) ||
+                    this.options[propName] === propVal) {
+                return;
+            }
+            this.options[propName] = propVal;
+            /* actions to be taken if the timeline is playing */
+            if (this.is_playing()) {
+                if (propName === 'squish') {
+                /* enable god mode */
+                    this.toggleGodMode(propVal);
+                } else if (propName === 'sleep_msec') {
+                    /* have to remove the _frame & re-add. */
+                    this._playing = 0;
+                    this._relaunch = true;
+                } else if (propName === 'load1' && propVal < 0) {
+                    /* restore original toons */
+                    this.emit('load-averaging-end');
+                    if (this._toons.length - this._deadToons.length !== this._originalNumber) {
+                        this._setTotalNumber(this._originalNumber);
+                    }
+                }
+                /* Otherwise, things like angels, blood: these things can just
+                 * be set and no recalculating of signals etc or extra action
+                 * need be done.
+                 */
+                /* if it's currently sleeping, wake it up to process the change */
+                if (this._sleepID) {
+                    Mainloop.source_remove(this._sleepID);
+                    this._sleepID = null;
+                    this.resume();
+                }
+            }
+        } // whether xpenguins or window-listener option
+    },
+    // TODO: destroy
+    
+    /* connects up events required to maintain toonWindows as an accurate
+     * snapshot of what the windows on the workspace look like
+     * We override it to add windows for the xpenguins window.
+     */
+    _connectSignals: function () {
+        /* Extra signals to add if we're running XPenguins in a window:
+         * window changes workspace
+         * window is closed (stop window listener)
+         * window is minimized (pause) or unminimized (resume)
+         */
+        if (!this._onDesktop) {
+            this._listeningPerWindow = true;
+            this.connectAndTrack(this._XPenguinsWindow, this._XPenguinsWindow.meta_window,
+                'notify::minimized', Lang.bind(this, this._onXPenguinsWindowMinimized));
+            this.connectAndTrack(this._XPenguinsWindow, this._XPenguinsWindow.meta_window,
+                'workspace-changed', Lang.bind(this, this._onXPenguinsWindowWorkspaceChanged));
+        }
+        WindowListener.WindowListener.prototype._connectSignals.apply(this, arguments);
+    },
+
+    _disconnectSignals: function () {
+        WindowListener.WindowListener.prototype._disconnectSignals.apply(this, arguments);
+        this.disconnectTrackedSignals(this._XPenguinsWindow);
+    },
+
+    // have to override updateWindows to take into account maximised windows.
+    _updateWindows: function () {
+        this.windowRegion.clear();
+        /* Add windows to region. If we use list_windows() we wont' get popups,
+         * if we use get_window_actors() we will. */
+        let winList,
+            ws = this.get_workspace();
+        if (this.options.ignorePopups) {
+            winList = ws.list_windows();
+        } else {
+            // already sorted.
+            winList = global.get_window_actors().map(function (act) {
+                return act.meta_window;
+            });
+            /* filter out other workspaces */
+            winList = winList.filter(function (win) {
+                return win.get_workspace() === ws;
+            });
+        }
+
+        /* sort by stacking (bottom-most to top-most) */
+        if (this.options.stackingOrder) {
+            winList = global.display.sort_windows_by_stacking(winList);
+            /* sort by monitor ... ? */
+            winList.sort(function (a, b) { 
+                return a.get_monitor() - b.get_monitor();
+            });
+        }
+
+        /* filter out desktop & nonvisible/mapped windows windows */
+        winList = winList.filter(Lang.bind(this, function (win) {
+            return (win.get_compositor_private().mapped &&
+                    win.get_compositor_private().visible &&
+                    win.get_window_type() !== Meta.WindowType.DESKTOP);
+        }));
+
+        // BIG TODO: halfMaximised doesn't make sense. What if a window is under
+        // one half maximised window but over another?
+        // Then we ignore both half-maximised ones but only add in the rectangle
+        // representing the *visible* region or the window?
+        /* If running in a window: loop through until we hit the window we're
+         * running in.
+         *
+         * Otherwise, sort windows BY MONITOR.
+         * Then ignore all windows behind a maximised one.
+         */
+        // TODO: make the 'go to next monitor' code more efficient.
+        // Sort into a 2D array? winList[monitor][i] ?
+        let win, curMon, i = winList.length;
+        while (i--) {
+            win = winList[i];
+            if (!this._onDesktop && win === this._XPenguinsWindow.meta_window) {
+                break;
+            }
+            if (this.options.ignoreMaximised && win.get_maximized() ===
+                    (Meta.MaximizeFlags.HORIZONTAL | Meta.MaximizeFlags.VERTICAL)) {
+                /* look for the next monitor */
+                curMon = win.get_monitor();
+                while (i--) {
+                    if (winList[i].get_monitor() !== curMon) {
+                        ++i; /* for the loop */
+                        break;
+                    }
+                }
+                if (i <= 0) { /* no windows left */
+                    break;
+                }
+                continue;
+            }
+            this.windowRegion.addRectangle(winList[i].get_outer_rect());
+        }
+    },
+
+
+    /****************
+     * Initialising *
+     ****************/
     _initToons: function () {
-        XPUtil.DEBUG('[XP] _initToons');
+        this.LOG('[XP] _initToons');
         /* set up global vars to feed in to the toons */
         this._toonGlobals = {
             XPenguinsWindow   : this._XPenguinsWindow,
             toonData          : this._theme.toonData,
-            toon_windows      : this._toonWindows,
+            toon_windows      : this.windowRegion,
             edge_block        : this.options.edge_block,
             max_relocate_up   : this.options.max_relocate_up,
             max_relocate_down : this.options.max_relocate_down,
@@ -125,27 +482,25 @@ XPenguinsLoop.prototype = {
         this._addToonDataToStage(ALL);
 
         /* temporarily set _playing = true so .setNumber will initialise toons.
-         * Use default amount if none specified by now.
+         * Use default amount if none specified by now. A bit of a hack.
          */
-        this._playing = true;
-        /* bit of a hack to get _setNumbers to init penguins */
-        let i = this.themeList.length,
+        let playing = this._playing,
+            i = this.themeList.length,
             oldNumbers = this._numbers;
+        this._playing = true;
         this._numbers = {};
-        // BAH: causes segfault when we run if oldNumbers is not {}
         while (i--) {
-            XPUtil.DEBUG('setThemeNumbers(%s, %d)', this.themeList[i],
+            this.LOG('setThemeNumbers(%s, %d)', this.themeList[i],
                 oldNumbers[this.themeList[i]]);
             this.setThemeNumbers(this.themeList[i],
                 oldNumbers[this.themeList[i]] || -1);
         }
-        this._playing = 0;
-
+        this._playing = playing;
     },
 
     /* add ToonDatas to the stage so clones can be added properly */
     _addToonDataToStage: function (theme) {
-        XPUtil.DEBUG('Add toon data to stage');
+        this.LOG('Add toon data to stage');
         let genii = [];
         if (theme === ALL) {
             /* do all */
@@ -173,6 +528,9 @@ XPenguinsLoop.prototype = {
         }
     },
 
+    /*******************
+     *  PUBLIC METHODS *
+     *******************/
     /* returns a set of default options (wanted to be able to call it as a
      * static method)
      */
@@ -181,10 +539,6 @@ XPenguinsLoop.prototype = {
             /* Load average checking: kill penguins if load is too high
                Start killing toons when the 1-min averaged system load
                 exceeds load1; when it exceeds load2  kill them  all.
-               The toons  will  reappear  when  the load average comes down.
-               When there are no  toons  on  the screen, XPenguins uses
-                only a miniscule amount of CPU time - it just wakes up
-                every 5 seconds to recheck the load.
              */
             load_check_interval : 5000, // ms between load average checks
             load_cycles: 0, // number of frames between load average checks
@@ -199,16 +553,7 @@ XPenguinsLoop.prototype = {
             ignoreMaximised : true, // maximised windows are not solid
             ignoreHalfMaximised : true, // if the above is true, half maximised
                                         // windows are also not solid.
-            ignorePopups : false, // ignore popup windows (right-click menus,
-                                  // tooltips, ...). Ie anything firing 'map'
-                                  // but not 'window-added'.
             squish : false, // squish toons with the mouse.
-            onAllWorkspaces: false, // what happens when we switch workspaces.
-
-            /* possible efficiency gain (really, don't bother changing it).
-             * Technically in order of most efficient to least:
-             * RECALC.END, RECALC.PAUSE, RECALC.ALWAYS. */
-            recalcMode: RECALC.ALWAYS,
 
             /* maximum amount a window can move for the penguin to still
              * cling on */
@@ -218,16 +563,23 @@ XPenguinsLoop.prototype = {
             max_relocate_right: 16,
 
             sleep_msec : 0, // delay in milliseconds between each frame.
+
+            /* WINDOW LISTENER OPTIONS (defined in that code) */
+            /*
+            ignorePopups : false, // ignore popup windows (right-click menus,
+                                  // tooltips, ...). Ie anything firing 'map'
+                                  // but not 'window-added'.
+            onAllWorkspaces: false, // what happens when we switch workspaces.
+            stackingOrder: true
+            verbose: true
+            // possible efficiency gain (really, don't bother changing it).
+            // Technically in order of most efficient to least:
+            // RECALC.END, RECALC.PAUSE, RECALC.ALWAYS.
+            recalcMode: RECALC.ALWAYS,
+            */
         };
     },
 
-    /* returns whether the animation is currently running.
-     * If it is paused/sleeping (say because there are no toons) but the user
-     * hasn't asked it to actually stop, this is regarded as playing.
-     */
-    is_playing: function () {
-        return this._playing > 0;
-    },
 
     /* returns array of themes with non-zero toons */
     getThemes: function () {
@@ -241,7 +593,7 @@ XPenguinsLoop.prototype = {
      * It *does not* set the number of penguins (but init() will do that)
      */
     setThemes: function (themeList) {
-        XPUtil.DEBUG('[XP] setThemes');
+        this.LOG('[XP] setThemes');
         /* stop if in progress */
         let playing = this._playing;
         if (playing) {
@@ -266,7 +618,7 @@ XPenguinsLoop.prototype = {
      * If you specify number = -1, the default for that theme will be used.
      */
     setThemeNumbers: function (inames, ns, silent) {
-        XPUtil.DEBUG('[XP] setThemeNumbers');
+        this.LOG('[XP] setThemeNumbers');
         if (!(inames instanceof Array)) {
             inames = [inames];
         }
@@ -277,7 +629,7 @@ XPenguinsLoop.prototype = {
         while (i--) {
             let n = ns instanceof Array ? ns[i] : ns,
                 name = inames[i];
-            XPUtil.DEBUG(' .. %s: %d', name, n);
+            this.LOG(' .. %s: %d', name, n);
             if (!this._theme.hasTheme(name)) {
                 if (n) {
                     this._theme.appendTheme(name);
@@ -296,7 +648,7 @@ XPenguinsLoop.prototype = {
             } else if (n === 0) {
                 this.themeList.splice(this.themeList.indexOf(name), 1);
             }
-            XPUtil.DEBUG(' .. calling this._setNumber(%s, %d)', name, n);
+            this.LOG(' .. calling this._setNumber(%s, %d)', name, n);
             this._setNumber(name, n, silent);
             /* for load averaging: store a copy of the originals */
             this._originalNumber += this._numbers[name];
@@ -308,6 +660,60 @@ XPenguinsLoop.prototype = {
             this.resume();
         }
     },
+
+    /* call this to set XPenguins running in the specified window */
+    setWindow: function(winActor) {
+        let playing = this._playing;
+        if (playing) {
+            this.stop(true);
+        }
+
+        this._onDesktop = !(winActor instanceof Meta.WindowActor);
+
+        /* make a clone */
+        // UPTO: can use this.get_workspace() !
+        this.options.onAllWorkspaces = this.options.onAllWorkspaces && this._onDesktop;
+        this.options.stackingOrder = (!this._onDesktop || this.options.ignoreMaximised);
+        this._XPenguinsWindow = new WindowClone.XPenguinsWindow(winActor,
+            this.options.onAllWorkspaces);
+        // TODO: update toggle.
+        /* We track for the host window being destroyed even if XPenguins is
+         * not running. Because then we have to set the window back to the
+         * desktop.
+         */
+        this._XPenguinsWindowDestroyedID = this._XPenguinsWindow.actor.connect(
+            'destroy',
+            Lang.bind(this, this._onXPenguinsWindowDestroyed)
+        );
+
+        if (playing) {
+            this.start();
+        }
+    },
+
+    toggleGodMode: function (onoff) {
+        this.LOG('!!!!!!!!!! toggling GOD MODE !!!!!!!!!!');
+        let i = this._toons.length;
+        if (onoff) {
+            while (i--) {
+                if (this._toons[i].active) {
+                    this._addSquishEvents(this._toons[i]);
+                }
+            }
+        } else {
+            while (i--) {
+                this._removeSquishEvents(this._toons[i]);
+            }
+
+            /* change cursor back */
+            global.unset_cursor();
+        }
+    },
+
+
+    /*******************
+     * PRIVATE METHODS *
+     *******************/
 
     /* sets the total number of penguins in the entire animation to n,
      * basically setting the # toons approx. equal for each theme
@@ -329,7 +735,7 @@ XPenguinsLoop.prototype = {
     _setNumber: function (iname, n, silent) {
         let name = ThemeManager.sanitiseThemeName(iname);
         n = Math.min(PENGUIN_MAX, Math.max(0, n));
-        XPUtil.DEBUG('_setNumber(%s, %d)', name, n);
+        this.LOG('_setNumber(%s, %d)', name, n);
 
         if (!this._playing) {
             this._numbers[name] = n;
@@ -345,7 +751,7 @@ XPenguinsLoop.prototype = {
          * However, might have to add a check: if they made 100000 toons and
          * then cut it back to 10, we have 999990 empty slots to carry around.
          */
-        XPUtil.DEBUG(' .. current: %d. requested: %d', current, n);
+        this.LOG(' .. current: %d. requested: %d', current, n);
         if (n > current) {
             /* assign the numbers per genus */
             let idx,
@@ -400,7 +806,7 @@ XPenguinsLoop.prototype = {
              */
             let left = (current - n);
             for (let i = 0; i < this._toons.length && left; ++i) {
-                XPUtil.DEBUG('toon %d: theme: %s genus: %s active: %s', i,
+                this.LOG('toon %d: theme: %s genus: %s active: %s', i,
                         this._toons[i].theme, this._toons[i].genus,
                         this._toons[i].active);
                 if (this._toons[i].theme === name) {
@@ -426,126 +832,48 @@ XPenguinsLoop.prototype = {
         } // whether to add or delete toons
     },
 
-    /******
-     * onDesktop
-     *******/
-    setWindow: function(winActor) {
-        let playing = this._playing;
-        if (playing) {
-            this.stop(true);
-        }
-        this._oldXPenguinsWindow = winActor;
-
-        this._onDesktop = !(winActor instanceof Meta.WindowActor);
-
-        /* make a clone */
-        this.options.onAllWorkspaces = this.options.onAllWorkspaces && this._onDesktop;
-        this._XPenguinsWindow = new WindowClone.XPenguinsWindow(winActor,
-            this.options.onAllWorkspaces);
-        
-        /* if !onDesktop, set onAllWorkspaces to false.
-         * if  onDesktop, set onAllWorkspaces to whatever it used to be */
-        /*
-        let tmp = this.options.onAllWorkspaces;
-        this.options.onAllWorkspaces = null;
-        this.changeOption('onAllWorkspaces', tmp && this._onDesktop);
-        */
-        // TODO: update toggle.
-
-        if (playing) {
-            this.start();
-        }
-    },
-
-    //BIG UPTO: windowListener has no use for onDesktop. that should be handled
-    //in XPenguins Loop !!!!!!!!!!!!
     _onXPenguinsWindowMinimized: function () {
         // UPTO: minimized && !paused already!
         if (this._XPenguinsWindow.meta_window.minimized) {
-            this._disconnectTrackedSignals(this._resumeSignal);
-            this.pause(false, this._XPenguinsWindow.meta_window, 'notify::minimized',
+            this.pause(true, this._XPenguinsWindow.meta_window, 'notify::minimized',
                     Lang.bind(this, this._onXPenguinsWindowMinimized));
             return false;
         }
         return true; // resume.
     },
 
-    /* hide if it's not the active workspace, and reassign get_workspace? */
+    /* hide if it's not the active workspace.
+     * This is equivalent to us switching away from xpenguin window's workspace.
+     */
     _onXPenguinsWindowWorkspaceChanged: function (metaWin, oldWorkspace) {
+        this.LOG('xpenguins window has switched workspaces');
+        //UPTO
         // reassign get_workspace and fire this._onWorkspaceChanged
         // Hmm - get_workspace is guaranteed to be current anyhow since
         // this is only fired if we are using XPenguinsWindow as a window.
-        WindowListener._onWorkspaceChanged.call(this, null,
-            global.screen.get_active_workspace_index());
-        // but pretend we're switching *to* the current?
-        this._onWorkspaceChanged(null, global.screen.get_active_workspace_index(),
+        this._onWorkspaceChanged.call(this, null,
             global.screen.get_active_workspace_index());
     },
-    // UPTO: maybe we should inherit from windowListener?
-    // if we handle onAllWorkspaces here we're going to mix up all the window signals
-    // with the xpenguins loop which is not nice conceptually.
 
     /* stop and send a signal */
     _onXPenguinsWindowDestroyed: function () {
-        this.stop(true);
-        this.emit('xpenguins-stopped');
-    },
-
-    /******************
-     * START STOP ETC *
-     * ****************/
-    /* when you send the stop signal to xpenguins (through the toggle) */
-    stop: function (immediately) {
-        XPUtil.DEBUG('[XP] STOP');
-        this._onInterrupt(immediately);
-    },
-
-    /* when you really want to kill xpenguins
-     * (ie exit sequence has finished)
-     * xpenguins_exit()
-     */
-    exit: function () {
-        this._cleanUp();
-        if (this._playing) {
-            this._playing = 0;
+        if (this.is_playing()) {
+            this.stop(true);
+            this.emit('xpenguins-stopped');
         }
-    },
-
-    /* start the main xpenguins loop: main.c
-     * init() should have been called by now.
-     */
-    start: function () {
-        XPUtil.DEBUG('[XP] START');
-        this.init();
-        this._playing = Clutter.threads_add_timeout(GLib.PRIORITY_DEFAULT,
-            this.options.sleep_msec, Lang.bind(this, this._frame));
-    },
-
-    /* pauses the timeline & temporarily stops listening for events,
-     * *except* for owner.connect(eventName) which sends the resume signal.
-     */
-    pause: function (hide, owner, eventName, cb) {
-        /* pauses the window tracker */
-        WindowListener.pause.call(this, hide, owner, eventName, cb);
-        if (hide) {
-            this._hideToons();
+        if (this._XPenguinsWindow.actor) {
+            this._XPenguinsWindow.actor.disconnect(this._XPenguinsWindowDestroyedID);
+            this._XPenguinsWindowDestroyedID = null;
         }
-    },
-
-    /* resumes timeline, connects up events */
-    resume: function () {
-        /* resume window tracker */
-        WindowListener.resume.apply(this, arguments);
-        if (this._toons[0] && !this._toons[0].visible) {
-            this._showToons();
-        }
-        this._playing = Clutter.threads_add_timeout(GLib.PRIORITY_DEFAULT,
-            this.options.sleep_msec, Lang.bind(this, this._frame));
+        /* destroy this._XPenguinsWindow */
+        this._XPenguinsWindow.destroy();
+        delete this._XPenguinsWindow;
+        // TODO: send a signal indicating the window changed.
     },
 
     /* stop xpenguins, but play the exit sequence */
     _onInterrupt: function (justExit) {
-        XPUtil.DEBUG(_("Interrupt received: Exiting."));
+        this.LOG(_("Interrupt received: Exiting."));
 
         /* tell the loop to start the exit sequence */
         this._exiting = true;
@@ -561,296 +889,26 @@ XPenguinsLoop.prototype = {
         }
     },
 
-
-    /* ToonFinishUp in toon_end.c */
-    _cleanUp: function () {
-        XPUtil.DEBUG('[XP] _cleanUp');
-        let i;
-
-        /* clean up Clutter.threads_add_timeout */
-        if (this._playing) {
-            this._playing = 0;
-        }
-
-        /* disconnect events */
-        this._disconnectSignals();
-        if (this._sleepID) {
-            Mainloop.source_remove(this._sleepID);
-        }
-
-        /* remove god mode */
-        if (this.options.squish) {
-            this.toggleGodMode(false);
-        }
-
-        /* remove toons from stage & destroy */
-        i = this._toons.length;
-        while (i--) {
-            Main.layoutManager.removeChrome(this._toons[i].actor);
-            this._toons[i].destroy();
-        }
-
-        /* remove toonDatas from the stage */
-        for (i in this._theme.toonData) {
-            if (this._theme.toonData.hasOwnProperty(i)) {
-                let gdata = this._theme.toonData[i];
-                for (let type in gdata) {
-                    if (gdata.hasOwnProperty(type) &&
-                            !this._theme.toonData[i][type].master) {
-                        Main.uiGroup.remove_actor(gdata[type].texture);
-                    }
-                }
-            }
-        }
-
-        /* destroy the window clone */
-        this._XPenguinsWindow.destroy();
-
-        /* destroy theme */
-        if (this._theme) {
-            this._theme.destroy();
-        }
-
-        /* delete references to big objects to help free up memory */
-        delete this._toonGlobals;
-        delete this._theme;
-        this._toons = [];
-    },
-
-    /* Initialise all variables & load themes & initialise toons.
-     * Stuff that has to get reset whenever the timeline restarts.
-     * should be called before start()
-     * xpenguins_start
-     */
-    init: function () {
-        XPUtil.DEBUG('[XP] init');
-
-        /* signals */
-        this._sleepID = null;
-        this._playing = 0;
-        this._relaunch = false;
-        this._resumeSignal = {}; // holds the signal we listen to to resume
-
-        /* variables */
-        this._toons = [];
-        this._deadToons = [];
-        /* The number of penguins that are active or not terminating.
-         * When 0, we can call xpenguins_exit() */
-        this._numbers = this._numbers || {};
-        this._originalNumber = 0; // store original requested nPenguins for
-                                  // load averaging.
-
-        this._cycle = 0;
-        this._tempFRAMENUMBER = 0;
-        this._exiting = false;
-
-        this._dirty = true;
-        this._listeningPerWindow = false;
-
-        /* Laziness */
-        let opt = this.options;
-        /* If they set onAllWorkspaces but are running in a window,
-         * unset onAllWorkspaces
-         */
-        if (opt.onAllWorkspaces && !this._onDesktop) {
-            XPUtil.warn(_("Warning: onAllWorkspaces is TRUE but running in a window, setting onAllWorkspaces to FALSE"));
-            opt.onAllWorkspaces = false;
-        }
-
-        /* Load theme into this._theme, if not already done */
-        if (!this.themeList) {
-            this.themeList = [];
-        }
-
-        if (!this._theme) {
-            this.setThemes(this.themeList);
-        }
-
-        /* theme-specific options */
-        if (!opt.sleep_msec) {
-            opt.sleep_msec = this._theme.delay;
-        }
-
-        /* See if load averaging will work */
-        if (opt.load1 >= 0) {
-            let load = XPUtil.loadAverage();
-            if (load < 0) {
-                XPUtil.DEBUG(_("Warning: cannot detect load averages on this system"));
-                opt.load1 = -1;
-                opt.load2 = -1;
-            }
-        }
-        opt.load_cycles = opt.load_check_interval / opt.sleep_msec;
-
-        /* Set up the window we're drawing on.
-         * (has not been implemented yet besides global.stage).
-         * _XPenguinsWindow is the *actor*.
-         */
-        this.setWindow(this._XPenguinsWindow ? this._XPenguinsWindow.actor :
-            global.stage);
-
-        /* set up god mode */
-        if (opt.squish) {
-            this.toggleGodMode(true);
-        }
-
-        /* set up toon_windows */
-        this._toonWindows = new Region.Region();
-
-        /* set up toons */
-        this._initToons();
-
-        /* Connect signals */
-        this._connectSignals();
-
-        this._updateToonWindows();
-    },
-
-    changeOption: function (propName, propVal) {
-        /* disallowed options changes */
-        if (propName === 'onAllWorkspaces' && this._onDesktop) {
-            XPUtil.warn(_("Cannot use the on all workspaces option if running in a window"));
-            return;
-        }
-        // TODO: phase out windowListener
-        /* Window tracking-specific options */
-        if (WindowListener.options.hasOwnProperty(propName)) {
-            WindowListener.changeOption.call(this, propName, propVal);
-            this._dirtyToonWindows('changeOption');
-        } else {
-        /* XPENGUIN-specific options. */
-            XPUtil.DEBUG('changeOption[XP]: %s = %s', propName, propVal);
-            if (!this.options.hasOwnProperty(propName) ||
-                    this.options[propName] === propVal) {
-                return;
-            }
-            this.options[propName] = propVal;
-            /* actions to be taken if the timeline is playing */
-            if (this.is_playing()) {
-                if (propName === 'squish') {
-                /* enable god mode */
-                    this.toggleGodMode(propVal);
-                } else if (propName === 'sleep_msec') {
-                    /* have to remove the _frame & re-add. */
-                    this._playing = 0;
-                    this._relaunch = true;
-                } else if (propName === 'load1' && propVal < 0) {
-                    /* restore original toons */
-                    this.emit('load-averaging-end');
-                    if (this._toons.length - this._deadToons.length !== this._originalNumber) {
-                        this._setTotalNumber(this._originalNumber);
-                    }
-                }
-                /* Otherwise, things like angels, blood: these things can just
-                 * be set and no recalculating of signals etc or extra action
-                 * need be done.
-                 */
-                /* if it's currently sleeping, wake it up to process the change */
-                if (this._sleepID) {
-                    Mainloop.source_remove(this._sleepID);
-                    this._sleepID = null;
-                    this.resume();
-                }
-            }
-        } // whether xpenguins or window-listener option
-    },
-
-    /***** Signals ****/
-    /* connects up events required to maintain toonWindows as an accurate
-     * snapshot of what the windows on the workspace look like
-     */
-    _connectSignals: function () {
-        /* Extra signals to add if we're running XPenguins in a window:
-         * window changes workspace
-         * window is closed (stop window listener)
-         * window is minimized (pause) or unminimized (resume)
-         */
-        if (!this._onDesktop) {
-            this._listeningPerWindow = true;
-            this._connectAndTrack(this._XPenguinsWindow, this._XPenguinsWindow.meta_window,
-                'notify::minimized', Lang.bind(this, this._onXPenguinsWindowMinimized));
-            this._connectAndTrack(this._XPenguinsWindow, this._XPenguinsWindow.meta_window,
-                'workspace-changed', Lang.bind(this, this._onXPenguinsWindowWorkspaceChanged));
-            this._connectAndTrack(this._XPenguinsWindow, this._XPenguinsWindow.actor,
-                'destroy', Lang.bind(this, this._onXPenguinsWindowDestroyed));
-        }
-        WindowListener._connectSignals.apply(this, arguments);
-    },
-
-    _disconnectSignals: function () {
-        WindowListener._disconnectSignals.apply(this, arguments);
-        this._disconnectTrackedSignals(this._XPenguinsWindow);
-    },
-
-    _updateSignals: function () {
-        WindowListener._updateSignals.apply(this, arguments);
-    },
-
-    _onWindowAdded: function () {
-        WindowListener._onWindowAdded.apply(this, arguments);
-    },
-
-    _onWindowRemoved: function () {
-        WindowListener._onWindowRemoved.apply(this, arguments);
-    },
-
-    _onWorkspaceChanged: function () {
-        WindowListener._onWorkspaceChanged.apply(this, arguments);
-    },
-
-    /********** TOON WINDOWS **************/
-    _dirtyToonWindows: function (msg) {
-        XPUtil.DEBUG('[XP] _dirtyToonWindows %s', msg);
-        this._dirty = true;
-    },
-
-    _updateToonWindows: function () {
-        XPUtil.DEBUG(('[XP] _updateToonWindows. dirty: ' + this._dirty));
-        /* populate toonWindows (a Region, basically a list of Meta.Rect.
-         * Also store the 'wid' of each window, to associate toons with. */
-        WindowListener._updateToonWindows.apply(this, arguments);
-        this._dirty = false;
-    },
-
     /**************** GOD MODE **************/
-    toggleGodMode: function (onoff) {
-        XPUtil.DEBUG('!!!!!!!!!! toggling GOD MODE !!!!!!!!!!');
-        let i = this._toons.length;
-        if (onoff) {
-            while (i--) {
-                if (this._toons[i].active) {
-                    this._addSquishEvents(this._toons[i]);
-                }
-            }
-        } else {
-            while (i--) {
-                this._removeSquishEvents(this._toons[i]);
-            }
-
-            /* change cursor back */
-            global.unset_cursor();
-        }
-    },
-
     _addSquishEvents: function (toon) {
         if (toon.actor.get_reactive()) {
             /* already has squish events. */
             return;
         }
-        XPUtil.DEBUG('adding squish events');
+        this.LOG('adding squish events');
         toon.actor.set_reactive(true);
         /* kill toon on click, change cursor to "smite" icon on mouseover. */
         // FIXME: "smite" icon is currently a hand. Make it something
         // suitably god-like, like a lightning bolt :P
-        this._connectAndTrack(toon, toon.actor,
+        this.connectAndTrack(toon, toon.actor,
             'button-press-event',
             Lang.bind(this, this._onSmite, toon));
-        this._connectAndTrack(toon, toon.actor,
+        this.connectAndTrack(toon, toon.actor,
             'enter-event', function () {
                 global.set_cursor(Shell.Cursor.POINTING_HAND);
                 return true; /* event fully handled, do not pass on */
             });
-        this._connectAndTrack(toon, toon.actor,
+        this.connectAndTrack(toon, toon.actor,
             'leave-event', function () {
                 global.unset_cursor();
                 return true; /* event fully handled, do not pass on */
@@ -858,13 +916,13 @@ XPenguinsLoop.prototype = {
     },
 
     _removeSquishEvents: function (toon) {
-        XPUtil.DEBUG('removing squish events');
+        this.LOG('removing squish events');
         toon.actor.set_reactive(false);
-        this._disconnectTrackedSignals(toon);
+        this.disconnectTrackedSignals(toon);
     },
 
     _onSmite: function (actor, event, toon) {
-        XPUtil.DEBUG('OWWWIEEE!');
+        this.LOG('OWWWIEEE!');
         /* Not in Clutter-gir. button 1: PRIMARY, 2: MIDDLE, 3: SECONDARY */
         if (event.get_button() !== 1) {
             return false; /* pass on the event */
@@ -873,7 +931,7 @@ XPenguinsLoop.prototype = {
          * and can be transformed into actor-relative coordinates using
          * actor.transform_stage_point().
         let [stageX, stageY] = event.get_coords();
-        XPUtil.DEBUG('SMITE at %d, %d'.format(stageX, stageY));
+        this.LOG('SMITE at %d, %d'.format(stageX, stageY));
          */
 
         /* squash if it's not already dead/dying.
@@ -930,7 +988,7 @@ XPenguinsLoop.prototype = {
     _frame: function () {
         ++this._tempFRAMENUMBER;
         /*
-        XPUtil.DEBUG('FRAME %d _toonNumber: %d', this._tempFRAMENUMBER,
+        this.LOG('FRAME %d _toonNumber: %d', this._tempFRAMENUMBER,
             this._toons.length - this._deadToons.length);
             */
 
@@ -948,7 +1006,7 @@ XPenguinsLoop.prototype = {
                     this._toons[i].calculateAssociations();
                 }
             }
-            this._updateToonWindows();
+            this._updateWindows();
             i = this._toons.length;
             while (i--) {
                 if (this._deadToons.indexOf(i) >= 0) {
@@ -992,7 +1050,7 @@ XPenguinsLoop.prototype = {
                 if (!((toon.data.conf & Toon.NOBLOCK) ||
                         (toon.data.conf & Toon.INVULNERABLE)) &&
                         toon.blocked(Toon.HERE)) {
-                    XPUtil.DEBUG('EXPLODING');
+                    this.LOG('EXPLODING');
                     if (o.blood && gdata.squashed) {
                         toon.setType('squashed', toon.direction, Toon.HERE);
                     } else if (gdata.explosion) {
@@ -1124,7 +1182,7 @@ XPenguinsLoop.prototype = {
                             let actionN = 'action%d'.format(
                                 XPUtil.RandInt(this._theme.nactions[toon.genus])
                             );
-                            XPUtil.DEBUG('new action: ' + actionN);
+                            this.LOG('new action: ' + actionN);
                             /* If we have enough space, start the action: */
                             if (!toon.checkBlocked(actionN, Toon.DOWN)) {
                                 toon.setType(actionN, toon.direction, Toon.DOWN);
@@ -1279,12 +1337,12 @@ XPenguinsLoop.prototype = {
          */
         let numActive = this._toons.length - this._deadToons.length;
         if (!numActive && this._exiting) {
-            XPUtil.DEBUG(_("Done."));
+            this.LOG(_("Done."));
             this.exit();
             return false;
         }
         if (this._exiting) {
-            XPUtil.DEBUG('.');
+            this.LOG('.');
         }
 
         /* check the CPU loading */
@@ -1307,7 +1365,7 @@ XPenguinsLoop.prototype = {
                 signal = 'load-averaging-kill';
             }
             if (this._toons.length - this._deadToons.length !== newp) {
-                XPUtil.DEBUG(_("Adjusting number according to load: %d -> %d"),
+                this.LOG(_("Adjusting number according to load: %d -> %d"),
                         this._toons.length - this._deadToons.length, newp);
                 this._setTotalNumber(newp);
                 this.emit(signal);
@@ -1339,25 +1397,6 @@ XPenguinsLoop.prototype = {
         }
 
         return play;
-    }, // _frame
-
-    /*********************
-     *      UTILITY      *
-     *********************/
-    /* Note : my connect/disconnect tracker takes ideas from shellshape
-     * extension: signals are stored by the owner, storing both the target &
-     * the id to clean up later
-     */
-    _connectAndTrack: function () {
-        WindowListener._connectAndTrack.apply(this, arguments);
-    },
-
-    _disconnectTrackedSignals: function () {
-        WindowListener._disconnectTrackedSignals.apply(this, arguments);
-    }
-
+    } // _frame
 };
-/* so we can emit 'ntoons-changed' and extension will update accordingly.
- * FIXME: what about the other toggles? (currently handled in changeOption).
- */
 Signals.addSignalMethods(XPenguinsLoop.prototype);
