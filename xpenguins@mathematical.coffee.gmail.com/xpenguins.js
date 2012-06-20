@@ -1,3 +1,16 @@
+/* TODO:
+ * - pause in windowed mode when it becomes totally obscured
+ *    (at the moment toons die and float to heaven endlessly)
+ * - test always on visible workspace/switching workspace in windowed mode
+ * - global always on visible workspace is disabled when running in windowed
+ *   mode: just use setSensitive(false) on the UI. Also, send signal out
+ *   to extension on changeOptions(emit)
+ * * don't think XPenguinsWindow switch-workspace ever gets fired??
+ * It doesn't if onAlLWOrkspaces is true.
+ * ** With window on all workspaces, when you switch workspaces resume()
+ * is called repeatedly!
+ * --> this.get_workspace() is returning NA
+ */
 const Clutter  = imports.gi.Clutter;
 const GLib     = imports.gi.GLib;
 const Lang     = imports.lang;
@@ -125,6 +138,18 @@ XPenguinsLoop.prototype = {
     _onWindowEvent: function (eventName) {
         this.LOG('[XP] _onWindowEvent %s', eventName);
         this._dirty = true;
+    },
+
+    /* Have to override get_workspace to incorporate a movable window :/ */
+    get_workspace: function () {
+        // BIG TODO: would like to just have this.XPenguinsWindow.get_workspace()
+        // here, but it is not robust to option changes!
+        if (this.onDesktop) {
+            return WindowListener.WindowListener.prototype.get_workspace.call(this);
+        } else {
+            return this._XPenguinsWindow.get_workspace();
+            // BIG TODO: N/A ??!!
+        }
     },
 
     /* Initialise all variables & load themes & initialise toons.
@@ -423,10 +448,6 @@ XPenguinsLoop.prototype = {
                     win.get_window_type() !== Meta.WindowType.DESKTOP);
         }));
 
-        // BIG TODO: halfMaximised doesn't make sense. What if a window is under
-        // one half maximised window but over another?
-        // Then we ignore both half-maximised ones but only add in the rectangle
-        // representing the *visible* region or the window?
         /* If running in a window: loop through until we hit the window we're
          * running in.
          *
@@ -441,7 +462,8 @@ XPenguinsLoop.prototype = {
             if (!this._onDesktop && win === this._XPenguinsWindow.meta_window) {
                 break;
             }
-            if (this.options.ignoreMaximised && win.get_maximized() ===
+            if (this._onDesktop && this.options.ignoreMaximised && 
+                    win.get_maximized() ===
                     (Meta.MaximizeFlags.HORIZONTAL | Meta.MaximizeFlags.VERTICAL)) {
                 /* look for the next monitor */
                 curMon = win.get_monitor();
@@ -521,8 +543,8 @@ XPenguinsLoop.prototype = {
                      * container of type '...', but the actor already has
                      * a parent of type '...'.
                      */
-                    Main.uiGroup.add_actor(gdata[type].texture);
                     gdata[type].texture.hide();
+                    Main.uiGroup.add_actor(gdata[type].texture);
                 }
             }
         }
@@ -551,8 +573,6 @@ XPenguinsLoop.prototype = {
             angels : true, // don't show angels flying up to heaven on squash
             blood : true,  // don't show gory death sequences
             ignoreMaximised : true, // maximised windows are not solid
-            ignoreHalfMaximised : true, // if the above is true, half maximised
-                                        // windows are also not solid.
             squish : false, // squish toons with the mouse.
 
             /* maximum amount a window can move for the penguin to still
@@ -833,10 +853,12 @@ XPenguinsLoop.prototype = {
     },
 
     _onXPenguinsWindowMinimized: function () {
+        this.LOG('..............notify::minimized')
         // UPTO: minimized && !paused already!
         if (this._XPenguinsWindow.meta_window.minimized) {
             this.pause(true, this._XPenguinsWindow.meta_window, 'notify::minimized',
                     Lang.bind(this, this._onXPenguinsWindowMinimized));
+            // y u no pause?
             return false;
         }
         return true; // resume.
@@ -846,7 +868,7 @@ XPenguinsLoop.prototype = {
      * This is equivalent to us switching away from xpenguin window's workspace.
      */
     _onXPenguinsWindowWorkspaceChanged: function (metaWin, oldWorkspace) {
-        this.LOG('xpenguins window has switched workspaces');
+        this.LOG('..............XPenguins window switched workspace')
         //UPTO
         // reassign get_workspace and fire this._onWorkspaceChanged
         // Hmm - get_workspace is guaranteed to be current anyhow since
@@ -861,23 +883,20 @@ XPenguinsLoop.prototype = {
             this.stop(true);
             this.emit('xpenguins-stopped');
         }
-        if (this._XPenguinsWindow.actor) {
+        if (this._XPenguinsWindow.actor && this._XPenguinsWindowDestroyedID) {
             this._XPenguinsWindow.actor.disconnect(this._XPenguinsWindowDestroyedID);
             this._XPenguinsWindowDestroyedID = null;
         }
         /* destroy this._XPenguinsWindow */
         this._XPenguinsWindow.destroy();
         delete this._XPenguinsWindow;
-        // TODO: send a signal indicating the window changed.
+        /* Indicate to the extension that the window has changed */
+        this.emit('xpenguins-window-killed');
     },
 
     /* stop xpenguins, but play the exit sequence */
     _onInterrupt: function (justExit) {
         this.LOG(_("Interrupt received: Exiting."));
-
-        /* tell the loop to start the exit sequence */
-        this._exiting = true;
-        this._setTotalNumber(0, true); // don't emit signal or sliders go to 0.
         /* If we're sleeping then quit immediately */
         if (this._sleepID) {
             Mainloop.source_remove(this._sleepID);
@@ -886,6 +905,10 @@ XPenguinsLoop.prototype = {
         } else if (justExit) {
         /* If emergency exit requested then quit immediately */
             this.exit();
+        } else {
+            /* tell the loop to start the exit sequence */
+            this._exiting = true;
+            this._setTotalNumber(0, true); // don't emit signal or sliders go to 0.
         }
     },
 
@@ -986,6 +1009,12 @@ XPenguinsLoop.prototype = {
      * main.c
      */
     _frame: function () {
+        /* sometimes the rug is pulled from under our feet - xpenguins is
+         * stopped and there's one extra _frame() call
+         */
+        if ((!this._playing || this._sleeping) && !this._relaunch) {
+            return false;
+        }
         ++this._tempFRAMENUMBER;
         /*
         this.LOG('FRAME %d _toonNumber: %d', this._tempFRAMENUMBER,
@@ -1044,14 +1073,15 @@ XPenguinsLoop.prototype = {
             } else {
                 /* laziness */
                 let u,
-                    gdata = this._theme.toonData[toon.genus];
+                    gdata = this._theme.toonData[toon.genus],
+                    box = this._XPenguinsWindow.get_box();
 
                 /* see if the toon is squashed */
                 if (!((toon.data.conf & Toon.NOBLOCK) ||
                         (toon.data.conf & Toon.INVULNERABLE)) &&
                         toon.blocked(Toon.HERE)) {
                     this.LOG('EXPLODING');
-                    if (o.blood && gdata.squashed) {
+                    if (o.blood && gdata.squased) {
                         toon.setType('squashed', toon.direction, Toon.HERE);
                     } else if (gdata.explosion) {
                         toon.setType('explosion', toon.direction, Toon.HERE);
@@ -1248,7 +1278,7 @@ XPenguinsLoop.prototype = {
                     /* climber */
                     } else if (toon.type === 'climber') {
                         var direction = toon.direction;
-                        if (toon.y < 0) {
+                        if (toon.y < box.top) {
                             /* reached top of screen, fall down */
                             toon.direction = +!direction;
                             toon.makeFaller();
@@ -1288,7 +1318,7 @@ XPenguinsLoop.prototype = {
                         }
                     /* floater */
                     } else if (toon.type === 'floater') {
-                        if (toon.y < 0) {
+                        if (toon.y < box.top) {
                             toon.direction = +(toon.u > 0);
                             toon.makeFaller();
                         } else if (sstatus !== Toon.OK) {
@@ -1312,7 +1342,7 @@ XPenguinsLoop.prototype = {
                     /* angel */
                     } else if (toon.type === 'angel') {
                         /* deactivate if offscreen */
-                        if (toon.y < -toon.data.height) {
+                        if (toon.y < box.top - toon.data.height) {
                             toon.active = 0;
                         }
                         if (sstatus !== Toon.OK) {
@@ -1389,7 +1419,7 @@ XPenguinsLoop.prototype = {
         /* requested to exit and re-add the timeout
          * (for example when the sleep_msec changes)
          */
-        let play = this._playing && !this._sleepID;
+        let play = !this.is_paused();
         if (!this._playing && this._relaunch) {
             this._relaunch = false;
             this._playing = Clutter.threads_add_timeout(GLib.PRIORITY_DEFAULT,

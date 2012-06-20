@@ -47,6 +47,8 @@ XPenguinsWindow.prototype = {
                     height: this.actor.height,
                 };
             });
+            // BIG TODO: this is fixed w.r.t. onAllWorkspaces!
+            // We don't want this! do a this.options.onAllWorkspaces??
             if (onAllWorkspaces) {
                 // always return the 'current' workspace
                 this.get_workspace = Lang.bind(global.screen,
@@ -63,13 +65,14 @@ XPenguinsWindow.prototype = {
     },
 
     _onDestroy: function () {
-        this.clear();
         /* remove references */
         this.meta_window = null;
-        this.actor.disconnect(this._destroyID);
+        if (this.actor) {
+            this.actor.disconnect(this._destroyID);
+            this.actor._delegate = null;
+            this.actor = null;
+        }
         this._destroyID = null;
-        this.actor._delegate = null;
-        this.actor = null;
     },
    
     destroy: function () {

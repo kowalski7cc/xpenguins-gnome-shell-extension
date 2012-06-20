@@ -158,6 +158,7 @@ Toon.prototype = {
             XPUtil.RandInt(geom.width - this.data.width) + geom.left,
             1 - this.data.height + geom.top
         );
+        XPUtil.DEBUG("init: %d, %d", this.actor.x, this.actor.y);
         this.setAssociation(UNASSOCIATED);
         this.setVelocity(this.direction * 2 - 1, this.data.speed);
         this.terminating = false;
@@ -556,12 +557,17 @@ Toon.prototype = {
         if (this.active) {
             let direction = (this.direction >= this.data.ndirections ? 0 :
                     this.direction),
+                box = this._globals.XPenguinsWindow.get_box(),
                 anchor_x = this.data.width * this.frame,
-                anchor_y = this.data.height * direction;
-
+                anchor_y = this.data.height * direction,
+                clip_y = (box.top > this.actor.y ? box.top - this.actor.y : 0);
+            /* the extra clip_y is if we draw XPenguins in a window
+             * and toons spawn at negative coordinates, they need to be clipped
+             * so they don't show outside of the window we are running in.
+             */
             this.actor.set_anchor_point(anchor_x, anchor_y);
             /* clip is measured from top-left of pixmap */
-            this.actor.set_clip(anchor_x, anchor_y,
+            this.actor.set_clip(anchor_x, anchor_y + clip_y,
                                 this.data.width, this.data.height);
         }
     },
@@ -622,6 +628,10 @@ ToonData.prototype = {
 
     loadTexture: function (filename) {
         this.texture = Clutter.Texture.new_from_file(filename);
+        /* How to avoid annoyling little flicker when they're first added?
+         * setting x, y to negative doesn't seem to work! */
+        this.texture.x = -this.texture.width;
+        this.texture.y = -this.texture.height;
     },
 
     get filename() {

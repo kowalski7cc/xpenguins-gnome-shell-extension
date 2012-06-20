@@ -762,7 +762,6 @@ XPenguinsMenu.prototype = {
         this._toggles = {
             ignorePopups       : _("Ignore popups"),
             ignoreMaximised    : _("Ignore maximised windows"),
-            ignoreHalfMaximised: _(".. and half-maximised too"),
             onAllWorkspaces    : _("Always on visible workspace"),
             blood              : _("Show blood"),
             angels             : _("Show angels"),
@@ -828,7 +827,7 @@ XPenguinsMenu.prototype = {
         this._optionsMenu = new PopupMenu.PopupSubMenuMenuItem(_("Options"));
         this.menu.addMenuItem(this._optionsMenu);
 
-        /* ignore maximised, ignore popups, ignore half maximised, god mode,
+        /* ignore maximised, ignore popups, god mode,
          * always on visible workspace, angels, blood, verbose toggles */
         for (let propName in this._toggles) {
             if (this._toggles.hasOwnProperty(propName) && !blacklist[propName]) {
@@ -838,18 +837,6 @@ XPenguinsMenu.prototype = {
                     Lang.bind(this, this.changeOption, propName));
                 this._optionsMenu.menu.addMenuItem(this._items[propName]);
             }
-        }
-
-        /* ignore half maximised should be greyed out/unusable if
-         * 'ignoreMaximised' is false, and usable if it's true.
-         * reactive: false?
-         */
-        if (this._items.ignoreHalfMaximised && this._items.ignoreMaximised) {
-            this._items.ignoreMaximised.connect('toggled', Lang.bind(this,
-                function (item, state) {
-                    this._items.ignoreHalfMaximised.setSensitive(state);
-                }));
-            this._items.ignoreHalfMaximised.setSensitive(this._items.ignoreMaximised.state);
         }
 
         /* animation speed */
@@ -917,6 +904,8 @@ XPenguinsMenu.prototype = {
                 }
             })
         );
+        this._XPenguinsLoop.connect('xpenguins-window-killed',
+            Lang.bind(this, this._onWindowChosen));
     },
 
     _populateThemeMenu: function () {
@@ -1014,7 +1003,6 @@ XPenguinsMenu.prototype = {
     },
 
     _onWindowChosen: function (dialog, metaWindow) {
-        XPUtil.DEBUG('window chosen: ' + metaWindow);
         dialog.disconnect(dialog._windowSelectedID);
         /* if meta window is null or has been destroyed in the meantime, use
          * the desktop. */

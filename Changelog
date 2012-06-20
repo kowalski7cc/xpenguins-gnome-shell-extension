@@ -1,0 +1,9 @@
+v1.1:
+* use windowListener class from the window-HUD repository
+* removed ignoreHalfMaximised. It doesn't make sense.
+  For example, what if a window is under one half-maximised window but over
+  another? We'd have to restrict to just the visible region, but that involves
+  a lot of fancy footwork with the Region (i.e. the ability to remove part of
+  the region that is not one of the constituent rectangles).
+  
+  I don't want to undertake this footwork!

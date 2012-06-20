@@ -158,8 +158,6 @@ WindowListener.prototype = {
     pause: function (owner, eventName, cb) {
         this.LOG('[WL] pause');
 
-        /* recalculate toon windows on resume */
-        this._onWindowEvent('pause');
         /* temporarily disconnect events */
         this._disconnectSignals();
 
@@ -489,8 +487,12 @@ WindowListener.prototype = {
      * and add them to the current one
      */
     _onWorkspaceChanged: function (shellwm, fromI, toI, direction) {
+        this.LOG('_onWorkspaceChanged(%d): from %d to %d', this.get_workspace(), fromI, toI);
+        if (this.get_workspace() === toI) {
+            // BAH THIS IS NOT HAPPENING AS IT SHOULD
+            return;
+        }
         // from & to are indices.
-        this.LOG('_onWorkspaceChanged: from %d to %d', fromI, toI);
         /* If you've changed workspaces, you need to change window-added/
          * removed listeners. */
         if (this.options.onAllWorkspaces) {
