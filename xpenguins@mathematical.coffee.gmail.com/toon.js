@@ -77,7 +77,7 @@ Toon.prototype = {
         /* initialisation */
         this.u = this.v = 0; /* velocity */
         this.genus = null;
-        this.type = 'faller';
+        this.type = '';
         this.direction = null;
         this.theme = null;
 
@@ -153,13 +153,12 @@ Toon.prototype = {
         this.data = this._globals.toonData[this.genus][this.type];
         this.direction = XPUtil.RandInt(2);
         this.setType('faller', this.direction, UNASSOCIATED);
-        let geom = this._globals.XPenguinsWindow.get_box();
+        let geom = this._globals.box;
         this.actor.set_position(
-            XPUtil.RandInt(geom.width - this.data.width) + geom.left,
-            1 - this.data.height + geom.top
-        );
-        XPUtil.DEBUG("init: %d, %d", this.actor.x, this.actor.y);
-        this.setAssociation(UNASSOCIATED);
+                 XPUtil.RandInt(geom.width - this.data.width) + geom.left,
+                 1 - this.data.height + geom.top
+             );
+        this.associate = UNASSOCIATED;
         this.setVelocity(this.direction * 2 - 1, this.data.speed);
         this.terminating = false;
     },
@@ -167,6 +166,9 @@ Toon.prototype = {
     /**** ASSIGNMENT FUNCTIONS (toon_set.c) ****/
     /* ToonSetType */
     setType: function (type, direction, gravity) {
+        if (this.type === type) {
+            return;
+        }
         XPUtil.DEBUG('  toon changing from %s to %s'.format(this.type, type));
         this.setGenusAndType(this.genus, type, direction, gravity);
     },
@@ -187,14 +189,6 @@ Toon.prototype = {
         /* precache .data rather than having a getter */
         this.data = this._globals.toonData[this.genus][this.type];
         this.actor.set_source(this.data.texture);
-    },
-
-    /* Set a toons association direction - e.g. Toon_DOWN if the toon
-       is walking along the tops the window, Toon_UNASSOCIATED if
-       the toon is in free space */
-    // ToonSetAssocation
-    setAssociation: function (direction) {
-        this.associate = direction;
     },
 
     // ToonSetVelocity
@@ -242,23 +236,22 @@ Toon.prototype = {
      * I.e. cannot move any further in that direction.
      */
     blocked: function (direction) {
-        let box = this._globals.XPenguinsWindow.get_box();
         // NOTE: right and bottom are inclusive of the last pixel.
         if (this._globals.edge_block) {
             if (direction === LEFT) {
-                if (this.x <= box.left) {
+                if (this.x <= this._globals.box.left) {
                     return 1;
                 }
             } else if (direction === RIGHT) {
-                if (this.x + this.data.width >= box.right) {
+                if (this.x + this.data.width >= this._globals.box.right) {
                     return 1;
                 }
             } else if (direction === UP) {
-                if (this.y <= box.top) {
+                if (this.y <= this._globals.box.top) {
                     return 1;
                 }
             } else if (direction === DOWN) {
-                if (this.y + this.data.height >= box.bottom) {
+                if (this.y + this.data.height >= this._globals.box.bottom) {
                     return 1;
                 }
             } // switch(direction)
@@ -291,7 +284,7 @@ Toon.prototype = {
      * TODO: <= vs < !!
      */
     offsetBlocked: function (xoffset, yoffset) {
-        let box = this._globals.XPenguinsWindow.get_box();
+        let box = this._globals.box;
         if (this._globals.edge_block) {
             if ((this.x + xoffset < box.left) ||
                     (this.x + this.data.width + xoffset > box.right) ||
@@ -323,7 +316,7 @@ Toon.prototype = {
     makeClimber: function () {
         this.setType('climber', this.direction,
             (this.direction ? DOWNRIGHT : DOWNLEFT));
-        this.setAssociation(this.direction);
+        this.associate = this.direction;
         this.setVelocity(0, -this.data.speed);
     },
 
@@ -346,7 +339,7 @@ Toon.prototype = {
             }
         }
         this.setType(newtype, this.direction, gravity);
-        this.setAssociation(DOWN);
+        this.associate = DOWN;
         this.setVelocity(this.data.speed * (2 * this.direction - 1), 0);
     },
 
@@ -356,7 +349,7 @@ Toon.prototype = {
     makeFaller: function () {
         this.setType('faller', this.direction, UP);
         this.setVelocity(this.direction * 2 - 1, this.data.speed);
-        this.setAssociation(UNASSOCIATED);
+        this.associate = UNASSOCIATED;
     },
 
     /*** HANDLING TOON ASSOCIATIONS WITH MOVING WINDOWS (toon_associate.c) ***/
@@ -460,7 +453,7 @@ Toon.prototype = {
             newy = this.y + this.v,
             stationary = (this.u === 0 && this.v === 0),
             result = OK,
-            box = this._globals.XPenguinsWindow.get_box();
+            box = this._globals.box;
 
         if (this._globals.edge_block) {
             if (newx < box.left) {
@@ -557,10 +550,11 @@ Toon.prototype = {
         if (this.active) {
             let direction = (this.direction >= this.data.ndirections ? 0 :
                     this.direction),
-                box = this._globals.XPenguinsWindow.get_box(),
                 anchor_x = this.data.width * this.frame,
                 anchor_y = this.data.height * direction,
-                clip_y = (box.top > this.actor.y ? box.top - this.actor.y : 0);
+                top = this._globals.box.top,
+                clip_y = (top > 0 && top > this.actor.y ?
+                    top - this.actor.y : 0);
             /* the extra clip_y is if we draw XPenguins in a window
              * and toons spawn at negative coordinates, they need to be clipped
              * so they don't show outside of the window we are running in.

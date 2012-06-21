@@ -106,6 +106,9 @@ Here are some known issues/limitations of the program (if you think you can fix 
 * When you have dual monitors of different sizes, toons will happily walk in the areas of the combined screens' bounding box that are not visible to the user (patches welcome!).
 * Toons don't treat the message tray or gnome-shell menus/popups as solid. This is because XPenguins can only make toons interact with objects that the window manager knows about, and things created with GNOME-shell such as the message tray/notifications are not handled by the window manager.
 
+Windowed mode is much harder than desktop mode, and as such has some caveats:
+* if you obscure the entire top edge of the XPenguins window with another one, toons will not respawn on dying and you may see flickery explosion pictures at the top of the window. This is because toons respawn by floating down from the top of the XPenguins window but if you've obscured it they die as soon as they spawn.
+
 # Wish list
 Patches welcome! (add wish list stuff as an 'enhancement' on the [Issues page](https://bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension/issues?status=new&status=open).
 

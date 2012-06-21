@@ -1,9 +1,19 @@
 v1.1:
 * use windowListener class from the window-HUD repository
 * removed ignoreHalfMaximised. It doesn't make sense.
-  For example, what if a window is under one half-maximised window but over
-  another? We'd have to restrict to just the visible region, but that involves
-  a lot of fancy footwork with the Region (i.e. the ability to remove part of
-  the region that is not one of the constituent rectangles).
+For example, what if a window is under one half-maximised window but over
+another? We'd have to restrict to just the visible region, but that involves
+a lot of fancy footwork with the Region (i.e. the ability to remove part of
+the region that is not one of the constituent rectangles).
   
   I don't want to undertake this footwork!
+* efficiency: the XPenguins window bounds (get_box()) is now only calculated
+once per loop for all toons (instead of once per toon per function call per
+loop). This means storing it in this._toonGlobals.box and refreshing that
+every frame.
+* removed Toon.setAssociation and replaced with a simple 'this.association ='.
+* At the moment we don't properly pause when the XPenguins window becomes
+obscured, but we just hide the toons until they can spawn without dying
+instantly (in the background they are still respawning every frame though).
+What we'd prefer is to know when the XPenguin window has become totally
+obscured, and then pause until some part of it is exposed again.

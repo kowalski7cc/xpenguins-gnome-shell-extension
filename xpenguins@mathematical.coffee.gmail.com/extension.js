@@ -86,7 +86,6 @@ WindowPickerDialog.prototype = {
 
         /* thumbnails in scroll box (put in BoxLayout or else cannot see) */
         let box = new St.BoxLayout();
-        // TODO: add 'desktop' window.
         this._windows = global.get_window_actors().map(function (w) {
             return w.meta_window;
         });
@@ -94,7 +93,6 @@ WindowPickerDialog.prototype = {
         this._windows = this._windows.filter(function (w) {
             return w.window_type != Meta.WindowType.DESKTOP;
         });
-        // TODO: add a desktop clone here but redirect to global.stage.
         this._thumbnails = new AltTab.ThumbnailList(this._windows);
         this._thumbnails.actor.get_allocation_box();
         box.add(this._thumbnails.actor, {expand: true, x_fill: true, y_fill: true});
@@ -126,11 +124,6 @@ WindowPickerDialog.prototype = {
 
     _windowEntered: function (thumbnails, n) {
         this._thumbnails.highlight(n);
-    },
-
-     /* In case it is somehow destroyed without close() being called */
-    _onDestroy: function () {
-        this.emit('window-selected', null);
     }
 };
 
@@ -818,6 +811,7 @@ XPenguinsMenu.prototype = {
             this.menu.addMenuItem(this._items.onDesktop);
         }
 
+
         /* theme submenu */
         this._themeMenu = new PopupMenu.PopupSubMenuMenuItem(_("Theme"));
         this.menu.addMenuItem(this._themeMenu);
@@ -906,6 +900,8 @@ XPenguinsMenu.prototype = {
         );
         this._XPenguinsLoop.connect('xpenguins-window-killed',
             Lang.bind(this, this._onWindowChosen));
+        this._XPenguinsLoop.connect('option-changed',
+            Lang.bind(this, this._onOptionChanged));
     },
 
     _populateThemeMenu: function () {
@@ -1015,6 +1011,16 @@ XPenguinsMenu.prototype = {
         
         this._XPenguinsLoop.setWindow(metaWindow ? 
             metaWindow.get_compositor_private() : global.stage);
+
+        /* 'always on visible workspace' is invalid if !onDesktop */
+        this._items.onAllWorkspaces.setSensitive(!metaWindow);
+    },
+
+    _onOptionChanged: function (loop, propName, propVal) {
+        XPUtil.DEBUG('[ext] _onOptionChanged: %s -> %s', propName, propVal);
+        if (this._items[propName]) {
+            this._items[propName].setToggleState(propVal);
+        }
     },
 
     _startXPenguins: function (item, state) {
@@ -1026,6 +1032,11 @@ XPenguinsMenu.prototype = {
         } else {
             this._XPenguinsLoop.stop();
         }
+    },
+
+    destroy: function () {
+        this._XPenguinsLoop.destroy();
+        PanelMenu.SystemStatusButton.prototype.destroy.call(this);
     }
 };
 

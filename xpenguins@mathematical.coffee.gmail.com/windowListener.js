@@ -178,6 +178,7 @@ WindowListener.prototype = {
     /* Called to resume listening for events after a pause. */
     resume: function () {
         this.LOG('[WL] resume');
+        this.disconnectTrackedSignals(this._resumeSignal);
         /* reconnect events */
         this._connectSignals();
         /* recalculate toon windows */
@@ -206,7 +207,9 @@ WindowListener.prototype = {
             this._startingWorkspace = global.screen.get_active_workspace();
         }
 
-        if (this.is_playing()) {
+        if (this.is_paused()) {
+            this.resume();
+        } else if (this.is_playing()) {
             this._updateSignals();
         }
     },
@@ -219,7 +222,7 @@ WindowListener.prototype = {
 
     /* calls subject.connect(name, cb) and stores the resulting ID in owner. */
     connectAndTrack: function (owner, subject, name, cb) {
-        this.LOG('connectAndTrack for %s', owner.toString());
+        this.LOG('connectAndTrack for event %s', name);
         if (!owner.hasOwnProperty('_WindowHUD_bound_signals')) {
             owner._WindowHUD_bound_signals = [];
         }
@@ -487,15 +490,17 @@ WindowListener.prototype = {
      * and add them to the current one
      */
     _onWorkspaceChanged: function (shellwm, fromI, toI, direction) {
-        this.LOG('_onWorkspaceChanged(%d): from %d to %d', this.get_workspace(), fromI, toI);
-        if (this.get_workspace() === toI) {
-            // BAH THIS IS NOT HAPPENING AS IT SHOULD
+        let ws = this.get_workspace().index();
+        this.LOG('_onWorkspaceChanged(%s): from %d to %d', ws, fromI, toI);
+        /*
+        if (ws === toI) {
             return;
         }
+        */
         // from & to are indices.
         /* If you've changed workspaces, you need to change window-added/
          * removed listeners. */
-        if (this.options.onAllWorkspaces) {
+        if (this.options.onAllWorkspaces || ws === toI) {
             /* update the toon region
              * Note: if you call this straight away and switch back into a
              * workspace *with* windows, it doesn't update until the next event.
@@ -511,23 +516,27 @@ WindowListener.prototype = {
                 let from = global.screen.get_workspace_by_index(fromI),
                     to = global.screen.get_workspace_by_index(toI);
                 this.disconnectTrackedSignals(from);
+                from.list_windows().map(Lang.bind(this, function (w) {
+                    this.disconnectTrackedSignals(w);
+                }));
 
                 this.connectAndTrack(this, to, 'window-added',
                     Lang.bind(this, this._onWindowAdded));
                 this.connectAndTrack(this, to, 'window-removed',
                     Lang.bind(this, this._onWindowRemoved));
 
-                /* connect up existing windows */
+                // connect up existing windows. NOTE: these fire window-added
+                /*
                 to.list_windows().map(Lang.bind(this, function (metaWin) {
                     if (metaWin.get_window_type() !== Meta.WindowType.DESKTOP) {
                         this._onWindowAdded(null, metaWin);
                     }
                 }));
+                */
             }
         } else {
             /* hide the toons & pause if we've switched to another workspace */
-            if (global.screen.get_workspace_by_index(toI) !==
-                    this.get_workspace()) {
+            if (toI !== ws) {
                 this.pause(true, global.window_manager, 'switch-workspace',
                     function (dmy, fI, tI, dir) {
                         return (global.screen.get_workspace_by_index(tI) ===

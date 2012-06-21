@@ -16,6 +16,8 @@ XPenguinsWindow.prototype = {
     _init: function (baseWindow, onAllWorkspaces) {
         this.actor = baseWindow;
         this._destroyID = this.actor.connect('destroy', Lang.bind(this, this._onDestroy));
+        this._onAllWorkspaces = onAllWorkspaces;
+        this._startingWorkspace = global.screen.get_active_workspace();
 
         if (baseWindow instanceof Meta.WindowActor) {
             this.meta_window = this.actor.meta_window;
@@ -47,21 +49,26 @@ XPenguinsWindow.prototype = {
                     height: this.actor.height,
                 };
             });
-            // BIG TODO: this is fixed w.r.t. onAllWorkspaces!
-            // We don't want this! do a this.options.onAllWorkspaces??
-            if (onAllWorkspaces) {
-                // always return the 'current' workspace
-                this.get_workspace = Lang.bind(global.screen,
-                    global.screen.get_active_workspace);
-            } else {
-                // starting workspace
-                let ws = global.screen.get_active_workspace();
-                this.get_workspace = function () {
-                    return ws;
+            this.get_workspace = Lang.bind(this, function () {
+                if (this._onAllWorkspaces) {
+                    return global.screen.get_active_workspace();
+                } else {
+                    return this._startingWorkspace;
                 }
-            }
+            });
         }
         this.actor._delegate = this;
+    },
+
+    setOnAllWorkspaces: function (val) {
+        this._onAllWorkspaces = val;
+        if (!val) {
+            this._startingWorkspace = global.screen.get_active_workspace();
+        }
+    },
+
+    getOnAllWorkspaces: function () {
+        return this._onAllWorkspaces;
     },
 
     _onDestroy: function () {
