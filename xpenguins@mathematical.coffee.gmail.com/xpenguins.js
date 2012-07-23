@@ -1,6 +1,3 @@
-/* TODO:
- * When stopping & restarting, numbers get set back to defaults.
- */
 const Clutter  = imports.gi.Clutter;
 const GLib     = imports.gi.GLib;
 const Lang     = imports.lang;
@@ -284,6 +281,9 @@ XPenguinsLoop.prototype = {
         delete this._toonGlobals;
         delete this._theme;
         this._toons = [];
+
+        /* tell everyone we've finished */
+        this.emit('stopped');
     },
 
     /* pauses the timeline & temporarily stops listening for events,

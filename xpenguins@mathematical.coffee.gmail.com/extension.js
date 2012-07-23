@@ -815,7 +815,6 @@ XPenguinsMenu.prototype = {
         /* theme submenu */
         this._themeMenu = new PopupMenu.PopupSubMenuMenuItem(_("Theme"));
         this.menu.addMenuItem(this._themeMenu);
-        this._populateThemeMenu();
 
         /* options submenu */
         this._optionsMenu = new PopupMenu.PopupSubMenuMenuItem(_("Options"));
@@ -902,6 +901,24 @@ XPenguinsMenu.prototype = {
             Lang.bind(this, this._onWindowChosen));
         this._XPenguinsLoop.connect('option-changed',
             Lang.bind(this, this._onOptionChanged));
+        this._XPenguinsLoop.connect('stopped', Lang.bind(this, function () {
+            /* Quietly reset numbers for the loop from sliders for next time 
+             * (on the loop ending they are all 0)
+             */
+            let themes = [], ns = [];
+            for (let th in this._items.themes) {
+                if (this._items.themes.hasOwnProperty(th)) {
+                    let n = this._items.themes[th].getValue();
+                    if (n) {
+                        themes.push(th);
+                        ns.push(n);
+                    }
+                }
+            }
+            this._XPenguinsLoop.setThemeNumbers(themes, ns, false);
+        }));
+
+        this._populateThemeMenu();
     },
 
     _populateThemeMenu: function () {
@@ -1025,8 +1042,6 @@ XPenguinsMenu.prototype = {
 
     _startXPenguins: function (item, state) {
         XPUtil.DEBUG((state ? 'STARTING ' : 'STOPPING ') + 'XPenguins');
-        // UPTO: set numbers back from 0 (if second start, sliders
-        // may not be in sync with XPenguinsLoop._number)
         if (state) {
             this._XPenguinsLoop.start();
         } else {
