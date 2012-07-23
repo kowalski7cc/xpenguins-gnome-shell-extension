@@ -133,6 +133,8 @@ WindowPickerDialog.prototype = {
  * Future icing: make one toon of each type in the theme and have them run
  * in the about dialog.
  */
+const ABOUT_ORDER = ['name', 'date', 'artist', 'copyright',
+                     'license', 'maintainer', 'location', 'comment'];
 function AboutDialog() {
     this._init.apply(this, arguments);
 }
@@ -140,10 +142,11 @@ function AboutDialog() {
 AboutDialog.prototype = {
     __proto__: ModalDialog.ModalDialog.prototype,
 
-    _init: function (title, text, icon_path) {
+    _init: function (themeInfo) {
         ModalDialog.ModalDialog.prototype._init.call(this,
             {styleClass: 'modal-dialog'});
 
+        this._theme = themeInfo;
         let monitor = global.screen.get_monitor_geometry(global.screen.get_primary_monitor()),
             width   = Math.max(400, Math.round(monitor.width / 3)),
             height  = Math.max(400, Math.round(monitor.height / 2.5));
@@ -158,10 +161,10 @@ AboutDialog.prototype = {
             icon_type: St.IconType.FULLCOLOR,
             style_class: 'xpenguins-about-icon'
         });
-        this.setIcon(icon_path);
+        this.setIcon(themeInfo.icon);
         this.titleBox.add(this.icon);
 
-        this.title = new St.Label({text: title || '',
+        this.title = new St.Label({text: themeInfo.name || '',
             style_class: 'xpenguins-about-title'});
         this.titleBox.add(this.title,  {x_fill: true});
 
@@ -178,7 +181,7 @@ AboutDialog.prototype = {
 
         /* text in scrollbox.
          * For some reason it won't display unless in a St.BoxLayout. */
-        this.text = new St.Label({text: (text || ''),
+        this.text = new St.Label({text: '',
             style_class: 'xpenguins-about-text'});
         this.text.clutter_text.ellipsize = Pango.EllipsizeMode.NONE; // allows scrolling
         //this.text.clutter_text.line_wrap = true;
@@ -197,7 +200,87 @@ AboutDialog.prototype = {
                 this.close(global.get_current_time());
             })
         }]);
+
+
+        /* Xpenguins-specific stuff */
+        for (let i = 0; i < ABOUT_ORDER.length; ++i) {
+            let propName = ABOUT_ORDER[i];
+            if (themeInfo[propName]) {
+                this.appendText('%s%s: %s'.format(
+                    propName.charAt(0).toUpperCase(),
+                    propName.slice(1),
+                    themeInfo[propName]
+                ));
+            }
+        }
+
+        /*
+        this.actor = new Clutter.Stage({
+            width: this.contentLayout.width,
+            height: this.contentLayout.height,
+            x: this.contentLayout.x,
+            y: this.contentLayout.y
+        });
+        */
+
+        this._XPenguinsLoop = new XPenguins.XPenguinsLoop({
+            // actually, we want it to ignore everything.
+            ignoreMaximised: false, // so that stackingOrder is not forced to true
+            ignorePopups: false,
+            onAllWorkspaces: false,
+            stackingOrder: false
+        });
+        // TODO: exactly 1 of each genus.
+        this._XPenguinsLoop.setThemeNumbers(themeInfo.sanitised_name, -1);
+        // pretend there are no windows
+        this._XPenguinsLoop._updateWindows = function () {};
+
+        this._destroyID = this.connect('destroy', Lang.bind(this, this._onDestroy));
 	},
+
+    _onDestroy: function () {
+        log('destroying dialog');
+        this.disconnect(this._destroyID);
+        if (this.stage === ModalDialog.State.OPENED || this.state === ModalDialog.State.OPENING) {
+            this.close(global.get_current_time());
+            // destroy??
+            this._onDestroy();
+        }
+        this._XPenguinsLoop.destroy();
+        this._XPenguinsLoop = null;
+
+        if (this._container) {
+            global.stage.remove_actor(this._container);
+            this._container = null;
+        }
+    },
+
+    open: function() {
+        ModalDialog.ModalDialog.prototype.open.apply(this, arguments);
+        //global.stage.add_actor(this.actor);
+        Mainloop.idle_add(Lang.bind(this, function () {
+            let position = this.contentLayout.get_transformed_position();
+            this._container = new St.Group({
+                x: position[0],
+                y: position[1],
+                width: this.contentLayout.width,
+                height: this.contentLayout.height
+            });
+            global.stage.add_actor(this._container);
+            // YES!
+            log(JSON.stringify(this.contentLayout.get_transformed_position()));
+            // give it a (fake) window & set it above everything else.
+            this._XPenguinsLoop.setWindow(this._container);
+            this._XPenguinsLoop._onDesktop = true; // not true but simplifies things
+            this._XPenguinsLoop.start();
+            return false;
+        }));
+    },
+
+    close: function () {
+        ModalDialog.ModalDialog.prototype.close.apply(this, arguments);
+        this._onDestroy();
+    },
 
     setTitle: function (title) {
         this.title.text = title;
@@ -760,8 +843,6 @@ XPenguinsMenu.prototype = {
             angels             : _("Show angels"),
             squish             : _("God Mode"),
         };
-        this._ABOUT_ORDER = ['name', 'date', 'artist', 'copyright',
-            'license', 'maintainer', 'location', 'comment'];
         this._THEME_STRING_LENGTH_MAX = 30;
 
         /* create an Xpenguin Loop object which stores the XPenguins program */
@@ -962,18 +1043,7 @@ XPenguinsMenu.prototype = {
             this._themeInfo[name] = ThemeManager.describeThemes([name], false)[name];
         }
 
-        let dialog = new AboutDialog(this._themeInfo[name].name);
-        for (let i = 0; i < this._ABOUT_ORDER.length; ++i) {
-            let propName = this._ABOUT_ORDER[i];
-            if (this._themeInfo[name][propName]) {
-                dialog.appendText('%s%s: %s'.format(
-                    propName.charAt(0).toUpperCase(),
-                    propName.slice(1),
-                    this._themeInfo[name][propName]
-                ));
-            }
-        }
-        dialog.setIcon(this._themeInfo[name].icon);
+        let dialog = new AboutDialog(this._themeInfo[name]);
         dialog.open(global.get_current_time());
     },
 

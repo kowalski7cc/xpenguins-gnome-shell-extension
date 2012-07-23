@@ -254,15 +254,22 @@ XPenguinsLoop.prototype = {
         }
 
         /* remove toonDatas from the stage */
-        for (i in this._theme.toonData) {
-            if (this._theme.toonData.hasOwnProperty(i)) {
-                let gdata = this._theme.toonData[i];
-                for (let type in gdata) {
-                    if (gdata.hasOwnProperty(type) &&
-                            !this._theme.toonData[i][type].master) {
-                        Main.uiGroup.remove_actor(gdata[type].texture);
+        if (this._theme) {
+            for (i in this._theme.toonData) {
+                if (this._theme.toonData.hasOwnProperty(i)) {
+                    let gdata = this._theme.toonData[i];
+                    for (let type in gdata) {
+                        if (gdata.hasOwnProperty(type) &&
+                                !this._theme.toonData[i][type].master) {
+                            Main.uiGroup.remove_actor(gdata[type].texture);
+                        }
                     }
                 }
+            }
+
+            /* destroy theme */
+            if (this._theme) {
+                this._theme.destroy();
             }
         }
 
@@ -271,11 +278,6 @@ XPenguinsLoop.prototype = {
          * we want to run in. 
          */
         //this._XPenguinsWindow.destroy();
-
-        /* destroy theme */
-        if (this._theme) {
-            this._theme.destroy();
-        }
 
         /* delete references to big objects to help free up memory */
         delete this._toonGlobals;
