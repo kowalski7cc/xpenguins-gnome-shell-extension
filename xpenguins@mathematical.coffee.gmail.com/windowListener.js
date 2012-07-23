@@ -151,11 +151,11 @@ WindowListener.prototype = {
     },
 
     /* Called to temporarily stop listening for events, *except* for
-     * owner.connect(eventName) which will resume the signal *if* the
+     * subject.connect(eventName) which will resume the signal *if* the
      * specificed callback evaluates to TRUE.
      * Note - this.is_playing() will still return true if it's paused.
      */
-    pause: function (owner, eventName, cb) {
+    pause: function (subject, eventName, cb) {
         this.LOG('[WL] pause');
 
         /* temporarily disconnect events */
@@ -164,8 +164,8 @@ WindowListener.prototype = {
         this._sleeping = true;
 
         /* connect up the signal to resume */
-        if (owner) {
-            this.connectAndTrack(this._resumeSignal, owner, eventName,
+        if (subject) {
+            this.connectAndTrack(this._resumeSignal, subject, eventName,
                 Lang.bind(this, function () {
                     if (!cb || cb.apply(this, arguments)) {
                         this.disconnectTrackedSignals(this._resumeSignal);

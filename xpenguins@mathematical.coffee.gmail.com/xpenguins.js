@@ -1,6 +1,5 @@
 /* TODO:
  * When stopping & restarting, numbers get set back to defaults.
- * Hide on overview being shown.
  */
 const Clutter  = imports.gi.Clutter;
 const GLib     = imports.gi.GLib;
@@ -290,9 +289,9 @@ XPenguinsLoop.prototype = {
     /* pauses the timeline & temporarily stops listening for events,
      * *except* for owner.connect(eventName) which sends the resume signal.
      */
-    pause: function (hide, owner, eventName, cb) {
+    pause: function (hide, subject, eventName, cb) {
         /* pauses the window tracker */
-        WindowListener.WindowListener.prototype.pause.call(this, owner, eventName, cb);
+        WindowListener.WindowListener.prototype.pause.call(this, subject, eventName, cb);
         if (hide) {
             this._hideToons();
         }
@@ -394,6 +393,13 @@ XPenguinsLoop.prototype = {
                 'notify::minimized', Lang.bind(this, this._onXPenguinsWindowMinimized));
             this.connectAndTrack(this._XPenguinsWindow, this._XPenguinsWindow.meta_window,
                 'workspace-changed', Lang.bind(this, this._onXPenguinsWindowWorkspaceChanged));
+        } else {
+        /* pause on overview show, if we're on the desktop */
+            this.connectAndTrack(this, Main.overview, 'showing',
+                Lang.bind(this, function () {
+                    this.pause(true, Main.overview, 'hiding');
+                })
+            );
         }
         WindowListener.WindowListener.prototype._connectSignals.apply(this, arguments);
     },
