@@ -92,6 +92,7 @@ See next question.
 
 ### The toons froze and toggling them off doesn't do anything.
 You must have discovered a bug in the extension! Contact me on [the issues page](https://bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension/issues/new) with:
+
 * your gnome-shell version
 * your extension version (look in metadata.json; give both dev-version and version)
 * your current options configurations: what themes you had turned on and what options (on all workspaces, ignore popups, etc) were on.
@@ -107,6 +108,7 @@ Here are some known issues/limitations of the program (if you think you can fix 
 * Toons don't treat the message tray or gnome-shell menus/popups as solid. This is because XPenguins can only make toons interact with objects that the window manager knows about, and things created with GNOME-shell such as the message tray/notifications are not handled by the window manager.
 
 Windowed mode is much harder than desktop mode, and as such has some caveats:
+
 * if you obscure the entire top edge of the XPenguins window with another one, toons will not respawn on dying and you may see flickery explosion pictures at the top of the window. This is because toons respawn by floating down from the top of the XPenguins window but if you've obscured it they die as soon as they spawn.
 
 # Wish list
@@ -114,7 +116,6 @@ Patches welcome! (add wish list stuff as an 'enhancement' on the [Issues page](h
 
 - toons talk to each other with little speech bubbles
 - toons jump up and down when you get new mail
-- run xpenguins in a specified window instead of on the desktop (need some sort of window selector and listeners to signals for when the window moves)
 - toons try to get to your cursor (???) --> climb up windows/turn into superman/etc in order to get there?
 
 ---
@@ -127,5 +128,4 @@ Patches welcome! (add wish list stuff as an 'enhancement' on the [Issues page](h
   This is just helpful for me to do testing.
   It is also a lot more verbose than the release branches.
   Default branch is not guaranteed to be stable at *any* commit.
-* Bookmark 'windowed-mode' is an attempt to get windowed mode working, i.e. toons run around in a specified window.
 * I attempt to make new features with bookmarks instead of branches.
