@@ -311,6 +311,11 @@ Toon.prototype = {
     },
 
     /**** MORPHING FUNCTIONS ****/
+    talk: function (speech) {
+        // make the toon say 'speech'.
+        // For now, the text appears above the toon's head.
+    },
+
     /* Turn a penguin into a climber */
     // __xpenguins_make_climber
     makeClimber: function () {
