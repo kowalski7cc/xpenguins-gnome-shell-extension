@@ -5,9 +5,11 @@ const GLib     = imports.gi.GLib;
 const Gtk      = imports.gi.Gtk;
 const Lang     = imports.lang;
 const Mainloop = imports.mainloop;
+const Meta      = imports.gi.Meta;
 const Pango    = imports.gi.Pango;
 const St       = imports.gi.St;
 
+const AltTab    = imports.ui.altTab;
 const Main      = imports.ui.main;
 const ModalDialog = imports.ui.modalDialog;
 const PanelMenu = imports.ui.panelMenu;
@@ -43,6 +45,81 @@ function disable() {
 }
 
 //// Classes ////
+
+function WindowPickerDialog() {
+    this._init.apply(this, arguments);
+}
+
+WindowPickerDialog.prototype = {
+    __proto__: ModalDialog.ModalDialog.prototype,
+
+    _init: function () {
+        ModalDialog.ModalDialog.prototype._init.call(this,
+            {styleClass: 'modal-dialog'});
+
+        let monitor = global.screen.get_monitor_geometry(global.screen.get_primary_monitor()),
+            width   = Math.round(monitor.width * .6),
+            height  = Math.min(300, Math.round(monitor.height * .3));
+
+        /* title + icon */
+        let box = new St.BoxLayout();
+        box.add(new St.Label({text: _("Select which window to run XPenguins in, or 'Cancel' to use the Desktop:")}),
+                    {x_fill: true});
+        this.contentLayout.add(box, {x_fill: true});
+
+        /* scroll box */
+        this.scrollBox = new St.ScrollView({
+            x_fill: true,
+            y_fill: true,
+            width: width,
+            height: height
+        });
+        // automatic horizontal scrolling, no vertical scrolling
+        this.scrollBox.set_policy(Gtk.PolicyType.AUTOMATIC,
+            Gtk.PolicyType.NEVER);
+
+        /* thumbnails in scroll box (put in BoxLayout or else cannot see) */
+        let box = new St.BoxLayout();
+        this._windows = global.get_window_actors().map(function (w) {
+            return w.meta_window;
+        });
+        /* filter out Nautilus desktop window */
+        this._windows = this._windows.filter(function (w) {
+            return w.window_type != Meta.WindowType.DESKTOP;
+        });
+        this._thumbnails = new AltTab.ThumbnailList(this._windows);
+        this._thumbnails.actor.get_allocation_box();
+        box.add(this._thumbnails.actor, {expand: true, x_fill: true, y_fill: true});
+        this.scrollBox.add_actor(box,
+            {expand: true, x_fill: true, y_fill: true});
+        this.contentLayout.add(this.scrollBox, {expand: true, x_fill: true, y_fill: true});
+        // need to call addClones at some point. it was called in _allocate ...
+
+        /* Cancel button */
+        this.setButtons([{
+            label: _("Cancel"),
+            action: Lang.bind(this, function () {
+                this._windowActivated(this._thumbnails, -1);
+            })
+        }]);
+	},
+
+    open: function() {
+        ModalDialog.ModalDialog.prototype.open.apply(this, arguments);
+        this._thumbnails.addClones(this.scrollBox.height);
+        this._thumbnails.connect('item-activated', Lang.bind(this, this._windowActivated));
+        this._thumbnails.connect('item-entered', Lang.bind(this, this._windowEntered));
+    },
+
+    _windowActivated: function (thumbnails, n) {
+        this.emit('window-selected', this._windows[n]);
+        this.close(global.get_current_time());
+    },
+
+    _windowEntered: function (thumbnails, n) {
+        this._thumbnails.highlight(n);
+    }
+};
 
 /* Popup dialog with scrollable text.
  * See InstallExtensionDialog in extensionSystem.js for an example.
@@ -93,7 +170,7 @@ AboutDialog.prototype = {
         this.scrollBox.set_policy(Gtk.PolicyType.AUTOMATIC,
             Gtk.PolicyType.AUTOMATIC);
 
-        /* text in scrollbox. 
+        /* text in scrollbox.
          * For some reason it won't display unless in a St.BoxLayout. */
         this.text = new St.Label({text: (text || ''),
             style_class: 'xpenguins-about-text'});
@@ -665,38 +742,20 @@ XPenguinsMenu.prototype = {
         this._toggles = {
             ignorePopups       : _("Ignore popups"),
             ignoreMaximised    : _("Ignore maximised windows"),
-            ignoreHalfMaximised: _(".. and half-maximised too"),
             onAllWorkspaces    : _("Always on visible workspace"),
-            onDesktop          : _("Run on desktop"), // not fully implemented
             blood              : _("Show blood"),
             angels             : _("Show angels"),
             squish             : _("God Mode"),
         };
         this._ABOUT_ORDER = ['name', 'date', 'artist', 'copyright',
             'license', 'maintainer', 'location', 'comment'];
-        this._THEME_STRING_LENGTH_MAX = 15;
+        this._THEME_STRING_LENGTH_MAX = 30;
+
+        /* create an Xpenguin Loop object which stores the XPenguins program */
+        this._XPenguinsLoop = new XPenguins.XPenguinsLoop();
 
         /* Create menus */
         this._createMenu();
-
-        /* create an Xpenguin Loop object which stores the XPenguins program */
-        this._XPenguinsLoop = new XPenguins.XPenguinsLoop(this.getConf());
-
-        /* Stuff that needs _XPenguinsLoop to be initialised */
-        // populate themes
-        this._populateThemeMenu();
-        // Listen to 'ntoons-changed' and adjust slider accordingly
-        this._XPenguinsLoop.connect('ntoons-changed', Lang.bind(this,
-            this._onChangeThemeNumber));
-        if (this._items.loadAveraging) {
-            this._XPenguinsLoop.connect('load-averaging-start', Lang.bind(this,
-                function () { this._items.loadAveraging.setBeingUsed(true, false); }));
-            this._XPenguinsLoop.connect('load-averaging-end', Lang.bind(this,
-                function () { this._items.loadAveraging.setBeingUsed(false, false); }));
-            this._XPenguinsLoop.connect('load-averaging-kill', Lang.bind(this,
-                function () { this._items.loadAveraging.setBeingUsed(true, true); }));
-        }
-
     },
 
     getConf: function () {
@@ -716,7 +775,9 @@ XPenguinsMenu.prototype = {
 
     _createMenu: function () {
         XPUtil.DEBUG('_createMenu');
-        let dummy;
+        let dummy,
+            opts = this._XPenguinsLoop.options,
+            blacklist = XPenguins.getCompatibleOptions(true);
 
         /* clear the menu */
         this.menu.removeAll();
@@ -728,39 +789,34 @@ XPenguinsMenu.prototype = {
             this._startXPenguins));
         this.menu.addMenuItem(this._items.start);
 
+        /* choice of window */
+        if (!blacklist.onDesktop) {
+            this._items.onDesktop = new PopupMenu.PopupMenuItem(_("Running in: ") 
+                + _("Desktop"));
+            this._items.onDesktop.connect('activate', Lang.bind(this,
+                this._onChooseWindow));
+            this.menu.addMenuItem(this._items.onDesktop);
+        }
+
+
         /* theme submenu */
         this._themeMenu = new PopupMenu.PopupSubMenuMenuItem(_("Theme"));
         this.menu.addMenuItem(this._themeMenu);
-
 
         /* options submenu */
         this._optionsMenu = new PopupMenu.PopupSubMenuMenuItem(_("Options"));
         this.menu.addMenuItem(this._optionsMenu);
 
-        /* ignore maximised, ignore popups, ignore half maximised, god mode,
+        /* ignore maximised, ignore popups, god mode,
          * always on visible workspace, angels, blood, verbose toggles */
-        let defaults = XPenguins.XPenguinsLoop.prototype.defaultOptions();
-        let blacklist = XPenguins.getCompatibleOptions(true);
         for (let propName in this._toggles) {
             if (this._toggles.hasOwnProperty(propName) && !blacklist[propName]) {
                 this._items[propName] = new PopupMenu.PopupSwitchMenuItem(
-                    this._toggles[propName], defaults[propName] || false);
+                    this._toggles[propName], opts[propName] || false);
                 this._items[propName].connect('toggled',
                     Lang.bind(this, this.changeOption, propName));
                 this._optionsMenu.menu.addMenuItem(this._items[propName]);
             }
-        }
-
-        /* ignore half maximised should be greyed out/unusable if
-         * 'ignoreMaximised' is false, and usable if it's true.
-         * reactive: false?
-         */
-        if (this._items.ignoreHalfMaximised && this._items.ignoreMaximised) {
-            this._items.ignoreMaximised.connect('toggled', Lang.bind(this,
-                function (item, state) {
-                    this._items.ignoreHalfMaximised.setSensitive(state);
-                }));
-            this._items.ignoreHalfMaximised.setSensitive(this._items.ignoreMaximised.state);
         }
 
         /* animation speed */
@@ -801,6 +857,55 @@ XPenguinsMenu.prototype = {
                     this.changeOption(null, id, 'recalcMode');
                 }));
         }
+
+        /* Listen to various signals from XPenguinsLoop to update the sliders
+         * accordingly */
+        this._XPenguinsLoop.connect('ntoons-changed', Lang.bind(this,
+            this._onChangeThemeNumber));
+        if (this._items.loadAveraging) {
+            this._XPenguinsLoop.connect('load-averaging-start', Lang.bind(this,
+                function () { this._items.loadAveraging.setBeingUsed(true, false);
+                })
+            );
+            this._XPenguinsLoop.connect('load-averaging-end', Lang.bind(this,
+                function () { this._items.loadAveraging.setBeingUsed(false, false);
+                })
+            );
+            this._XPenguinsLoop.connect('load-averaging-kill', Lang.bind(this,
+                function () { this._items.loadAveraging.setBeingUsed(true, true);
+                })
+            );
+        }
+        this._XPenguinsLoop.connect('xpenguins-stopped', Lang.bind(this,
+            function () {
+                this._items.start.setToggleState(false);
+                if (this._items.loadAveraging) {
+                    this._items.loadAveraging.setBeingUsed(false, false);
+                }
+            })
+        );
+        this._XPenguinsLoop.connect('xpenguins-window-killed',
+            Lang.bind(this, this._onWindowChosen));
+        this._XPenguinsLoop.connect('option-changed',
+            Lang.bind(this, this._onOptionChanged));
+        this._XPenguinsLoop.connect('stopped', Lang.bind(this, function () {
+            /* Quietly reset numbers for the loop from sliders for next time 
+             * (on the loop ending they are all 0)
+             */
+            let themes = [], ns = [];
+            for (let th in this._items.themes) {
+                if (this._items.themes.hasOwnProperty(th)) {
+                    let n = this._items.themes[th].getValue();
+                    if (n) {
+                        themes.push(th);
+                        ns.push(n);
+                    }
+                }
+            }
+            this._XPenguinsLoop.setThemeNumbers(themes, ns, false);
+        }));
+
+        this._populateThemeMenu();
     },
 
     _populateThemeMenu: function () {
@@ -890,17 +995,50 @@ XPenguinsMenu.prototype = {
         }
     },
 
+    _onChooseWindow: function () {
+        XPUtil.DEBUG('[ext] _onChooseWindow');
+        let dialog = new WindowPickerDialog();
+        dialog.open(global.get_current_time());
+        dialog._windowSelectedID = dialog.connect('window-selected', Lang.bind(this, this._onWindowChosen));
+    },
+
+    _onWindowChosen: function (dialog, metaWindow) {
+        dialog.disconnect(dialog._windowSelectedID);
+        /* if meta window is null or has been destroyed in the meantime, use
+         * the desktop. */
+        let string = _("Running in: ") + (metaWindow ? metaWindow.get_title() :
+            _("Desktop"));
+        if (string.length > this._THEME_STRING_LENGTH_MAX) {
+            string = string.substr(0, this._THEME_STRING_LENGTH_MAX - 3) + '...';
+        }
+        this._items.onDesktop.label.set_text(string);
+        
+        this._XPenguinsLoop.setWindow(metaWindow ? 
+            metaWindow.get_compositor_private() : global.stage);
+
+        /* 'always on visible workspace' is invalid if !onDesktop */
+        this._items.onAllWorkspaces.setSensitive(!metaWindow);
+    },
+
+    _onOptionChanged: function (loop, propName, propVal) {
+        XPUtil.DEBUG('[ext] _onOptionChanged: %s -> %s', propName, propVal);
+        if (this._items[propName]) {
+            this._items[propName].setToggleState(propVal);
+        }
+    },
+
     _startXPenguins: function (item, state) {
         XPUtil.DEBUG((state ? 'STARTING ' : 'STOPPING ') + 'XPenguins');
-
         if (state) {
             this._XPenguinsLoop.start();
         } else {
             this._XPenguinsLoop.stop();
-            if (this._items.loadAveraging) {
-                this._items.loadAveraging.setBeingUsed(false, false);
-            }
         }
+    },
+
+    destroy: function () {
+        this._XPenguinsLoop.destroy();
+        PanelMenu.SystemStatusButton.prototype.destroy.call(this);
     }
 };
 

@@ -72,7 +72,7 @@ Toon.prototype = {
         /* initialisation */
         this.u = this.v = 0; /* velocity */
         this.genus = null;
-        this.type = 'faller';
+        this.type = '';
         this.direction = null;
         this.theme = null;
 
@@ -148,11 +148,12 @@ Toon.prototype = {
         this.data = this._globals.toonData[this.genus][this.type];
         this.direction = XPUtil.RandInt(2);
         this.setType('faller', this.direction, UNASSOCIATED);
+        let geom = this._globals.box;
         this.actor.set_position(
-            XPUtil.RandInt(this._globals.XPenguinsWindow.get_width() - this.data.width),
-            1 - this.data.height
-        );
-        this.setAssociation(UNASSOCIATED);
+                 XPUtil.RandInt(geom.width - this.data.width) + geom.left,
+                 1 - this.data.height + geom.top
+             );
+        this.associate = UNASSOCIATED;
         this.setVelocity(this.direction * 2 - 1, this.data.speed);
         this.terminating = false;
     },
@@ -160,6 +161,9 @@ Toon.prototype = {
     /**** ASSIGNMENT FUNCTIONS (toon_set.c) ****/
     /* ToonSetType */
     setType: function (type, direction, gravity) {
+        if (this.type === type) {
+            return;
+        }
         XPUtil.DEBUG('  toon changing from %s to %s'.format(this.type, type));
         this.setGenusAndType(this.genus, type, direction, gravity);
     },
@@ -180,14 +184,6 @@ Toon.prototype = {
         /* precache .data rather than having a getter */
         this.data = this._globals.toonData[this.genus][this.type];
         this.actor.set_source(this.data.texture);
-    },
-
-    /* Set a toons association direction - e.g. Toon_DOWN if the toon
-       is walking along the tops the window, Toon_UNASSOCIATED if
-       the toon is in free space */
-    // ToonSetAssocation
-    setAssociation: function (direction) {
-        this.associate = direction;
     },
 
     // ToonSetVelocity
@@ -232,23 +228,25 @@ Toon.prototype = {
     /* Returns 1 if the toon is blocked in the specified direction,
      * 0 if not blocked and -1 if the direction argument was out of bounds
      * ToonBlocked
+     * I.e. cannot move any further in that direction.
      */
     blocked: function (direction) {
+        // NOTE: right and bottom are inclusive of the last pixel.
         if (this._globals.edge_block) {
             if (direction === LEFT) {
-                if (this.x <= 0) {
+                if (this.x <= this._globals.box.left) {
                     return 1;
                 }
             } else if (direction === RIGHT) {
-                if (this.x + this.data.width >= this._globals.XPenguinsWindow.get_width()) {
+                if (this.x + this.data.width >= this._globals.box.right) {
                     return 1;
                 }
             } else if (direction === UP) {
-                if (this.y <= 0) {
+                if (this.y <= this._globals.box.top) {
                     return 1;
                 }
             } else if (direction === DOWN) {
-                if (this.y + this.data.height >= this._globals.XPenguinsWindow.get_height()) {
+                if (this.y + this.data.height >= this._globals.box.bottom) {
                     return 1;
                 }
             } // switch(direction)
@@ -278,16 +276,16 @@ Toon.prototype = {
     /* Returns true the toon would be in an occupied area
      * if moved by xoffset and yoffset, false otherwise.
      * ToonOffsetBlocked
+     * TODO: <= vs < !!
      */
     offsetBlocked: function (xoffset, yoffset) {
+        let box = this._globals.box;
         if (this._globals.edge_block) {
-            if ((this.x + xoffset <= 0) ||
-                    (this.x + this.data.width + xoffset >=
-                        this._globals.XPenguinsWindow.get_width()) ||
-                    ((this.y + yoffset <= 0) && this._globals.edge_block
-                        !== SIDEBOTTOMBLOCK) ||
-                    (this.y + this.data.height + yoffset
-                        >= this._globals.XPenguinsWindow.get_height())) {
+            if ((this.x + xoffset < box.left) ||
+                    (this.x + this.data.width + xoffset > box.right) ||
+                    ((this.y + yoffset < box.top) &&
+                         this._globals.edge_block !== SIDEBOTTOMBLOCK) ||
+                    (this.y + this.data.height + yoffset > box.bottom)) {
                 return true;
             }
         }
@@ -313,7 +311,7 @@ Toon.prototype = {
     makeClimber: function () {
         this.setType('climber', this.direction,
             (this.direction ? DOWNRIGHT : DOWNLEFT));
-        this.setAssociation(this.direction);
+        this.associate = this.direction;
         this.setVelocity(0, -this.data.speed);
     },
 
@@ -336,7 +334,7 @@ Toon.prototype = {
             }
         }
         this.setType(newtype, this.direction, gravity);
-        this.setAssociation(DOWN);
+        this.associate = DOWN;
         this.setVelocity(this.data.speed * (2 * this.direction - 1), 0);
     },
 
@@ -346,7 +344,7 @@ Toon.prototype = {
     makeFaller: function () {
         this.setType('faller', this.direction, UP);
         this.setVelocity(this.direction * 2 - 1, this.data.speed);
-        this.setAssociation(UNASSOCIATED);
+        this.associate = UNASSOCIATED;
     },
 
     /*** HANDLING TOON ASSOCIATIONS WITH MOVING WINDOWS (toon_associate.c) ***/
@@ -449,27 +447,27 @@ Toon.prototype = {
             newx = this.x + this.u,
             newy = this.y + this.v,
             stationary = (this.u === 0 && this.v === 0),
-            result = OK;
+            result = OK,
+            box = this._globals.box;
 
         if (this._globals.edge_block) {
-            if (newx < 0) {
-                newx = 0;
+            if (newx < box.left) {
+                newx = box.left;
                 result = PARTIALMOVE;
-            } else if (newx + this.data.width >
-                    this._globals.XPenguinsWindow.get_width()) {
-                newx = this._globals.XPenguinsWindow.get_width() - this.data.width;
+            } else if (newx + this.data.width > box.right) {
+                newx = box.right - this.data.width;
                 result = PARTIALMOVE;
             }
         }
         if (!(this.data.conf & NOBLOCK)) {
             /* Consider all blocking: additionally y */
             if (this._globals.edge_block) {
-                if (newy < 0 && this._globals.edge_block !== SIDEBOTTOMBLOCK) {
-                    newy = 0;
+                if (newy < box.top && 
+                        this._globals.edge_block !== SIDEBOTTOMBLOCK) {
+                    newy = box.top;
                     result = PARTIALMOVE;
-                } else if (newy + this.data.height >
-                        this._globals.XPenguinsWindow.get_height()) {
-                    newy = this._globals.XPenguinsWindow.get_height() - this.data.height;
+                } else if (newy + this.data.height > box.bottom) {
+                    newy = box.bottom - this.data.height;
                     result = PARTIALMOVE;
                 }
                 if (newx === this.x && newy === this.y && !stationary) {
@@ -548,11 +546,17 @@ Toon.prototype = {
             let direction = (this.direction >= this.data.ndirections ? 0 :
                     this.direction),
                 anchor_x = this.data.width * this.frame,
-                anchor_y = this.data.height * direction;
-
+                anchor_y = this.data.height * direction,
+                top = this._globals.box.top,
+                clip_y = (top > 0 && top > this.actor.y ?
+                    top - this.actor.y : 0);
+            /* the extra clip_y is if we draw XPenguins in a window
+             * and toons spawn at negative coordinates, they need to be clipped
+             * so they don't show outside of the window we are running in.
+             */
             this.actor.set_anchor_point(anchor_x, anchor_y);
             /* clip is measured from top-left of pixmap */
-            this.actor.set_clip(anchor_x, anchor_y,
+            this.actor.set_clip(anchor_x, anchor_y + clip_y,
                                 this.data.width, this.data.height);
         }
     },
@@ -613,6 +617,10 @@ ToonData.prototype = {
 
     loadTexture: function (filename) {
         this.texture = Clutter.Texture.new_from_file(filename);
+        /* How to avoid annoyling little flicker when they're first added?
+         * setting x, y to negative doesn't seem to work! */
+        this.texture.x = -this.texture.width;
+        this.texture.y = -this.texture.height;
     },
 
     get filename() {
