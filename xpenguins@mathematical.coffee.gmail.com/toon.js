@@ -15,7 +15,7 @@
 const Clutter = imports.gi.Clutter;
 const Lang = imports.lang;
 
-const Gettext = imports.gettext.domain('gnome-shell-extensions');
+const Gettext = imports.gettext.domain('xpenguins');
 const _ = Gettext.gettext;
 
 var Me;

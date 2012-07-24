@@ -19,7 +19,7 @@ const WindowListener = Me.windowListener;
 const XPenguins = Me.xpenguins;
 const XPUtil = Me.util;
 
-const Gettext = imports.gettext.domain('gnome-shell-extensions');
+const Gettext = imports.gettext.domain('xpenguins');
 const _ = Gettext.gettext;
 
 /***********************
