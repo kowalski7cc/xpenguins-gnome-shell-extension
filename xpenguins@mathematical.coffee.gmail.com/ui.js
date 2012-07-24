@@ -642,7 +642,7 @@ const ThemeSliderMenuItem = new Lang.Class({
 
     /* sets the icon from a path */
     setIcon: function () {
-        AboutDialog.prototype.setIcon.apply(this, arguments); // TODO: TEST
+        AboutDialog.prototype.setIcon.apply(this, arguments);
     }
 });
 
