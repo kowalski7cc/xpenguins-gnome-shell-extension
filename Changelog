@@ -1,3 +1,6 @@
+v2.0:
+* many changes allowing XPenguins to run in a window
+* probably more, but I didn't document them :(
 v1.1:
 * use windowListener class from the window-HUD repository
 * removed ignoreHalfMaximised. It doesn't make sense.

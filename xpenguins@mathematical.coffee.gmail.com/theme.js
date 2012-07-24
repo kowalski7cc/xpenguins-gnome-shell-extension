@@ -16,6 +16,9 @@ const WindowListener = Me.windowListener;
 const XPenguins = Me.xpenguins;
 const XPUtil = Me.util;
 
+const Gettext = imports.gettext.domain('xpenguins');
+const _ = Gettext.gettext;
+
 /***********************
  *    Theme Object     *
  ***********************/
@@ -28,7 +31,7 @@ function Theme() {
 
 Theme.prototype = {
     _init: function (themeList) {
-        XPUtil.DEBUG('creating theme');
+        XPUtil.LOG('creating theme');
         /* members */
         /* Theme: can have one or more genera
          * Genus: class of toons (Penguins has 2: walker & skateboarder).
@@ -134,6 +137,8 @@ Theme.prototype = {
         }
         words = words.trim().split(' ');
 
+
+        /* make space for the next toon */
         try {
             for (let i = 0; i < words.length; ++i) {
                 let word = words[i].toLowerCase();

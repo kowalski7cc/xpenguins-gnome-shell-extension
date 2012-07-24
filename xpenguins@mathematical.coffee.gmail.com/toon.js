@@ -15,7 +15,7 @@
 const Clutter = imports.gi.Clutter;
 const Lang = imports.lang;
 
-const Gettext = imports.gettext.domain('gnome-shell-extensions');
+const Gettext = imports.gettext.domain('xpenguins');
 const _ = Gettext.gettext;
 
 const Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];

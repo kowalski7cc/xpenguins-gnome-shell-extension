@@ -98,7 +98,7 @@ WindowListener.prototype = {
             if (i_options.hasOwnProperty(opt) && this.options.hasOwnProperty(opt)) {
                 this.options[opt] = i_options[opt];
             } else {
-                LOG('  option %s not supported yet', opt);
+                this.LOG('  option %s not supported yet', opt);
             }
         }
 

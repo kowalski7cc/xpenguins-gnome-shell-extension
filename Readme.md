@@ -17,6 +17,9 @@ Project webpage: [at  bitbucket](https://bitbucket.org/mathematicalcoffee/xpengu
 # Options.
 To start/stop XPenguins, use the toggle.
 
+### Run in a particular window
+Click the "Running in:" item and choose which window you want the XPenguins to run around in ("Cancel" to have them use the desktop).
+
 ### Theme
 XPenguins is themable, and you can have multiple themes running simultaneously. 
 Use the sliders to add or remove toons from each theme.
@@ -26,10 +29,9 @@ Whether popup windows (right click menu, tooltips) are considered solid to the t
 ### Ignore maximised windows
 Whether maximised windows (and windows underneath these) are ignored.
 Toons only run around on the region of your desktop not covered by windows, so if windows are maximised you won't get any toons. Ignoring maximised windows means you can enjoy toons even with maximised windows. They will only bump into windows that are visible and non-maximised.
-### Ignore half-maximised windows
-If ignoring maximised windows is true, should we also ignore half-maximised windows (those that are maximised vertically or horizontally but not both)? This can be handy for people with big monitors who just use half-maximised windows all the time. **Only used if 'Ignore Maximised' is true.**
 ### Always on visible workspace
 Whether toons stay on the workspace you started XPenguins on, or follow you around all your workspaces.
+(Not applicable in windowed mode; then this setting is taken from the window itself).
 ### Blood
 Whether to show animations with blood (for example in the original Penguin theme the 'splat' animation has blood).
 ### Angels
@@ -38,7 +40,7 @@ Whether to show penguin angels floating up to heaven after dying.
 Enabling "God mode" lets you squash (smite) toons by clicking on them.
 ### Time between frames
 The time (in milliseconds) between each frame of the animation. By default the number specified by the theme is used (probably 60ms).
-### Recalc Mode
+### Recalc Mode (GNOME 3.4+)
 Ignore this. If you are suffering from severe performance issues AND you resize/move your windows really really often you can try switching this to "PAUSE" which will pause toons while you drag windows around. It probably won't make much difference at all.
 ### Load Averaging
 This defines two thresholds; when the computer's load average (for example given by `uptime` or `top`) exceeds the lower threshold, toons will start to be killed. 
@@ -57,7 +59,7 @@ The easy way (recommended):
 Alternatively (developers?):
 
 1. Checkout the repository: `hg clone https://bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension`
-2. Update to the `3.2` or `3.4` branch (the `default` branch is **NOT** guaranteed to work!).
+2. Update to the `gnome3.2` or `gnome3.4` branch (the `default` branch is **NOT** guaranteed to work!).
 3. Copy the folder `xpenguins@mathematical.coffee.gmail.com` to `.local/share/gnome-shell/extensions`.
 4. If on GNOME 3.2, use `dconf-editor` and modify the key `/org/gnome/shell/enabled-extensions` to include `'xpenguins@mathematical.coffee.gmail.com'`. 
 If on GNOME 3.4, then just do `gnome-shell-extension-tool -e xpenguins@mathematical.coffee.gmail.com`.
@@ -106,6 +108,7 @@ Here are some known issues/limitations of the program (if you think you can fix 
 
 * When you have dual monitors of different sizes, toons will happily walk in the areas of the combined screens' bounding box that are not visible to the user (patches welcome!).
 * Toons don't treat the message tray or gnome-shell menus/popups as solid. This is because XPenguins can only make toons interact with objects that the window manager knows about, and things created with GNOME-shell such as the message tray/notifications are not handled by the window manager.
+* When you first start XPenguins or first add in toons from another theme, you get an annoying flicker where all the toons' pixmaps are drawn on the screen very briefly before they get hidden.
 
 Windowed mode is much harder than desktop mode, and as such has some caveats:
 
@@ -116,7 +119,7 @@ Patches welcome! (add wish list stuff as an 'enhancement' on the [Issues page](h
 
 - toons talk to each other with little speech bubbles
 - toons jump up and down when you get new mail
-- toons try to get to your cursor (???) --> climb up windows/turn into superman/etc in order to get there?
+- see [issues page](https://bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension/issues?status=new&status=open) for more.
 
 ---
 # Changelog
