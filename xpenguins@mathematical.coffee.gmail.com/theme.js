@@ -22,11 +22,9 @@ const _ = Gettext.gettext;
 /* Contains all the information about the toon,
  * basically an array of ToonData structures.
  */
-function Theme() {
-    this._init.apply(this, arguments);
-}
 
-Theme.prototype = {
+const Theme = new Lang.Class({
+    Name: 'Theme',
     _init: function (themeList) {
         XPUtil.LOG('creating theme');
         /* members */
@@ -109,7 +107,6 @@ Theme.prototype = {
             return;
         }
 
-
         /* Read config file, ignoring comments ('#') and whitespace */
         let words = Shell.get_file_contents_utf8_sync(file_name),
             added_genii = [],
@@ -133,7 +130,6 @@ Theme.prototype = {
             added_genii.push(genus);
         }
         words = words.trim().split(' ');
-
 
         /* make space for the next toon */
         try {
@@ -317,4 +313,4 @@ Theme.prototype = {
             }
         }
     }
-};
+});

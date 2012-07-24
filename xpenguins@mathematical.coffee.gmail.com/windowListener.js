@@ -49,11 +49,9 @@ const RECALC = {
  * your own _onWindowEvent function (this calls _updateWindows() which is what
  * actually updates this.windowRegion).
  */
-function WindowListener() {
-    this._init.apply(this, arguments);
-}
 
-WindowListener.prototype = {
+const WindowListener = new Lang.Class({
+    Name: 'WindowListener',
     /* a bit silly but I want to access these externally without having to
      * create an instance of it first */
     options: {
@@ -255,7 +253,6 @@ WindowListener.prototype = {
         this._updateWindows();
     },
 
-
     //// Private methods ////
 
     /* updates this.windowRegion, the current snapshot of all the windows
@@ -330,7 +327,6 @@ WindowListener.prototype = {
                     this._onWindowEvent('destroy');
                 }));
         }
-
 
         /* resizing/moving */
         if (this.options.recalcMode === RECALC.ALWAYS) {
@@ -546,7 +542,7 @@ WindowListener.prototype = {
             }
         }
     }
-};
+});
 
 /* Region class
  * This is basically a collection of rectangles, with a function to see
@@ -557,11 +553,9 @@ WindowListener.prototype = {
  * If you for some reason wish to iterate through the rectangles in the region,
  * then iterate through region.rectangles as if it were an array.
  */
-function Region() {
-    this._init.apply(this, arguments);
-}
 
-Region.prototype = {
+const Region = new Lang.Class({
+    Name: 'Region',
     _init: function () {
         this.rectangles = [];
         this._extents = new Meta.Rectangle();
@@ -606,7 +600,7 @@ Region.prototype = {
         }
         return false;
     }
-};
+});
 
 /* Returns a list of WindowListener features that are supported by your version
  * of gnome-shell.

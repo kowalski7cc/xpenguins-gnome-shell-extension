@@ -42,18 +42,15 @@ function disable() {
 /*
  * XPenguinsMenu Object
  */
-function XPenguinsMenu() {
-    this._init.apply(this, arguments);
-}
 
-XPenguinsMenu.prototype = {
-    __proto__: PanelMenu.SystemStatusButton.prototype,
+const XPenguinsMenu = new Lang.Class({
+    Name: 'XPenguinsMenu',
+    Extends: PanelMenu.SystemStatusButton,
 
     _init: function (extensionPath) {
         XPUtil.DEBUG('_init');
         /* Initialise */
-        PanelMenu.SystemStatusButton.prototype._init.call(this,
-            'emblem-favorite', 'xpenguins');
+        this.parent('emblem-favorite', 'xpenguins');
         this.actor.add_style_class_name('xpenguins-icon');
         this.setGIcon(new Gio.FileIcon({
             file: Gio.file_new_for_path(GLib.build_filenamev([extensionPath,
@@ -117,13 +114,12 @@ XPenguinsMenu.prototype = {
 
         /* choice of window */
         if (!blacklist.onDesktop) {
-            this._items.onDesktop = new PopupMenu.PopupMenuItem(_("Running in: ") 
+            this._items.onDesktop = new PopupMenu.PopupMenuItem(_("Running in: ")
                 + _("Desktop"));
             this._items.onDesktop.connect('activate', Lang.bind(this,
                 this._onChooseWindow));
             this.menu.addMenuItem(this._items.onDesktop);
         }
-
 
         /* theme submenu */
         this._themeMenu = new PopupMenu.PopupSubMenuMenuItem(_("Theme"));
@@ -215,7 +211,7 @@ XPenguinsMenu.prototype = {
         this._XPenguinsLoop.connect('option-changed',
             Lang.bind(this, this._onOptionChanged));
         this._XPenguinsLoop.connect('stopped', Lang.bind(this, function () {
-            /* Quietly reset numbers for the loop from sliders for next time 
+            /* Quietly reset numbers for the loop from sliders for next time
              * (on the loop ending they are all 0)
              */
             let themes = [], ns = [];
@@ -338,8 +334,8 @@ XPenguinsMenu.prototype = {
             string = string.substr(0, this._THEME_STRING_LENGTH_MAX - 3) + '...';
         }
         this._items.onDesktop.label.set_text(string);
-        
-        this._XPenguinsLoop.setWindow(metaWindow ? 
+
+        this._XPenguinsLoop.setWindow(metaWindow ?
             metaWindow.get_compositor_private() : global.stage);
 
         /* 'always on visible workspace' is invalid if !onDesktop */
@@ -364,7 +360,7 @@ XPenguinsMenu.prototype = {
 
     destroy: function () {
         this._XPenguinsLoop.destroy();
-        PanelMenu.SystemStatusButton.prototype.destroy.call(this);
+        this.parent();
     }
-};
+});
 

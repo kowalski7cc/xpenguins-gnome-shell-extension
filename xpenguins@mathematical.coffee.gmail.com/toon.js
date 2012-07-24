@@ -53,18 +53,15 @@ const NOCYCLE = (1 << 0);
 const INVULNERABLE = (1 << 1);
 const NOBLOCK = (1 << 2);
 
-
 /********************************************************************
  * The Toon structure describes the properties of a particular toon,
  * such as its location and speed.
  * This is essentially a Clutter.Actor that is a Clutter.Clone of
  * the ToonData (Texture) corresponding to its type.
  ********************************************************************/
-function Toon() {
-    this._init.apply(this, arguments);
-}
 
-Toon.prototype = {
+const Toon = new Lang.Class({
+    Name: 'Toon',
     _init: function (globalvars, props, params) {
         /* __xpenguins_init_penguin(Toon *p) */
         this.actor = new Clutter.Clone(params || {});
@@ -462,7 +459,7 @@ Toon.prototype = {
         if (!(this.data.conf & NOBLOCK)) {
             /* Consider all blocking: additionally y */
             if (this._globals.edge_block) {
-                if (newy < box.top && 
+                if (newy < box.top &&
                         this._globals.edge_block !== SIDEBOTTOMBLOCK) {
                     newy = box.top;
                     result = PARTIALMOVE;
@@ -569,18 +566,16 @@ Toon.prototype = {
     destroy: function () {
         this.actor.destroy();
     }
-}; // Toon.prototype
+}); // Toon.prototype
 
 /********************************************************************
  * The ToonData structure describes the properties of a type of toon,
  * such as walker, climber etc.
  * It contains a Clutter.Texture holding the pixmap.
  ********************************************************************/
-function ToonData() {
-    this._init.apply(this, arguments);
-}
 
-ToonData.prototype = {
+const ToonData = new Lang.Class({
+    Name: 'ToonData',
 
     /* __xpenguins_copy_properties */
     _init: function (otherToonData) {
@@ -644,4 +639,4 @@ ToonData.prototype = {
             this.texture.destroy();
         }
     }
-};
+});
