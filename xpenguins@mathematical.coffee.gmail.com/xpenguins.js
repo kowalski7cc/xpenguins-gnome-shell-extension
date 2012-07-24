@@ -48,7 +48,7 @@ const ALL = -1;
  * Otherwise, you can specificy a blacklist (list.opt TRUE means blacklisted).
  */
 function getCompatibleOptions(blacklist) {
-    let list = Me.windowListener.getCompatibleOptions(blacklist);
+    let list = WindowListener.getCompatibleOptions(blacklist);
     /* enable everything else by default */
     let defOpts = XPenguinsLoop.prototype.defaultOptions();
     for (let opt in defOpts) {
