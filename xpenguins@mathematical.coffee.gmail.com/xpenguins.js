@@ -11,18 +11,13 @@ const Main = imports.ui.main;
 const Gettext = imports.gettext.domain('xpenguins');
 const _ = Gettext.gettext;
 
-var Me;
-try {
-    Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-} catch (err) {
-    Me = imports.misc.extensionUtils.getCurrentExtension().imports;
-}
-const Theme  = Me.theme;
-const ThemeManager = Me.themeManager;
-const Toon   = Me.toon;
-const WindowClone = Me.windowClone;
-const WindowListener = Me.windowListener;
-const XPUtil = Me.util;
+const Me = imports.misc.extensionUtils.getCurrentExtension();
+const Theme  = Me.imports.theme;
+const ThemeManager = Me.imports.themeManager;
+const Toon   = Me.imports.toon;
+const WindowClone = Me.imports.windowClone;
+const WindowListener = Me.imports.windowListener;
+const XPUtil = Me.imports.util;
 
 /* constants */
 const PENGUIN_MAX = 50; /* per theme */
@@ -78,15 +73,13 @@ function getCompatibleOptions(blacklist) {
  * the two functions (window tracking vs toon stuff) separate in my head
  * and makes it easier for me to work on them.
  ************************/
-function XPenguinsLoop() {
-    this._init.apply(this, arguments);
-}
 
-XPenguinsLoop.prototype = {
-    __proto__: WindowListener.WindowListener.prototype,
+const XPenguinsLoop = new Lang.Class({
+    Name: 'XPenguinsLoop',
+    Extends: WindowListener.WindowListener,
 
     _init: function (i_options) {
-        WindowListener.WindowListener.prototype._init.apply(this);
+        this.parent();
 
         /* set options */
         let options = this.defaultOptions(),
@@ -159,7 +152,7 @@ XPenguinsLoop.prototype = {
         this._exiting = false;
 
         this._dirty = true;
-        
+
         /* Laziness */
         let opt = this.options;
         /* If they set onAllWorkspaces but are running in a window,
@@ -207,7 +200,7 @@ XPenguinsLoop.prototype = {
         this._initToons();
 
         /* Call parent's start */
-        WindowListener.WindowListener.prototype.start.apply(this);
+        this.parent();
 
         /* actually start */
         this._playing = Clutter.threads_add_timeout(GLib.PRIORITY_DEFAULT,
@@ -273,7 +266,7 @@ XPenguinsLoop.prototype = {
 
         /* Note: we *don't* destroy the window clone so that it may be
          * re-used for the next run without having to re-assign the window
-         * we want to run in. 
+         * we want to run in.
          */
         //this._XPenguinsWindow.destroy();
 
@@ -291,7 +284,7 @@ XPenguinsLoop.prototype = {
      */
     pause: function (hide, subject, eventName, cb) {
         /* pauses the window tracker */
-        WindowListener.WindowListener.prototype.pause.call(this, subject, eventName, cb);
+        this.parent(subject, eventName, cb);
         if (hide) {
             this._hideToons();
         }
@@ -300,7 +293,7 @@ XPenguinsLoop.prototype = {
     /* resumes timeline, connects up events */
     resume: function () {
         /* resume window tracker */
-        WindowListener.WindowListener.prototype.resume.apply(this);
+        this.parent();
         if (this._toons[0] && !this._toons[0].visible) {
             this._showToons();
         }
@@ -330,7 +323,7 @@ XPenguinsLoop.prototype = {
             }
         /* Window tracking-specific options */
         } else if (WindowListener.WindowListener.prototype.options.hasOwnProperty(propName)) {
-            WindowListener.WindowListener.prototype.changeOption.call(this, propName, propVal);
+            this.parent(propName, propVal);
             this._onWindowEvent('changeOption');
         } else {
         /* XPENGUIN-specific options. */
@@ -373,10 +366,10 @@ XPenguinsLoop.prototype = {
     },
 
     destroy: function () {
-        WindowListener.WindowListener.prototype.destroy.call(this);
+        this.parent();
         this.exit();
     },
-    
+
     /* connects up events required to maintain toonWindows as an accurate
      * snapshot of what the windows on the workspace look like
      * We override it to add windows for the xpenguins window.
@@ -401,11 +394,11 @@ XPenguinsLoop.prototype = {
                 })
             );
         }
-        WindowListener.WindowListener.prototype._connectSignals.apply(this, arguments);
+        this.parent();
     },
 
     _disconnectSignals: function () {
-        WindowListener.WindowListener.prototype._disconnectSignals.apply(this, arguments);
+        this.parent();
         this.disconnectTrackedSignals(this._XPenguinsWindow);
     },
 
@@ -433,7 +426,7 @@ XPenguinsLoop.prototype = {
         if (this.options.stackingOrder) {
             winList = global.display.sort_windows_by_stacking(winList);
             /* sort by monitor ... ? */
-            winList.sort(function (a, b) { 
+            winList.sort(function (a, b) {
                 return a.get_monitor() - b.get_monitor();
             });
         }
@@ -457,7 +450,7 @@ XPenguinsLoop.prototype = {
             if (!this._onDesktop && win === this._XPenguinsWindow.meta_window) {
                 break;
             }
-            if (this._onDesktop && this.options.ignoreMaximised && 
+            if (this._onDesktop && this.options.ignoreMaximised &&
                     win.get_maximized() ===
                     (Meta.MaximizeFlags.HORIZONTAL | Meta.MaximizeFlags.VERTICAL)) {
                 /* look for the next monitor */
@@ -477,7 +470,6 @@ XPenguinsLoop.prototype = {
         }
         this._dirty = false;
     },
-
 
     /****************
      * Initialising *
@@ -605,7 +597,6 @@ XPenguinsLoop.prototype = {
         };
     },
 
-
     /* returns array of themes with non-zero toons */
     getThemes: function () {
         return this.themeList.filter(Lang.bind(this, function (name) {
@@ -708,7 +699,6 @@ XPenguinsLoop.prototype = {
             Lang.bind(this, this._onXPenguinsWindowDestroyed)
         );
 
-
         /* Note: we can't just call stop then start instantaneously, because
          * the current instance of _frame will return true (since _playing
          * is now the new instance) and the new instance of _frame will also
@@ -747,7 +737,6 @@ XPenguinsLoop.prototype = {
             global.unset_cursor();
         }
     },
-
 
     /*******************
      * PRIVATE METHODS *
@@ -1013,7 +1002,6 @@ XPenguinsLoop.prototype = {
         }
     },
 
-
     /* _frame is called every frame of the iteration.
      * It consists of two parts:
      *
@@ -1042,12 +1030,6 @@ XPenguinsLoop.prototype = {
         if (!this._playing || this._sleeping) {
             return false;
         }
-        ++this._tempFRAMENUMBER;
-        /*
-        this.LOG('FRAME %d _toonNumber: %d', this._tempFRAMENUMBER,
-            this._toons.length - this._deadToons.length);
-            */
-
         /* xpenguins_frame() */
         let i,
             sstatus = null,
@@ -1399,7 +1381,6 @@ XPenguinsLoop.prototype = {
         // it's this._toons.length - this._deadToons.length
         /************* END xpenguins_frame() ************/
 
-
         /************* START main loop ************/
         /* If there are no toons left & 'exiting' has been signalled,
          * then we've just finished killing all the penguins.
@@ -1457,5 +1438,5 @@ XPenguinsLoop.prototype = {
 
         return this._playing;
     } // _frame
-};
+});
 Signals.addSignalMethods(XPenguinsLoop.prototype);

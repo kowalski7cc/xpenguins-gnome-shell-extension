@@ -6,18 +6,12 @@
 const Lang  = imports.lang;
 const Shell = imports.gi.Shell;
 
-// temp until two distinct versions:
-var Me;
-try {
-    Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-} catch (err) {
-    Me = imports.misc.extensionUtils.getCurrentExtension().imports;
-}
-const ThemeManager = Me.themeManager;
-const Toon   = Me.toon;
-const WindowListener = Me.windowListener;
-const XPenguins = Me.xpenguins;
-const XPUtil = Me.util;
+const Me = imports.misc.extensionUtils.getCurrentExtension();
+const ThemeManager = Me.imports.themeManager;
+const Toon   = Me.imports.toon;
+const WindowListener = Me.imports.windowListener;
+const XPenguins = Me.imports.xpenguins;
+const XPUtil = Me.imports.util;
 
 const Gettext = imports.gettext.domain('xpenguins');
 const _ = Gettext.gettext;
@@ -28,11 +22,9 @@ const _ = Gettext.gettext;
 /* Contains all the information about the toon,
  * basically an array of ToonData structures.
  */
-function Theme() {
-    this._init.apply(this, arguments);
-}
 
-Theme.prototype = {
+const Theme = new Lang.Class({
+    Name: 'Theme',
     _init: function (themeList) {
         XPUtil.LOG('creating theme');
         /* members */
@@ -115,7 +107,6 @@ Theme.prototype = {
             return;
         }
 
-
         /* Read config file, ignoring comments ('#') and whitespace */
         let words = Shell.get_file_contents_utf8_sync(file_name),
             added_genii = [],
@@ -139,7 +130,6 @@ Theme.prototype = {
             added_genii.push(genus);
         }
         words = words.trim().split(' ');
-
 
         /* make space for the next toon */
         try {
@@ -323,4 +313,4 @@ Theme.prototype = {
             }
         }
     }
-};
+});
