@@ -6,12 +6,9 @@
  "name": "xpenguins",
  "description": "A port of XPenguins to gnome-shell! See extension home page for explanation of configuration options.",
  "shell-version": [ 
-     "3.2" ,
-     "3.2.2.1",
-     "3.4",
-     "3.4.1"
+     "3.2"
  ],
  "url": "https://bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension",
  "version": 1,
- "dev-version": "2.0"
+ "dev-version": "2.0_gnome3.2"
 }
