@@ -79,8 +79,6 @@ XPenguinsMenu.prototype = {
             angels             : _("Show angels"),
             squish             : _("God Mode"),
         };
-        this._ABOUT_ORDER = ['name', 'date', 'artist', 'copyright',
-            'license', 'maintainer', 'location', 'comment'];
         this._THEME_STRING_LENGTH_MAX = 30;
 
         /* create an Xpenguin Loop object which stores the XPenguins program */
@@ -281,18 +279,7 @@ XPenguinsMenu.prototype = {
             this._themeInfo[name] = ThemeManager.describeThemes([name], false)[name];
         }
 
-        let dialog = new UI.AboutDialog(this._themeInfo[name].name);
-        for (let i = 0; i < this._ABOUT_ORDER.length; ++i) {
-            let propName = this._ABOUT_ORDER[i];
-            if (this._themeInfo[name][propName]) {
-                dialog.appendText('%s%s: %s'.format(
-                    propName.charAt(0).toUpperCase(),
-                    propName.slice(1),
-                    this._themeInfo[name][propName]
-                ));
-            }
-        }
-        dialog.setIcon(this._themeInfo[name].icon);
+        let dialog = new UI.AboutDialog(this._themeInfo[name]);
         dialog.open(global.get_current_time());
     },
 
