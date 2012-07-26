@@ -15,7 +15,7 @@ const Gettext = imports.gettext.domain('xpenguins');
 const _ = Gettext.gettext;
 
 /* my files */
-Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
+const Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
 const XPenguins = Me.xpenguins;
 
 /*
