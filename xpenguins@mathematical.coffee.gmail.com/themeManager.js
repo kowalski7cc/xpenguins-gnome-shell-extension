@@ -8,18 +8,9 @@ const Shell = imports.gi.Shell;
 
 const fileUtils = imports.misc.fileUtils;
 
-var Me, extensionPath;
-try {
-    // gnome 3.2
-    Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-    extensionPath = imports.ui.extensionSystem.extensionMeta['xpenguins@mathematical.coffee.gmail.com'].path;
-} catch (err) {
-    // gnome 3.4
-    Me = imports.misc.extensionUtils.getCurrentExtension();
-    extensionPath = Me.path;
-    Me = Me.imports;
-}
-const XPUtil = Me.util;
+const Me = imports.misc.extensionUtils.getCurrentExtension();
+const XPUtil = Me.imports.util;
+let extensionPath = Me.path;
 
 /***********************
  * ThemeManager        *
