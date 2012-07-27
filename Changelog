@@ -1,3 +1,10 @@
+v2.1.1:
+* BUGFIX: if you start XPenguins on the desktop and onAllWorkspaces == false,
+stop it and then start it again on a *different* workspace, the toons will
+ignore the windows.
+v2.1:
+* when you open the about dialog for a theme, another XPenguins process will
+run in that dialog to give you a preview of that theme.
 v2.0:
 * many changes allowing XPenguins to run in a window
 * probably more, but I didn't document them :(

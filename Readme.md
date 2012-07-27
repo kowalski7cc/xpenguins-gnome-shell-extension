@@ -79,7 +79,7 @@ All together now:
 ---
 
 # FAQ
-### I want more themes!
+### I want more themes (MOAR THEMES)!
 By default this comes with the Penguins, Big Penguins, Classic Penguins, Turtles, and Bill themes.
 Normal XPenguins themes will work - put them in `~/.xpenguins/themes` or in the folder `themes` in the extension directory and they will be detected.
 
