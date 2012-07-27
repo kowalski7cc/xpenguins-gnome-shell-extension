@@ -196,6 +196,9 @@ XPenguinsLoop.prototype = {
          */
         if (!this._XPenguinsWindow) {
             this.setWindow(global.stage);
+        } else {
+            // refresh .get_workspace
+            this._XPenguinsWindow.refresh();
         }
 
         /* set up god mode */
