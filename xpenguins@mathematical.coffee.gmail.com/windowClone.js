@@ -18,8 +18,9 @@ XPenguinsWindow.prototype = {
         this._destroyID = this.actor.connect('destroy', Lang.bind(this, this._onDestroy));
         this._onAllWorkspaces = onAllWorkspaces;
         this._startingWorkspace = global.screen.get_active_workspace();
+        this.actor._delegate = this;
 
-        if (baseWindow instanceof Meta.WindowActor) {
+        if (this.actor instanceof Meta.WindowActor) {
             this.meta_window = this.actor.meta_window;
             this.get_workspace = Lang.bind(this.meta_window,
                 this.meta_window.get_workspace);
@@ -57,7 +58,16 @@ XPenguinsWindow.prototype = {
                 }
             });
         }
-        this.actor._delegate = this;
+
+        this.refresh();
+    },
+
+    /** refreshes the functions to be in sync (in particular, update the starting
+     *  workspace in the case of the baseWindow being the desktop & us remaining
+     *  on the starting workspace).
+     **/
+    refresh: function () {
+        this._startingWorkspace = global.screen.get_active_workspace();
     },
 
     setOnAllWorkspaces: function (val) {
