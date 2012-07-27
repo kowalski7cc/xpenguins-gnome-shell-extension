@@ -50,22 +50,24 @@ function LOG() {
         [].shift.call(arguments);
         msg = ''.format.apply(msg, arguments);
     }
-    log(msg);
+    //log(msg);
     return msg;
 }
 
 function DEBUG() {
-    LOG.apply(null, arguments);
+//    LOG.apply(null, arguments);
 }
 
 /* utility warning function */
 function warn() {
     let msg = LOG.apply(null, arguments);
+    log(msg);
     global.log(msg);
 }
 
 function error() {
     let msg = LOG.apply(null, arguments);
+    log(msg);
     global.log(msg);
     throw new Error(msg);
 }
