@@ -430,7 +430,6 @@ WindowListener.prototype = {
         this.disconnectTrackedSignals(this._resumeSignal);
     },
 
-
     /***********
      * SIGNALS *
      ***********/
@@ -640,5 +639,5 @@ function LOG() {
         [].shift.call(arguments);
         msg = ''.format.apply(msg, arguments);
     }
-    log(msg);
+    //log(msg);
 }

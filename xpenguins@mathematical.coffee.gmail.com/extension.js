@@ -11,13 +11,7 @@ const Gettext = imports.gettext.domain('xpenguins');
 const _ = Gettext.gettext;
 
 /* my files */
-// temp until two distinct versions:
-var Me;
-try {
-    Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-} catch (err) {
-    Me = imports.misc.extensionUtils.getCurrentExtension().imports;
-}
+const Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
 const ThemeManager = Me.themeManager;
 const UI = Me.ui;
 const WindowListener = Me.windowListener;
