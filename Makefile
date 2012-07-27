@@ -18,6 +18,5 @@ zip: all
 	zip -rq $(UUID).zip $(FILES:%=$(UUID)/%)
 
 dev-zip: all
-	zip -rqj $(UUID).zip $(FILES:%=$(UUID)/%)
 	(cd $(UUID); \
 		zip -rq ../$(UUID).zip $(FILES))
