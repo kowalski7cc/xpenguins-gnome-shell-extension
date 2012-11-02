@@ -327,7 +327,7 @@ XPenguinsLoop.prototype = {
         if (propName === 'ignoreMaximised' && propVal) {
             this.options.ignoreMaximised = propVal;
             let oldStack = this.options.stackingOrder;
-            this.options.stackingOrder = (!this._onDesktop || opt.ignoreMaximised);
+            this.options.stackingOrder = (!this._onDesktop || this.options.ignoreMaximised);
             if (this.options.stackingOrder !== oldStack) {
                 this.changeOption('stackingOrder', this.options.stackingOrder);
             }
