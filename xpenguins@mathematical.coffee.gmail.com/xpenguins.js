@@ -396,14 +396,13 @@ XPenguinsLoop.prototype = {
                 'notify::minimized', Lang.bind(this, this._onXPenguinsWindowMinimized));
             this.connectAndTrack(this._XPenguinsWindow, this._XPenguinsWindow.meta_window,
                 'workspace-changed', Lang.bind(this, this._onXPenguinsWindowWorkspaceChanged));
-        } else {
-        /* pause on overview show, if we're on the desktop */
-            this.connectAndTrack(this, Main.overview, 'showing',
-                Lang.bind(this, function () {
-                    this.pause(true, Main.overview, 'hiding');
-                })
-            );
         }
+        /* pause on overview show, if we're on the desktop */
+        this.connectAndTrack(this, Main.overview, 'showing',
+            Lang.bind(this, function () {
+                this.pause(true, Main.overview, 'hiding');
+            })
+        );
         WindowListener.WindowListener.prototype._connectSignals.apply(this, arguments);
     },
 
