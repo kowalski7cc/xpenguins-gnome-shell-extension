@@ -430,7 +430,6 @@ WindowListener.prototype = {
         this.disconnectTrackedSignals(this._resumeSignal);
     },
 
-
     /***********
      * SIGNALS *
      ***********/
@@ -516,6 +515,7 @@ WindowListener.prototype = {
                 let from = global.screen.get_workspace_by_index(fromI),
                     to = global.screen.get_workspace_by_index(toI);
                 this.disconnectTrackedSignals(from);
+                // the following commented out in xpenguins
                 from.list_windows().map(Lang.bind(this, function (w) {
                     this.disconnectTrackedSignals(w);
                 }));
@@ -527,6 +527,7 @@ WindowListener.prototype = {
 
                 // connect up existing windows. NOTE: these fire window-added
                 /*
+                // the following included in xpenguins
                 to.list_windows().map(Lang.bind(this, function (metaWin) {
                     if (metaWin.get_window_type() !== Meta.WindowType.DESKTOP) {
                         this._onWindowAdded(null, metaWin);
@@ -640,5 +641,5 @@ function LOG() {
         [].shift.call(arguments);
         msg = ''.format.apply(msg, arguments);
     }
-    log(msg);
+    //log(msg);
 }
