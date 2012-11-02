@@ -121,7 +121,6 @@ const AboutDialog = new Lang.Class({
 
         this.icon = new St.Icon({
             icon_name: 'image-missing',
-            icon_type: St.IconType.FULLCOLOR,
             style_class: 'xpenguins-about-icon'
         });
         this.setIcon(themeInfo.icon);
@@ -684,7 +683,6 @@ const ThemeSliderMenuItem = new Lang.Class({
         /* Icon (default no icon) */
         this.icon = new St.Icon({
             icon_name: 'image-missing', // placeholder icon
-            icon_type: St.IconType.FULLCOLOR,
             style_class: 'popup-menu-icon'
         });
 
@@ -693,7 +691,6 @@ const ThemeSliderMenuItem = new Lang.Class({
         let icon = new St.Icon({
             icon_name: 'help-contents',
             style_class: 'popup-menu-icon',
-            icon_type: St.IconType.FULLCOLOR
         });
         this.button.set_child(icon);
 
