@@ -15,29 +15,19 @@ const Gettext = imports.gettext.domain('xpenguins');
 const _ = Gettext.gettext;
 
 /* my files */
-// temp until two distinct versions:
-var Me;
-try {
-    Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-} catch (err) {
-    Me = imports.misc.extensionUtils.getCurrentExtension().imports;
-}
-const XPenguins = Me.xpenguins;
+const Me = imports.misc.extensionUtils.getCurrentExtension();
+const XPenguins = Me.imports.xpenguins;
 
 /*
  * Various UI elements.
  */
 
-function WindowPickerDialog() {
-    this._init.apply(this, arguments);
-}
-
-WindowPickerDialog.prototype = {
-    __proto__: ModalDialog.ModalDialog.prototype,
+const WindowPickerDialog = new Lang.Class({
+    Name: 'WindowPickerDialog',
+    Extends: ModalDialog.ModalDialog,
 
     _init: function () {
-        ModalDialog.ModalDialog.prototype._init.call(this,
-            {styleClass: 'modal-dialog'});
+        this.parent({styleClass: 'modal-dialog'});
 
         let monitor = global.screen.get_monitor_geometry(global.screen.get_primary_monitor()),
             width   = Math.round(monitor.width * .6),
@@ -86,8 +76,8 @@ WindowPickerDialog.prototype = {
         }]);
 	},
 
-    open: function() {
-        ModalDialog.ModalDialog.prototype.open.apply(this, arguments);
+    open: function(timestamp) {
+        this.parent(timestamp);
         this._thumbnails.addClones(this.scrollBox.height);
         this._thumbnails.connect('item-activated', Lang.bind(this, this._windowActivated));
         this._thumbnails.connect('item-entered', Lang.bind(this, this._windowEntered));
@@ -101,7 +91,7 @@ WindowPickerDialog.prototype = {
     _windowEntered: function (thumbnails, n) {
         this._thumbnails.highlight(n);
     }
-};
+});
 
 /* Popup dialog with scrollable text.
  * See InstallExtensionDialog in extensionSystem.js for an example.
@@ -111,16 +101,13 @@ WindowPickerDialog.prototype = {
  */
 const ABOUT_ORDER = ['name', 'date', 'artist', 'copyright',
                      'license', 'maintainer', 'location', 'comment'];
-function AboutDialog() {
-    this._init.apply(this, arguments);
-}
 
-AboutDialog.prototype = {
-    __proto__: ModalDialog.ModalDialog.prototype,
+const AboutDialog = new Lang.Class({
+    Name: 'AboutDialog',
+    Extends: ModalDialog.ModalDialog,
 
     _init: function (themeInfo) {
-        ModalDialog.ModalDialog.prototype._init.call(this,
-            {styleClass: 'modal-dialog'});
+        this.parent({styleClass: 'modal-dialog'});
 
         this._theme = themeInfo;
         let monitor = global.screen.get_monitor_geometry(global.screen.get_primary_monitor()),
@@ -134,7 +121,6 @@ AboutDialog.prototype = {
 
         this.icon = new St.Icon({
             icon_name: 'image-missing',
-            icon_type: St.IconType.FULLCOLOR,
             style_class: 'xpenguins-about-icon'
         });
         this.setIcon(themeInfo.icon);
@@ -265,18 +251,16 @@ AboutDialog.prototype = {
             this.icon.set_gicon(new Gio.FileIcon({file: path}));
         }
     }
-};
+});
 
 /* A DoubleSliderPopupMenuItem paired with a text label & two number labels */
-function DoubleSliderMenuItem() {
-    this._init.apply(this, arguments);
-}
 
-DoubleSliderMenuItem.prototype = {
-    __proto__: PopupMenu.PopupBaseMenuItem.prototype,
+const DoubleSliderMenuItem = new Lang.Class({
+    Name: 'DoubleSliderMenuItem',
+    Extends: PopupMenu.PopupBaseMenuItem,
 
     _init: function (text, valLower, valUpper, min, max, round, ndec, params) {
-        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
+        this.parent(params);
 
         /* set up properties */
         this.min = min || 0;
@@ -295,11 +279,11 @@ DoubleSliderMenuItem.prototype = {
         this.box = new St.BoxLayout({vertical: true});
         this.addActor(this.box, {expand: true, span: -1});
 
-        this.topBox = new St.BoxLayout({vertical: false, 
+        this.topBox = new St.BoxLayout({vertical: false,
             style_class: 'double-slider-menu-item-top-box'});
         this.box.add(this.topBox, {x_fill: true});
 
-        this.bottomBox = new St.BoxLayout({vertical: false, 
+        this.bottomBox = new St.BoxLayout({vertical: false,
             style_class: 'double-slider-menu-item-bottom-box'});
         this.box.add(this.bottomBox, {x_fill: true});
 
@@ -308,9 +292,9 @@ DoubleSliderMenuItem.prototype = {
             style_class: 'double-slider-menu-item-label'});
 
         /* numbers */
-        this.numberLabelLower = new St.Label({text: this._values[0].toFixed(this.ndec), 
+        this.numberLabelLower = new St.Label({text: this._values[0].toFixed(this.ndec),
             reactive: false});
-        this.numberLabelUpper = new St.Label({text: this._values[1].toFixed(this.ndec), 
+        this.numberLabelUpper = new St.Label({text: this._values[1].toFixed(this.ndec),
             reactive: false});
         this.numberLabelLower.add_style_class_name('double-slider-menu-item-number-label');
         this.numberLabelUpper.add_style_class_name('double-slider-menu-item-number-label');
@@ -320,11 +304,11 @@ DoubleSliderMenuItem.prototype = {
             (valLower - min) / (max - min),
             (valUpper - min) / (max - min)
         );
-       
+
         /* connect up signals */
         this.slider.connect('value-changed', Lang.bind(this, this._updateValue));
         /* pass through the drag-end, clicked signal. */
-        this.slider.connect('drag-end', Lang.bind(this, function (actor, which, value) { 
+        this.slider.connect('drag-end', Lang.bind(this, function (actor, which, value) {
             this.emit('drag-end', which, this._values[which]);
         }));
         // Note: if I set the padding in the css it gets overridden
@@ -383,21 +367,19 @@ DoubleSliderMenuItem.prototype = {
             this.numberLabelUpper.set_text(val.toFixed(this.ndec));
         }
     }
-};
+});
 /* A SliderMenuItem with two slidable things, for
  * selecting a range. Basically a modified PopupSliderMenuItem.
  * It has no scroll or key-press event as it's hard to tell which
  *  blob the user meant to scroll.
  */
-function DoubleSliderPopupMenuItem() {
-    this._init.apply(this, arguments);
-}
-DoubleSliderPopupMenuItem.prototype = {
-    __proto__: PopupMenu.PopupBaseMenuItem.prototype,
+
+const DoubleSliderPopupMenuItem = new Lang.Class({
+    Name: 'DoubleSliderPopupMenuItem',
+    Extends: PopupMenu.PopupBaseMenuItem,
 
     _init: function (val1, val2) {
-        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, 
-            { activate: false });
+        this.parent({activate: false});
 
         if (isNaN(val1) || isNaN(val2))
             // Avoid spreading NaNs around
@@ -485,7 +467,7 @@ DoubleSliderPopupMenuItem.prototype = {
             sliderColor.green / 255,
             sliderColor.blue / 255,
             sliderColor.alpha / 255);
-        cr.rectangle(handleRadius + sliderWidth * this._values[1], 
+        cr.rectangle(handleRadius + sliderWidth * this._values[1],
             (height - sliderHeight) / 2,
             sliderWidth, sliderHeight);
         cr.fillPreserve();
@@ -530,7 +512,7 @@ DoubleSliderPopupMenuItem.prototype = {
         else
             newvalue = (relX - handleRadius) / (width - 2 * handleRadius);
 
-        return (Math.abs(newvalue - this._values[0]) < 
+        return (Math.abs(newvalue - this._values[0]) <
                 Math.abs(newvalue - this._values[1]) ? 0 : 1);
     },
 
@@ -546,7 +528,6 @@ DoubleSliderPopupMenuItem.prototype = {
         }
         return true;
     },
-
 
     _startDragging: function(actor, event) {
         if (this._dragging) // don't allow two drags at the same time
@@ -586,13 +567,13 @@ DoubleSliderPopupMenuItem.prototype = {
             handleRadius = this._slider.get_theme_node().get_length('-slider-handle-radius'),
             newvalue = (relX - handleRadius) / (width - 2 * handleRadius);
 
-        newvalue = Math.max(which == 0 ? 0 : this._values[0], 
+        newvalue = Math.max(which == 0 ? 0 : this._values[0],
             Math.min(newvalue, which == 0 ? this._values[1] : 1));
         this._values[which] = newvalue;
         this._slider.queue_repaint();
         this.emit('value-changed', which, this._values[which]);
     }
-};
+});
 
 /* A slider with a label + number that updates with the slider
  * text: the text for the item
@@ -602,14 +583,13 @@ DoubleSliderPopupMenuItem.prototype = {
  * ndec: number of decimal places to round to
  * params: other params for PopupBaseMenuItem
  */
-function SliderMenuItem() {
-    this._init.apply(this, arguments);
-}
-SliderMenuItem.prototype = {
-    __proto__: PopupMenu.PopupBaseMenuItem.prototype,
+
+const SliderMenuItem = new Lang.Class({
+    Name: 'SliderMenuItem',
+    Extends: PopupMenu.PopupBaseMenuItem,
 
     _init: function (text, defaultVal, min, max, round, ndec, params) {
-        PopupMenu.PopupBaseMenuItem.prototype._init.call(this, params);
+        this.parent(params);
 
         /* set up properties */
         this.min = min || 0;
@@ -637,7 +617,7 @@ SliderMenuItem.prototype = {
         this.label = new St.Label({text: text, reactive: false});
 
         /* number */
-        this.numberLabel = new St.Label({text: this._value.toFixed(this.ndec), 
+        this.numberLabel = new St.Label({text: this._value.toFixed(this.ndec),
             reactive: false});
 
         /* slider */
@@ -691,22 +671,18 @@ SliderMenuItem.prototype = {
         this._value = val;
         this.numberLabel.set_text(val.toFixed(this.ndec));
     },
-};
+});
 
-function ThemeSliderMenuItem() {
-    this._init.apply(this, arguments);
-}
+const ThemeSliderMenuItem = new Lang.Class({
+    Name: 'ThemeSliderMenuItem',
+    Extends: SliderMenuItem,
 
-ThemeSliderMenuItem.prototype = {
-    __proto__: SliderMenuItem.prototype,
-
-    _init: function () {
-        SliderMenuItem.prototype._init.apply(this, arguments);
+    _init: function (text, defaultVal, min, max, round, ndec, params) {
+        this.parent(text, defaultVal, min, max, round, ndec, params);
 
         /* Icon (default no icon) */
         this.icon = new St.Icon({
             icon_name: 'image-missing', // placeholder icon
-            icon_type: St.IconType.FULLCOLOR,
             style_class: 'popup-menu-icon'
         });
 
@@ -715,7 +691,6 @@ ThemeSliderMenuItem.prototype = {
         let icon = new St.Icon({
             icon_name: 'help-contents',
             style_class: 'popup-menu-icon',
-            icon_type: St.IconType.FULLCOLOR
         });
         this.button.set_child(icon);
 
@@ -743,17 +718,14 @@ ThemeSliderMenuItem.prototype = {
     setIcon: function () {
         AboutDialog.prototype.setIcon.apply(this, arguments);
     }
-};
+});
 
-function LoadAverageSliderMenuItem() {
-    this._init.apply(this, arguments);
-}
+const LoadAverageSliderMenuItem = new Lang.Class({
+    Name: 'LoadAverageSliderMenuItem',
+    Extends: DoubleSliderMenuItem,
 
-LoadAverageSliderMenuItem.prototype = {
-    __proto__: DoubleSliderMenuItem.prototype,
-
-    _init: function () {
-        DoubleSliderMenuItem.prototype._init.apply(this, arguments);
+    _init: function (text, valLower, valUpper, min, max, round, ndec, params) {
+        this.parent(text, valLower, valUpper, min, max, round, ndec, params);
 
         /* set styles */
         this.numberLabelLower.add_style_class_name('xpenguins-load-averaging');
@@ -772,5 +744,4 @@ LoadAverageSliderMenuItem.prototype = {
             this.numberLabelUpper.remove_style_pseudo_class('loadAveragingActive');
         }
     }
-}
-
+});

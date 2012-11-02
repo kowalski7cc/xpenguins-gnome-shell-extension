@@ -6,10 +6,9 @@
  "name": "XPenguins",
  "description": "A port of XPenguins to gnome-shell! See extension home page for explanation of configuration options.\n\nIncludes the basic xpenguins themes, and compatible with the original xpenguins themes: more can be found from http://xpenguins.seul.org.",
  "shell-version": [ 
-     "3.2" ,
-     "3.4"
+     "3.6"
  ],
  "url": "https://bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension",
- "version": 1,
- "dev-version": "2.1.1"
+ "version": 2,
+ "dev-version": "2.1.1_gnome3.6"
 }

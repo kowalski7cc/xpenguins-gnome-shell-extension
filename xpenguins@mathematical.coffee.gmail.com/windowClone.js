@@ -8,11 +8,9 @@ const Signals = imports.signals;
  * get_workspace and retrieving the proper x/y/width/height
  * (recall that MetaWindowActors have a slightly off x/y/width/height)
  */
-function XPenguinsWindow() {
-    this._init.apply(this, arguments);
-}
 
-XPenguinsWindow.prototype = {
+const XPenguinsWindow = new Lang.Class({
+    Name: 'XPenguinsWindow',
     _init: function (baseWindow, onAllWorkspaces) {
         this.actor = baseWindow;
         this._destroyID = this.actor.connect('destroy', Lang.bind(this, this._onDestroy));
@@ -29,7 +27,7 @@ XPenguinsWindow.prototype = {
             /* position, width, height must come from the meta window */
             this.get_box = Lang.bind(this, function () {
                 let rect = this.meta_window.get_outer_rect();
-                return { 
+                return {
                     left: rect.x,
                     right: rect.x + rect.width - 1,
                     top: rect.y,
@@ -41,7 +39,7 @@ XPenguinsWindow.prototype = {
         } else {
             /* position, width, height come from the actor */
             this.get_box = Lang.bind(this, function () {
-                return { 
+                return {
                     left: this.actor.x,
                     right: this.actor.x + this.actor.width - 1,
                     top: this.actor.y,
@@ -91,8 +89,8 @@ XPenguinsWindow.prototype = {
         }
         this._destroyID = null;
     },
-   
+
     destroy: function () {
         this._onDestroy();
     }
-};
+});
