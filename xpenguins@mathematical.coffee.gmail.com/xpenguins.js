@@ -18,6 +18,7 @@ const Toon   = Me.imports.toon;
 const WindowClone = Me.imports.windowClone;
 const WindowListener = Me.imports.windowListener;
 const XPUtil = Me.imports.util;
+const Talk = Me.imports.talk;
 
 /* constants */
 const PENGUIN_MAX = 50; /* per theme */
@@ -1373,6 +1374,22 @@ const XPenguinsLoop = new Lang.Class({
                         }
                     } // switch(toon.type)
                 } // whether sqashed
+                /* there is a small chance a toon will say something, if it
+                 * isn't already saying something */
+                // little under 20%
+                if (!XPUtil.RandInt(100) && !toon.isSpeaking()) {
+                    let speeches = Talk.Speeches[toon.type] ? Talk.Speeches[toon.type].during : null,
+                        speech = null;
+                    if (!speeches || !speeches.length) {
+                        speeches = Talk.RandomSpeeches;
+                    }
+                    speech = speeches[XPUtil.RandInt(speeches.length)];
+                    if (typeof speech === 'function') {
+                        speech = speech(toon);
+                    }
+                    toon.speak(speech);
+                }
+
             } // toon state
 
             /* update clip frame to advance animation */

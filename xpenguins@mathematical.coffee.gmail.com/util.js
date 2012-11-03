@@ -43,6 +43,12 @@ function RandInt(max) {
     return Math.floor(Math.random() * max);
 }
 
+
+/* random int from min to max inclusive */
+function RandIntRange(min, max) {
+    return RandInt(max - min + 1) + min;
+}
+
 /* Utility logging function */
 function LOG() {
     let msg = arguments[0];
