@@ -124,6 +124,7 @@ const Toon = new Lang.Class({
 
     hide: function () {
         this.actor.hide();
+        this.speechBubble.hide();
     },
 
     set_position: function (x, y) {
