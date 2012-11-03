@@ -400,7 +400,7 @@ XPenguinsLoop.prototype = {
         /* pause on overview show, if we're on the desktop */
         this.connectAndTrack(this, Main.overview, 'showing',
             Lang.bind(this, function () {
-                this.pause(true, Main.overview, 'hiding');
+                this.pause(true, Main.overview, 'hidden');
             })
         );
         WindowListener.WindowListener.prototype._connectSignals.apply(this, arguments);
