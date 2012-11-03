@@ -58,6 +58,8 @@ const NOCYCLE = (1 << 0);
 const INVULNERABLE = (1 << 1);
 const NOBLOCK = (1 << 2);
 
+const Talk = Me.talk; // Talk requires the constants in Toon... unless I
+                      // put them in this order it screws up (?!?!)
 
 /********************************************************************
  * The Toon structure describes the properties of a particular toon,
@@ -97,6 +99,8 @@ Toon.prototype = {
         this.squished = false;
 
         this.data = null; /* reference to ToonData[this.genus][this.type] */
+
+        this.speechBubble = new Talk.SpeechBubble(this);
 
         // UGLY way to pass in the theme/toon data/stage info/parameters.
         /* needs: XPenguinsWindow's width, height; ToonData; toon_windows;
@@ -171,6 +175,7 @@ Toon.prototype = {
         }
         XPUtil.DEBUG('  toon changing from %s to %s'.format(this.type, type));
         this.setGenusAndType(this.genus, type, direction, gravity);
+        this.speak(Talk.Speeches[this.type] ? Talk.Speeches[this.type].initial : '');
     },
 
     /* Change a toons genus and type and activate it. */
@@ -311,6 +316,33 @@ Toon.prototype = {
     },
 
     /**** MORPHING FUNCTIONS ****/
+    /* TODO:
+     * - position based on direction
+     * - unicode chars/pics in the speech bubble
+     * - add to windowClone? stage? do that externally?
+     *   onExit: count down 3..2..1 ! (lemmings) (\u278{C,B,A})
+     *
+     * \u2048 ?!
+     * \u203c !!
+     *
+     * The speech bubble needs to follow the toon, because (e.g.) in the
+     *  case of walking toons.
+     */
+    speak: function (speech) {
+        if (typeof (speech) === 'function') {
+            speech = speech(this);
+        }
+        if (!speech || !speech.length) {
+            return;
+        }
+
+        this.speechBubble.show(speech);
+    },
+
+    isSpeaking: function () {
+        return this.speechBubble.actor.visible;
+    },
+
     /* Turn a penguin into a climber */
     // __xpenguins_make_climber
     makeClimber: function () {
@@ -573,6 +605,8 @@ Toon.prototype = {
 
     destroy: function () {
         this.actor.destroy();
+        this.speechBubble.destroy();
+        this.speechBubble = null;
     }
 }; // Toon.prototype
 
