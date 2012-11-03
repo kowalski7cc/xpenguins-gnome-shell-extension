@@ -1376,18 +1376,27 @@ const XPenguinsLoop = new Lang.Class({
                 } // whether sqashed
                 /* there is a small chance a toon will say something, if it
                  * isn't already saying something */
-                // little under 20%
                 if (!XPUtil.RandInt(100) && !toon.isSpeaking()) {
                     let speeches = Talk.Speeches[toon.type] ? Talk.Speeches[toon.type].during : null,
-                        speech = null;
-                    if (!speeches || !speeches.length) {
-                        speeches = Talk.RandomSpeeches;
-                    }
-                    speech = speeches[XPUtil.RandInt(speeches.length)];
+                        speech = null,
+                        numS = speeches ? speeches.length : 0;
+                    // you can always do a random speech.
+                    let speechN = XPUtil.RandInt(numS + Talk.RandomSpeeches.length);
+                    speech = speeches && speeches[speechN] || Talk.RandomSpeeches[speechN - numS];
                     if (typeof speech === 'function') {
                         speech = speech(toon);
                     }
-                    toon.speak(speech);
+                    try {
+                    if (speech) {
+                        toon.speak(speech);
+                    }
+                    } catch (e) {
+                        // TODO: when toons hdie so should their speech bubbles.
+                        // TODO: Embedded NULs
+                        // (I should probably loop through the dictionary and clean it).
+                        // TODO: failed to convert utf8 to JS
+                        log("HAD TROUBLE GIVING SPEECH: " + e.message);
+                    }
                 }
 
             } // toon state
