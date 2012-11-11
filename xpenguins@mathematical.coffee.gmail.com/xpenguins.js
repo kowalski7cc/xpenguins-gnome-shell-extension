@@ -115,6 +115,7 @@ XPenguinsLoop.prototype = {
         this._playing = 0;
         this._numbers = {};
         this._relaunch = false;
+        this._toons = [];
     },
 
     /***************************************
@@ -129,8 +130,12 @@ XPenguinsLoop.prototype = {
 
     /* Have to override get_workspace to incorporate a movable window :/ */
     get_workspace: function () {
-        XPUtil.DEBUG('[XP] get_workspace: %d', this._XPenguinsWindow.get_workspace().index());
-        return this._XPenguinsWindow.get_workspace();
+        if (!this._XPenguinsWindow) {
+            return global.screen.get_active_workspace();
+        } else {
+            XPUtil.DEBUG('[XP] get_workspace: %d', this._XPenguinsWindow.get_workspace().index());
+            return this._XPenguinsWindow.get_workspace();
+        }
     },
 
     /* Initialise all variables & load themes & initialise toons.
@@ -159,7 +164,7 @@ XPenguinsLoop.prototype = {
         this._exiting = false;
 
         this._dirty = true;
-        
+
         /* Laziness */
         let opt = this.options;
         /* If they set onAllWorkspaces but are running in a window,
@@ -239,7 +244,7 @@ XPenguinsLoop.prototype = {
         if (this._sleepID) {
             Mainloop.source_remove(this._sleepID);
         }
-        if (this._XPenguinsWindowDestroyedID && this._XPenguinsWindow.actor) {
+        if (this._XPenguinsWindowDestroyedID && this._XPenguinsWindow && this._XPenguinsWindow.actor) {
             this._XPenguinsWindow.actor.disconnect(this._XPenguinsWindowDestroyedID);
             this._XPenguinsWindowDestroyedID = null;
         }
@@ -264,7 +269,7 @@ XPenguinsLoop.prototype = {
                     for (let type in gdata) {
                         if (gdata.hasOwnProperty(type) &&
                                 !this._theme.toonData[i][type].master) {
-                            Main.uiGroup.remove_actor(gdata[type].texture);
+                            gdata[type].texture.unparent();
                         }
                     }
                 }
@@ -276,7 +281,7 @@ XPenguinsLoop.prototype = {
 
         /* Note: we *don't* destroy the window clone so that it may be
          * re-used for the next run without having to re-assign the window
-         * we want to run in. 
+         * we want to run in.
          */
         //this._XPenguinsWindow.destroy();
 
@@ -379,7 +384,7 @@ XPenguinsLoop.prototype = {
         WindowListener.WindowListener.prototype.destroy.call(this);
         this.exit();
     },
-    
+
     /* connects up events required to maintain toonWindows as an accurate
      * snapshot of what the windows on the workspace look like
      * We override it to add windows for the xpenguins window.
@@ -435,7 +440,7 @@ XPenguinsLoop.prototype = {
         if (this.options.stackingOrder) {
             winList = global.display.sort_windows_by_stacking(winList);
             /* sort by monitor ... ? */
-            winList.sort(function (a, b) { 
+            winList.sort(function (a, b) {
                 return a.get_monitor() - b.get_monitor();
             });
         }
@@ -459,7 +464,7 @@ XPenguinsLoop.prototype = {
             if (!this._onDesktop && win === this._XPenguinsWindow.meta_window) {
                 break;
             }
-            if (this._onDesktop && this.options.ignoreMaximised && 
+            if (this._onDesktop && this.options.ignoreMaximised &&
                     win.get_maximized() ===
                     (Meta.MaximizeFlags.HORIZONTAL | Meta.MaximizeFlags.VERTICAL)) {
                 /* look for the next monitor */
@@ -479,7 +484,6 @@ XPenguinsLoop.prototype = {
         }
         this._dirty = false;
     },
-
 
     /****************
      * Initialising *
@@ -607,7 +611,6 @@ XPenguinsLoop.prototype = {
         };
     },
 
-
     /* returns array of themes with non-zero toons */
     getThemes: function () {
         return this.themeList.filter(Lang.bind(this, function (name) {
@@ -710,7 +713,6 @@ XPenguinsLoop.prototype = {
             Lang.bind(this, this._onXPenguinsWindowDestroyed)
         );
 
-
         /* Note: we can't just call stop then start instantaneously, because
          * the current instance of _frame will return true (since _playing
          * is now the new instance) and the new instance of _frame will also
@@ -749,7 +751,6 @@ XPenguinsLoop.prototype = {
             global.unset_cursor();
         }
     },
-
 
     /*******************
      * PRIVATE METHODS *
@@ -1014,7 +1015,6 @@ XPenguinsLoop.prototype = {
             }
         }
     },
-
 
     /* _frame is called every frame of the iteration.
      * It consists of two parts:
@@ -1400,7 +1400,6 @@ XPenguinsLoop.prototype = {
         /* store the number of active/non-terminating penguins */
         // it's this._toons.length - this._deadToons.length
         /************* END xpenguins_frame() ************/
-
 
         /************* START main loop ************/
         /* If there are no toons left & 'exiting' has been signalled,
