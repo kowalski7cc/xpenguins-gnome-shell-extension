@@ -188,7 +188,7 @@ XPenguinsLoop.prototype = {
         if (opt.load1 >= 0) {
             let load = XPUtil.loadAverage();
             if (load < 0) {
-                this.LOG(_("Warning: cannot detect load averages on this system"));
+                this.LOG("Warning: cannot detect load averages on this system");
                 opt.load1 = -1;
                 opt.load2 = -1;
             }
@@ -320,7 +320,7 @@ XPenguinsLoop.prototype = {
     changeOption: function (propName, propVal, emit) {
         /* disallowed options changes */
         if (propName === 'onAllWorkspaces' && propVal && !this._onDesktop) {
-            XPUtil.warn(_("Cannot use the on all workspaces option if running in a window"));
+            XPUtil.warn(_("Cannot use the 'on all workspaces' option if running in a window"));
             return;
         }
 
@@ -696,7 +696,7 @@ XPenguinsLoop.prototype = {
 
         this._onDesktop = !(winActor instanceof Meta.WindowActor);
         if (this.options.onAllWorkspaces && !this._onDesktop) {
-            XPUtil.warn(_("Warning: onAllWorkspaces is TRUE but running in a window, setting onAllWorkspaces to FALSE"));
+            XPUtil.LOG("Warning: onAllWorkspaces is TRUE but running in a window, setting onAllWorkspaces to FALSE");
             this.changeOption('onAllWorkspaces', false, true);
         }
         this.options.stackingOrder = (!this._onDesktop || this.options.ignoreMaximised);
@@ -917,7 +917,7 @@ XPenguinsLoop.prototype = {
 
     /* stop xpenguins, but play the exit sequence */
     _onInterrupt: function (justExit) {
-        this.LOG(_("Interrupt received: Exiting."));
+        this.LOG('Interrupt received: Exiting.');
         /* If we're sleeping then quit immediately */
         if (this._sleepID) {
             Mainloop.source_remove(this._sleepID);
@@ -1407,7 +1407,7 @@ XPenguinsLoop.prototype = {
          */
         let numActive = this._toons.length - this._deadToons.length;
         if (!numActive && this._exiting) {
-            this.LOG(_("Done."));
+            this.LOG('Done.');
             this.exit();
             return false;
         }
@@ -1435,8 +1435,8 @@ XPenguinsLoop.prototype = {
                 signal = 'load-averaging-kill';
             }
             if (this._toons.length - this._deadToons.length !== newp) {
-                this.LOG(_("Adjusting number according to load: %d -> %d"),
-                        this._toons.length - this._deadToons.length, newp);
+                this.LOG("Adjusting number according to load: %d -> %d".format(
+                        this._toons.length - this._deadToons.length, newp));
                 this._setTotalNumber(newp);
                 this.emit(signal);
             }

@@ -106,11 +106,11 @@ Theme.prototype = {
         let name = ThemeManager.sanitiseThemeName(iname),
             file_name = ThemeManager.getThemePath(name);
         if (!file_name) {
-            throw new Error("Theme " + name + " not found or config file not present");
+            throw new Error(_("Theme '%s' not found or config file not present").format(name));
         }
         /* if theme has already been parsed, do not re-parse */
         if (this._themeGenusMap[name]) {
-            XPUtil.warn("Warning: theme %s already exists, not re-parsing",
+            XPUtil.warn(_("Warning: theme %s already exists, not re-parsing"),
                 iname);
             return;
         }

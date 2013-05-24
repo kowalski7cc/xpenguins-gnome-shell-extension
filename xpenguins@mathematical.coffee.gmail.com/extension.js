@@ -29,6 +29,7 @@ let _indicator, extensionPath;
 
 function init(metadata) {
     extensionPath = metadata.path;
+    imports.gettext.bindtextdomain('xpenguins', GLib.build_filenamev([extensionPath, 'locale']));
 }
 
 function enable() {
@@ -121,8 +122,7 @@ XPenguinsMenu.prototype = {
 
         /* choice of window */
         if (!blacklist.onDesktop) {
-            this._items.onDesktop = new PopupMenu.PopupMenuItem(_("Running in: ") 
-                + _("Desktop"));
+            this._items.onDesktop = new PopupMenu.PopupMenuItem(_("Running in: %s").format(_("Desktop")));
             this._items.onDesktop.connect('activate', Lang.bind(this,
                 this._onChooseWindow));
             this.menu.addMenuItem(this._items.onDesktop);
@@ -325,7 +325,8 @@ XPenguinsMenu.prototype = {
         dialog.disconnect(dialog._windowSelectedID);
         /* if meta window is null or has been destroyed in the meantime, use
          * the desktop. */
-        let string = _("Running in: ") + (metaWindow ? metaWindow.get_title() :
+        /* Translators: This means XPenguins is running in the window with title '%s' */
+        let string = _("Running in: %s").format(metaWindow ? metaWindow.get_title() :
             _("Desktop"));
         if (string.length > this._THEME_STRING_LENGTH_MAX) {
             string = string.substr(0, this._THEME_STRING_LENGTH_MAX - 3) + '...';
