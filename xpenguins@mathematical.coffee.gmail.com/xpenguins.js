@@ -11,12 +11,7 @@ const Main = imports.ui.main;
 const Gettext = imports.gettext.domain('xpenguins');
 const _ = Gettext.gettext;
 
-var Me;
-try {
-    Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-} catch (err) {
-    Me = imports.misc.extensionUtils.getCurrentExtension().imports;
-}
+const Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
 const Theme  = Me.theme;
 const ThemeManager = Me.themeManager;
 const Toon   = Me.toon;
@@ -160,7 +155,6 @@ XPenguinsLoop.prototype = {
                                   // load averaging.
 
         this._cycle = 0;
-        this._tempFRAMENUMBER = 0;
         this._exiting = false;
 
         this._dirty = true;
@@ -1044,12 +1038,6 @@ XPenguinsLoop.prototype = {
         if (!this._playing || this._sleeping) {
             return false;
         }
-        ++this._tempFRAMENUMBER;
-        /*
-        this.LOG('FRAME %d _toonNumber: %d', this._tempFRAMENUMBER,
-            this._toons.length - this._deadToons.length);
-            */
-
         /* xpenguins_frame() */
         let i,
             sstatus = null,

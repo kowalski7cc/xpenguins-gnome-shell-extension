@@ -6,13 +6,7 @@
 const Lang  = imports.lang;
 const Shell = imports.gi.Shell;
 
-// temp until two distinct versions:
-var Me;
-try {
-    Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-} catch (err) {
-    Me = imports.misc.extensionUtils.getCurrentExtension().imports;
-}
+const Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
 const ThemeManager = Me.themeManager;
 const Toon   = Me.toon;
 const WindowListener = Me.windowListener;
