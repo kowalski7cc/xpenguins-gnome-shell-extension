@@ -11,18 +11,13 @@ const Main = imports.ui.main;
 const Gettext = imports.gettext.domain('xpenguins');
 const _ = Gettext.gettext;
 
-var Me;
-try {
-    Me = imports.ui.extensionSystem.extensions['xpenguins@mathematical.coffee.gmail.com'];
-} catch (err) {
-    Me = imports.misc.extensionUtils.getCurrentExtension().imports;
-}
-const Theme  = Me.theme;
-const ThemeManager = Me.themeManager;
-const Toon   = Me.toon;
-const WindowClone = Me.windowClone;
-const WindowListener = Me.windowListener;
-const XPUtil = Me.util;
+const Me = imports.misc.extensionUtils.getCurrentExtension();
+const Theme  = Me.imports.theme;
+const ThemeManager = Me.imports.themeManager;
+const Toon   = Me.imports.toon;
+const WindowClone = Me.imports.windowClone;
+const WindowListener = Me.imports.windowListener;
+const XPUtil = Me.imports.util;
 
 /* constants */
 const PENGUIN_MAX = 50; /* per theme */
@@ -58,10 +53,6 @@ function getCompatibleOptions(blacklist) {
     }
     list.rectangularWindows = blacklist || false; // for now no shaped windows
     /* see if we can do load averaging */
-    list.loadAveraging = XPUtil.loadAverage() >= 0;
-    if (blacklist) {
-        list.loadAveraging = !list.loadAveraging;
-    }
     let load = XPUtil.loadAverage();
     list.loadAveraging = blacklist ? load < 0 : load >= 0;
     return list;
@@ -78,15 +69,13 @@ function getCompatibleOptions(blacklist) {
  * the two functions (window tracking vs toon stuff) separate in my head
  * and makes it easier for me to work on them.
  ************************/
-function XPenguinsLoop() {
-    this._init.apply(this, arguments);
-}
 
-XPenguinsLoop.prototype = {
-    __proto__: WindowListener.WindowListener.prototype,
+const XPenguinsLoop = new Lang.Class({
+    Name: 'XPenguinsLoop',
+    Extends: WindowListener.WindowListener,
 
     _init: function (i_options) {
-        WindowListener.WindowListener.prototype._init.apply(this);
+        this.parent();
 
         /* set options */
         let options = this.defaultOptions(),
@@ -215,7 +204,7 @@ XPenguinsLoop.prototype = {
         this._initToons();
 
         /* Call parent's start */
-        WindowListener.WindowListener.prototype.start.apply(this);
+        this.parent();
 
         /* actually start */
         this._playing = Clutter.threads_add_timeout(GLib.PRIORITY_DEFAULT,
@@ -299,7 +288,7 @@ XPenguinsLoop.prototype = {
      */
     pause: function (hide, subject, eventName, cb) {
         /* pauses the window tracker */
-        WindowListener.WindowListener.prototype.pause.call(this, subject, eventName, cb);
+        this.parent(subject, eventName, cb);
         if (hide) {
             this._hideToons();
         }
@@ -308,7 +297,7 @@ XPenguinsLoop.prototype = {
     /* resumes timeline, connects up events */
     resume: function () {
         /* resume window tracker */
-        WindowListener.WindowListener.prototype.resume.apply(this);
+        this.parent();
         if (this._toons[0] && !this._toons[0].visible) {
             this._showToons();
         }
@@ -338,7 +327,7 @@ XPenguinsLoop.prototype = {
             }
         /* Window tracking-specific options */
         } else if (WindowListener.WindowListener.prototype.options.hasOwnProperty(propName)) {
-            WindowListener.WindowListener.prototype.changeOption.call(this, propName, propVal);
+            this.parent(propName, propVal);
             this._onWindowEvent('changeOption');
         } else {
         /* XPENGUIN-specific options. */
@@ -381,7 +370,7 @@ XPenguinsLoop.prototype = {
     },
 
     destroy: function () {
-        WindowListener.WindowListener.prototype.destroy.call(this);
+        this.parent();
         this.exit();
     },
 
@@ -408,11 +397,11 @@ XPenguinsLoop.prototype = {
                 this.pause(true, Main.overview, 'hidden');
             })
         );
-        WindowListener.WindowListener.prototype._connectSignals.apply(this, arguments);
+        this.parent();
     },
 
     _disconnectSignals: function () {
-        WindowListener.WindowListener.prototype._disconnectSignals.apply(this, arguments);
+        this.parent();
         this.disconnectTrackedSignals(this._XPenguinsWindow);
     },
 
@@ -1044,12 +1033,6 @@ XPenguinsLoop.prototype = {
         if (!this._playing || this._sleeping) {
             return false;
         }
-        ++this._tempFRAMENUMBER;
-        /*
-        this.LOG('FRAME %d _toonNumber: %d', this._tempFRAMENUMBER,
-            this._toons.length - this._deadToons.length);
-            */
-
         /* xpenguins_frame() */
         let i,
             sstatus = null,
@@ -1458,5 +1441,5 @@ XPenguinsLoop.prototype = {
 
         return this._playing;
     } // _frame
-};
+});
 Signals.addSignalMethods(XPenguinsLoop.prototype);

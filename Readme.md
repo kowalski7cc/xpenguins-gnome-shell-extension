@@ -135,6 +135,14 @@ Patches welcome! (add wish list stuff as an 'enhancement' on the [Issues page](h
 - see [issues page](https://bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension/issues?status=new&status=open) for more.
 
 ---
+# Changelog
+
+v1.1:
+* added a slider to control load averaging: the lower limit is when toons start to be killed, and the upper is when all are killed.
+* added a slider to control animation speed
+* when changing options while XPenguins is sleeping, it will wake up to re-process them straight away.
+
+---
 
 # Branch Info (for developers)
 
