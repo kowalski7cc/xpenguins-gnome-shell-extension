@@ -51,7 +51,9 @@ This checks the load average every 5 seconds.
 
 # Installation
 
-The easy way (recommended):
+**Recommended:** One-click install from [extensions.gnome.org](https://extensions.gnome.org/extension/405/xpenguins/).
+
+Otherwise:
 
 1. Download the .zip file on the [Downloads page](https://bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension/downloads).
 2. Open `gnome-tweak-tool`, go to "Shell Extensions", "Install Extension" and select the .zip file.
@@ -59,19 +61,21 @@ The easy way (recommended):
 Alternatively (developers?):
 
 1. Checkout the repository: `hg clone https://bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension`
-2. Update to the `gnome3.2` or `gnome3.4` branch (the `default` branch is **NOT** guaranteed to work!).
-3. Copy the folder `xpenguins@mathematical.coffee.gmail.com` to `.local/share/gnome-shell/extensions`.
-4. If on GNOME 3.2, use `dconf-editor` and modify the key `/org/gnome/shell/enabled-extensions` to include `'xpenguins@mathematical.coffee.gmail.com'`. 
-If on GNOME 3.4, then just do `gnome-shell-extension-tool -e xpenguins@mathematical.coffee.gmail.com`.
+2. Update to the appropriate branch.
+3. Run `make`.
+4. Copy the folder `xpenguins@mathematical.coffee.gmail.com` to `.local/share/gnome-shell/extensions`.
+5. If on GNOME 3.2, use `dconf-editor` and modify the key `/org/gnome/shell/enabled-extensions` to include `'xpenguins@mathematical.coffee.gmail.com'`. 
+If on GNOME 3.4+, then just do `gnome-shell-extension-tool -e xpenguins@mathematical.coffee.gmail.com`.
 
 All together now:
 
     hg clone https://bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension
     cd xpenguins-gnome-shell-extension
     # Use 'hg branches' to see what branches are available. They are GNOME versions it is compatible with.
-    hg up 3.2 
+    hg up gnome3.6 
+    make
     cp -r xpenguins@mathematical.coffee.gmail.com ~/.local/share/gnome-shell/extensions
-    # if you have GNOME 3.4:
+    # if you have GNOME 3.4+:
     gnome-shell-extension-tool -e xpenguins@mathematical.coffee.gmail.com
     # if you have GNOME 3.2:
     dconf read '/org/gnome/shell/enabled-extensions' | sed -r -e 's#\[(.+)\]#dconf write "/org/gnome/shell/enabled-extensions" "[\1, '\'xpenguins@mathematical.coffee.gmail.com\'']"#' | /bin/sh
@@ -79,6 +83,15 @@ All together now:
 ---
 
 # FAQ
+### I want to help translate
+
+First off, thank you very much!
+I *think* I have translations set up. Use the [`po/xpenguins.pot`](https://bitbucket.org/mathematicalcoffee/xpenguins-gnome-shell-extension/src/default/xpenguins%40mathematical.coffee.gmail.com/po/xpenguins.pot) file to create a `.po` file with the translation.
+
+Skip the error/warning message translations if you like; the important ones are from `ui.js` and `extension.js` (these appear in the XPenguins menu).
+
+Then either email it to me, or submit a pull request with it.
+
 ### I want more themes (MOAR THEMES)!
 By default this comes with the Penguins, Big Penguins, Classic Penguins, Turtles, and Bill themes.
 Normal XPenguins themes will work - put them in `~/.xpenguins/themes` or in the folder `themes` in the extension directory and they will be detected.

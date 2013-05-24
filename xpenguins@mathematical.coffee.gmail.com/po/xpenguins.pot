@@ -1,0 +1,165 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: XPenguins\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2013-05-24 14:30+1000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: xpenguins@mathematical.coffee.gmail.com/extension.js:76
+msgid "Ignore popups"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/extension.js:77
+msgid "Ignore maximised windows"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/extension.js:78
+msgid "Always on visible workspace"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/extension.js:79
+msgid "Show blood"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/extension.js:80
+msgid "Show angels"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/extension.js:81
+msgid "God Mode"
+msgstr ""
+
+#. toggle to start xpenguins
+#: xpenguins@mathematical.coffee.gmail.com/extension.js:117
+msgid "Start"
+msgstr ""
+
+#. if meta window is null or has been destroyed in the meantime, use
+#. * the desktop.
+#. Translators: This means XPenguins is running in the window with title '%s'
+#: xpenguins@mathematical.coffee.gmail.com/extension.js:125
+#: xpenguins@mathematical.coffee.gmail.com/extension.js:329
+#, c-format
+msgid "Running in: %s"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/extension.js:125
+#: xpenguins@mathematical.coffee.gmail.com/extension.js:330
+msgid "Desktop"
+msgstr ""
+
+#. theme submenu
+#: xpenguins@mathematical.coffee.gmail.com/extension.js:133
+#: xpenguins@mathematical.coffee.gmail.com/extension.js:272
+#: xpenguins@mathematical.coffee.gmail.com/extension.js:306
+msgid "Theme"
+msgstr ""
+
+#. options submenu
+#: xpenguins@mathematical.coffee.gmail.com/extension.js:137
+msgid "Options"
+msgstr ""
+
+#. animation speed
+#: xpenguins@mathematical.coffee.gmail.com/extension.js:153
+msgid "Time between frames (ms)"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/extension.js:162
+msgid "Load average reduce threshold"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/extension.js:248
+msgid "No themes found, click to reload!"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/theme.js:109
+#, c-format
+msgid "Theme '%s' not found or config file not present"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/theme.js:113
+#, c-format
+msgid "Warning: theme %s already exists, not re-parsing"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/theme.js:171
+#, c-format
+msgid "Warning: unknown type '%s': ignoring"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/theme.js:198
+msgid "Warning: theme config file may not specify a default pixmap, ignoring"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/theme.js:212
+#, c-format
+msgid "Warning: resetting pixmap to %s"
+msgstr ""
+
+#. unknown word
+#: xpenguins@mathematical.coffee.gmail.com/theme.js:250
+#, c-format
+msgid "Warning: Unrecognised word %s, ignoring"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/theme.js:256
+#, c-format
+msgid "Error reading config file: config file ended unexpectedly: Line %d: %s"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/theme.js:270
+msgid "Theme must contain at least walkers and fallers"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/theme.js:279
+msgid "Width of xpm image too small for even a single frame"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/theme.js:281
+#, c-format
+msgid "Warning: width of %s is too small to display all frames"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/theme.js:287
+msgid "Height of xpm image too small for even a single frame"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/theme.js:289
+#, c-format
+msgid "Warning: height of %s is too small to display all frames"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/toon.js:388
+#, c-format
+msgid "Error: illegal direction %d"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/ui.js:48
+msgid ""
+"Select which window to run XPenguins in, or 'Cancel' to use the Desktop:"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/ui.js:82
+msgid "Cancel"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/ui.js:174
+msgid "OK"
+msgstr ""
+
+#: xpenguins@mathematical.coffee.gmail.com/xpenguins.js:323
+msgid "Cannot use the 'on all workspaces' option if running in a window"
+msgstr ""
